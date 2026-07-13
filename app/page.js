@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main style={{ fontFamily: "Arial", margin: 0 }}>
@@ -23,35 +25,41 @@ export default function Home() {
           companies looking for emerging talent.
         </p>
 
-        <button
-          style={{
-            marginTop: "30px",
-            padding: "16px 28px",
-            borderRadius: "8px",
-            border: "none",
-            fontSize: "17px",
-            fontWeight: "bold",
-          }}
-        >
-          Join as a Graduate
-        </button>
+        <Link href="/graduate">
+          <button
+            style={{
+              marginTop: "30px",
+              padding: "16px 28px",
+              borderRadius: "8px",
+              border: "none",
+              fontSize: "17px",
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            Join as a Graduate
+          </button>
+        </Link>
 
         <br />
 
-        <button
-          style={{
-            marginTop: "15px",
-            padding: "16px 28px",
-            borderRadius: "8px",
-            border: "2px solid white",
-            background: "transparent",
-            color: "white",
-            fontSize: "17px",
-            fontWeight: "bold",
-          }}
-        >
-          Join as a Company
-        </button>
+        <Link href="/company">
+          <button
+            style={{
+              marginTop: "15px",
+              padding: "16px 28px",
+              borderRadius: "8px",
+              border: "2px solid white",
+              background: "transparent",
+              color: "white",
+              fontSize: "17px",
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            Join as a Company
+          </button>
+        </Link>
       </section>
     </main>
   );
