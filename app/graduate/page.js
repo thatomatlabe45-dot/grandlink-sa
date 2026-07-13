@@ -1,13 +1,53 @@
 "use client";
 
 import { useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 export default function GraduatePage() {
-  const [submitted, setSubmitted] = useState(false);
+  const [form, setForm] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    qualification: "",
+    field_of_study: "",
+    institution: "",
+    province: "",
+    career_goals: "",
+  });
 
-  function handleSubmit(event) {
+  const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
+
+  function handleChange(event) {
+    setForm({
+      ...form,
+      [event.target.name]: event.target.value,
+    });
+  }
+
+  async function handleSubmit(event) {
     event.preventDefault();
+    setLoading(true);
+    setError("");
+
+    const { error } = await supabase
+      .from("graduates")
+      .insert([form]);
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+      return;
+    }
+
     setSubmitted(true);
+    setLoading(false);
   }
 
   if (submitted) {
@@ -26,20 +66,21 @@ export default function GraduatePage() {
     <main style={styles.page}>
       <div style={styles.card}>
         <h1 style={styles.title}>Graduate Registration</h1>
+
         <p style={styles.subtitle}>
           Create your profile and connect with internship opportunities.
         </p>
 
         <form onSubmit={handleSubmit}>
-          <input style={styles.input} type="text" placeholder="Full Name" required />
-          <input style={styles.input} type="email" placeholder="Email Address" required />
-          <input style={styles.input} type="tel" placeholder="Phone Number" required />
-          <input style={styles.input} type="text" placeholder="Qualification" required />
-          <input style={styles.input} type="text" placeholder="Field of Study" required />
-          <input style={styles.input} type="text" placeholder="Institution" required />
+          <input name="full_name" placeholder="Full Name" style={styles.input} onChange={handleChange} required />
+          <input name="email" type="email" placeholder="Email Address" style={styles.input} onChange={handleChange} required />
+          <input name="phone" placeholder="Phone Number" style={styles.input} onChange={handleChange} required />
+          <input name="qualification" placeholder="Qualification" style={styles.input} onChange={handleChange} required />
+          <input name="field_of_study" placeholder="Field of Study" style={styles.input} onChange={handleChange} required />
+          <input name="institution" placeholder="Institution" style={styles.input} onChange={handleChange} required />
 
-          <select style={styles.input} required defaultValue="">
-            <option value="" disabled>Select Province</option>
+          <select name="province" style={styles.input} onChange={handleChange} required>
+            <option value="">Select Province</option>
             <option>Gauteng</option>
             <option>Limpopo</option>
             <option>Mpumalanga</option>
@@ -52,13 +93,17 @@ export default function GraduatePage() {
           </select>
 
           <textarea
-            style={styles.textarea}
+            name="career_goals"
             placeholder="Tell companies about your skills and career goals"
+            style={styles.textarea}
+            onChange={handleChange}
             required
           />
 
-          <button style={styles.button} type="submit">
-            Create Graduate Profile
+          {error && <p style={{ color: "red" }}>{error}</p>}
+
+          <button style={styles.button} type="submit" disabled={loading}>
+            {loading ? "Creating Profile..." : "Create Graduate Profile"}
           </button>
         </form>
       </div>
@@ -83,7 +128,6 @@ const styles = {
   },
   title: {
     color: "#0b5ed7",
-    marginBottom: "10px",
   },
   subtitle: {
     color: "#555",
