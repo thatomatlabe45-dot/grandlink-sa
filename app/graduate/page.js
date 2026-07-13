@@ -20,6 +20,8 @@ export default function GraduatePage() {
     career_goals: "",
   });
 
+  const [cv, setCv] = useState(null);
+  const [qualificationFile, setQualificationFile] = useState(null);
   const [message, setMessage] = useState("");
 
   function handleChange(e) {
@@ -29,35 +31,52 @@ export default function GraduatePage() {
     });
   }
 
+  async function uploadFile(file, folder) {
+    const fileName = `${folder}/${Date.now()}-${file.name}`;
+
+    const { error } = await supabase.storage
+      .from("documents")
+      .upload(fileName, file);
+
+    if (error) throw error;
+
+    return fileName;
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
-    setMessage("Submitting...");
+    setMessage("Uploading documents...");
 
-    const { error } = await supabase
-      .from("graduates")
-      .insert([form]);
+    try {
+      const cvPath = await uploadFile(cv, "cv");
+      const qualificationPath = await uploadFile(
+        qualificationFile,
+        "qualifications"
+      );
 
-    if (error) {
-      setMessage("Error: " + error.message);
-    } else {
-      setMessage("Profile submitted successfully!");
-      setForm({
-        full_name: "",
-        email: "",
-        phone: "",
-        qualification: "",
-        field_of_study: "",
-        institution: "",
-        province: "",
-        career_goals: "",
-      });
+      const { error } = await supabase
+        .from("graduates")
+        .insert([
+          {
+            ...form,
+            cv_url: cvPath,
+            qualification_url: qualificationPath,
+          },
+        ]);
+
+      if (error) throw error;
+
+      setMessage(
+        "Your graduate profile has been submitted successfully!"
+      );
+    } catch (error) {
+      setMessage(error.message);
     }
   }
 
   return (
     <main style={{ padding: "30px", maxWidth: "600px", margin: "auto" }}>
-      <h1>Graduate Profile</h1>
-      <p>Join GradLink SA and connect with internship opportunities.</p>
+      <h1>GradLink SA Graduate Profile</h1>
 
       <form onSubmit={handleSubmit}>
         {Object.keys(form).map((field) => (
@@ -76,12 +95,33 @@ export default function GraduatePage() {
           />
         ))}
 
+        <label>Upload CV</label>
+        <input
+          type="file"
+          accept=".pdf,.doc,.docx"
+          onChange={(e) => setCv(e.target.files[0])}
+          required
+        />
+
+        <br /><br />
+
+        <label>Upload Qualification</label>
+        <input
+          type="file"
+          accept=".pdf,.jpg,.png"
+          onChange={(e) =>
+            setQualificationFile(e.target.files[0])
+          }
+          required
+        />
+
+        <br /><br />
+
         <button
           type="submit"
           style={{
             width: "100%",
             padding: "14px",
-            marginTop: "10px",
           }}
         >
           Submit Profile
