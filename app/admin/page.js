@@ -10,73 +10,139 @@ const supabase = createClient(
 
 export default function AdminPage() {
   const [graduates, setGraduates] = useState([]);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     getGraduates();
   }, []);
 
   async function getGraduates() {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("graduates")
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (!error) {
-      setGraduates(data);
-    }
+    setGraduates(data || []);
   }
 
   async function openDocument(path) {
+    if (!path) return alert("Document not available");
+
     const { data, error } = await supabase.storage
       .from("documents")
-      .createSignedUrl(path, 60);
+      .createSignedUrl(path, 300);
 
-    if (data) {
-      window.open(data.signedUrl, "_blank");
+    if (error) {
+      alert(error.message);
+      return;
     }
+
+    window.location.href = data.signedUrl;
   }
 
+  const filteredGraduates = graduates.filter((person) =>
+    `${person.full_name} ${person.qualification} ${person.field_of_study} ${person.province}`
+      .toLowerCase()
+      .includes(search.toLowerCase())
+  );
+
   return (
-    <main style={{ padding: "30px" }}>
-      <h1>GradLink SA Admin Dashboard</h1>
+    <main
+      style={{
+        minHeight: "100vh",
+        background: "#f4f8ff",
+        fontFamily: "Arial, sans-serif",
+      }}
+    >
+      <header
+        style={{
+          background: "#0057b8",
+          color: "white",
+          padding: "25px",
+        }}
+      >
+        <h1 style={{ margin: 0 }}>GradLink SA</h1>
+        <p style={{ marginBottom: 0 }}>Admin Dashboard</p>
+      </header>
 
-      <h2>Graduate Profiles</h2>
+      <section style={{ padding: "25px", maxWidth: "1000px", margin: "auto" }}>
+        <h2>Graduate Profiles</h2>
 
-      {graduates.map((person) => (
         <div
-          key={person.id}
           style={{
-            border: "1px solid #ccc",
-            padding: "20px",
-            margin: "15px 0",
+            background: "white",
+            padding: "18px",
+            borderRadius: "12px",
+            marginBottom: "20px",
           }}
         >
-          <h3>{person.full_name}</h3>
-
-          <p>Email: {person.email}</p>
-          <p>Phone: {person.phone}</p>
-          <p>
-            Qualification: {person.qualification}
-          </p>
-          <p>
-            Institution: {person.institution}
-          </p>
-
-          <button onClick={() => openDocument(person.cv_url)}>
-            View CV
-          </button>
-
-          {" "}
-
-          <button
-            onClick={() =>
-              openDocument(person.qualification_url)
-            }
-          >
-            View Qualification
-          </button>
+          <strong>Total Graduates: {graduates.length}</strong>
         </div>
-      ))}
+
+        <input
+          type="search"
+          placeholder="Search graduates..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "14px",
+            borderRadius: "8px",
+            border: "1px solid #ccc",
+            marginBottom: "20px",
+            boxSizing: "border-box",
+          }}
+        />
+
+        {filteredGraduates.map((person) => (
+          <div
+            key={person.id}
+            style={{
+              background: "white",
+              padding: "22px",
+              borderRadius: "12px",
+              marginBottom: "18px",
+              boxShadow: "0 3px 10px rgba(0,0,0,0.08)",
+            }}
+          >
+            <h3 style={{ color: "#0057b8", marginTop: 0 }}>
+              {person.full_name}
+            </h3>
+
+            <p>📧 {person.email}</p>
+            <p>📞 {person.phone}</p>
+            <p>🎓 {person.qualification}</p>
+            <p>📚 {person.field_of_study}</p>
+            <p>🏫 {person.institution}</p>
+            <p>📍 {person.province}</p>
+
+            <button
+              onClick={() => openDocument(person.cv_url)}
+              style={buttonStyle}
+            >
+              View CV
+            </button>
+
+            <button
+              onClick={() => openDocument(person.qualification_url)}
+              style={buttonStyle}
+            >
+              View Qualification
+            </button>
+          </div>
+        ))}
+      </section>
     </main>
   );
 }
+
+const buttonStyle = {
+  background: "#0057b8",
+  color: "white",
+  border: "none",
+  padding: "12px 16px",
+  borderRadius: "7px",
+  marginRight: "8px",
+  marginTop: "8px",
+  cursor: "pointer",
+};
