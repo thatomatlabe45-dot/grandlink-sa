@@ -175,10 +175,32 @@ function calculateMatch(graduate) {
             >
               View CV
             </button>
-         <div style={{ marginTop: "12px", marginBottom: "12px" }}>
-  <strong>AI Match: {match.score}% — {match.label}</strong>
-  <p style={{ fontSize: "13px" }}>{match.reason}</p>
+      <div
+  style={{
+    marginTop: "15px",
+    padding: "15px",
+    background: "#f4f8ff",
+    borderRadius: "12px",
+    borderLeft: "5px solid #0057b8",
+  }}
+>
+  <strong>
+    🤖 AI Match: {match.score}% — {match.label}
+  </strong>
+
+  <p
+    style={{
+      fontSize: "13px",
+      marginBottom: 0,
+      color: "#555",
+    }}
+  >
+    {match.reason}
+  </p>
 </div>
+  
+  
+
             <button
               onClick={() => openDocument(person.qualification_url)}
               style={buttonStyle}
