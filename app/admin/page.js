@@ -8,35 +8,42 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-export default function AdminPage() {
 function calculateMatch(graduate) {
   let score = 0;
   const reasons = [];
 
   if (graduate.qualification) {
-    score += 40;
-    reasons.push("Qualification provided");
+    score += 35;
+    reasons.push("Qualification added");
+  }
+
+  if (graduate.field_of_study) {
+    score += 25;
+    reasons.push("Field of study matches");
   }
 
   if (graduate.institution) {
-    score += 20;
-    reasons.push("Institution verified");
+    score += 15;
+    reasons.push("Institution provided");
   }
 
   if (graduate.cv_url) {
-    score += 25;
-    reasons.push("CV available");
+    score += 15;
+    reasons.push("CV uploaded");
   }
 
   if (graduate.qualification_url) {
-    score += 15;
-    reasons.push("Qualification document available");
+    score += 10;
+    reasons.push("Certificate uploaded");
   }
 
   let label = "Possible Match";
 
-  if (score >= 80) label = "Strong Match";
-  else if (score >= 60) label = "Good Match";
+  if (score >= 80) {
+    label = "Strong Match";
+  } else if (score >= 60) {
+    label = "Good Match";
+  }
 
   return {
     score,
@@ -44,6 +51,8 @@ function calculateMatch(graduate) {
     reason: reasons.join(" • "),
   };
 }
+
+export default function AdminPage() {
   const [graduates, setGraduates] = useState([]);
   const [search, setSearch] = useState("");
 
@@ -52,34 +61,41 @@ function calculateMatch(graduate) {
   }, []);
 
   async function getGraduates() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("graduates")
       .select("*")
       .order("created_at", { ascending: false });
 
-    setGraduates(data || []);
+    if (!error) {
+      setGraduates(data || []);
+    }
   }
 
   async function openDocument(path) {
-  if (!path) return alert("Document not available");
+    if (!path) {
+      alert("Document not available");
+      return;
+    }
 
-  let filePath = path;
+    let filePath = path;
 
-  if (path.includes("/documents/")) {
-    filePath = decodeURIComponent(path.split("/documents/")[1].split("?")[0]);
+    if (path.includes("/documents/")) {
+      filePath = decodeURIComponent(
+        path.split("/documents/")[1].split("?")[0]
+      );
+    }
+
+    const { data, error } = await supabase.storage
+      .from("documents")
+      .createSignedUrl(filePath, 300);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    window.location.href = data.signedUrl;
   }
-
-  const { data, error } = await supabase.storage
-    .from("documents")
-    .createSignedUrl(filePath, 300);
-
-  if (error) {
-    alert(error.message);
-    return;
-  }
-
-  window.location.href = data.signedUrl;
-}
 
   const filteredGraduates = graduates.filter((person) =>
     `${person.full_name} ${person.qualification} ${person.field_of_study} ${person.province}`
@@ -88,35 +104,17 @@ function calculateMatch(graduate) {
   );
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#f4f8ff",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <header
-        style={{
-          background: "#0057b8",
-          color: "white",
-          padding: "25px",
-        }}
-      >
+    <main style={pageStyle}>
+      <header style={headerStyle}>
         <h1 style={{ margin: 0 }}>GradLink SA</h1>
-        <p style={{ marginBottom: 0 }}>Admin Dashboard</p>
+        <p style={{ marginTop: "8px" }}>
+          AI Internship Matching Dashboard
+        </p>
       </header>
 
-      <section style={{ padding: "25px", maxWidth: "1000px", margin: "auto" }}>
-        <h2>Graduate Profiles</h2>
-
-        <div
-          style={{
-            background: "white",
-            padding: "18px",
-            borderRadius: "12px",
-            marginBottom: "20px",
-          }}
-        >
+      <section style={containerStyle}>
+        <div style={statsCard}>
+          <h2>Graduate Profiles</h2>
           <strong>Total Graduates: {graduates.length}</strong>
         </div>
 
@@ -125,103 +123,139 @@ function calculateMatch(graduate) {
           placeholder="Search graduates..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "14px",
-            borderRadius: "8px",
-            border: "1px solid #ccc",
-            marginBottom: "20px",
-            boxSizing: "border-box",
-          }}
+          style={searchStyle}
         />
-         {[...filteredGraduates]
-           .sort((a, b) => calculateMatch(b).score - calculateMatch(a).score)
-           .map((person) => {
-           const match = calculateMatch(person);
 
-           return (
-          <div
-  key={person.id}
-  style={{
-    background: "white",
-    padding: "25px",
-    borderRadius: "18px",
-    marginBottom: "20px",
-    border: "1px solid #e5e7eb",
-    boxShadow: "0 8px 25px rgba(0,0,0,0.06)",
-  }}
->
-          >
-        <h3
-  style={{
-    color: "#0057b8",
-    marginTop: 0,
-    fontSize: "22px",
-  }}
->
-              {person.full_name}
-            </h3>
+        {[...filteredGraduates]
+          .sort(
+            (a, b) =>
+              calculateMatch(b).score - calculateMatch(a).score
+          )
+          .map((person) => {
+            const match = calculateMatch(person);
 
-            <p>📧 {person.email}</p>
-            <p>📞 {person.phone}</p>
-            <p>🎓 {person.qualification}</p>
-            <p>📚 {person.field_of_study}</p>
-            <p>🏫 {person.institution}</p>
-            <p>📍 {person.province}</p>
+            return (
+              <div key={person.id} style={cardStyle}>
+                <h3 style={nameStyle}>
+                  {person.full_name}
+                </h3>
 
-            <button
-              onClick={() => openDocument(person.cv_url)}
-              style={buttonStyle}
-            >
-              View CV
-            </button>
-      <div
-  style={{
-    marginTop: "15px",
-    padding: "15px",
-    background: "#f4f8ff",
-    borderRadius: "12px",
-    borderLeft: "5px solid #0057b8",
-  }}
->
-  <strong>
-    🤖 AI Match: {match.score}% — {match.label}
-  </strong>
+                <p>📧 {person.email}</p>
+                <p>📞 {person.phone}</p>
+                <p>🎓 {person.qualification}</p>
+                <p>📚 {person.field_of_study}</p>
+                <p>🏫 {person.institution}</p>
+                <p>📍 {person.province}</p>
 
-  <p
-    style={{
-      fontSize: "13px",
-      marginBottom: 0,
-      color: "#555",
-    }}
-  >
-    {match.reason}
-  </p>
-</div>
-  
-  
+                <div style={aiCardStyle}>
+                  <strong>
+                    🤖 AI Match: {match.score}% — {match.label}
+                  </strong>
 
-            <button
-              onClick={() => openDocument(person.qualification_url)}
-              style={buttonStyle}
-            >
-              View Qualification
-            </button>
-          </div>
-        );
-        })}
+                  <p style={{ marginBottom: 0 }}>
+                    {match.reason}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => openDocument(person.cv_url)}
+                  style={buttonStyle}
+                >
+                  View CV
+                </button>
+
+                <button
+                  onClick={() =>
+                    openDocument(person.qualification_url)
+                  }
+                  style={buttonStyle}
+                >
+                  View Qualification
+                </button>
+              </div>
+            );
+          })}
       </section>
     </main>
   );
 }
 
+
+const pageStyle = {
+  minHeight: "100vh",
+  background: "#f4f8ff",
+  fontFamily: "Arial, sans-serif",
+};
+
+
+const headerStyle = {
+  background: "#0057b8",
+  color: "white",
+  padding: "30px 25px",
+  boxShadow: "0 5px 15px rgba(0,0,0,0.1)",
+};
+
+
+const containerStyle = {
+  maxWidth: "1000px",
+  margin: "auto",
+  padding: "25px",
+};
+
+
+const statsCard = {
+  background: "white",
+  padding: "20px",
+  borderRadius: "16px",
+  marginBottom: "20px",
+  boxShadow: "0 5px 20px rgba(0,0,0,0.05)",
+};
+
+
+const searchStyle = {
+  width: "100%",
+  padding: "15px",
+  borderRadius: "10px",
+  border: "1px solid #ddd",
+  marginBottom: "25px",
+  fontSize: "16px",
+  boxSizing: "border-box",
+};
+
+
+const cardStyle = {
+  background: "white",
+  padding: "25px",
+  borderRadius: "18px",
+  marginBottom: "20px",
+  border: "1px solid #e5e7eb",
+  boxShadow: "0 8px 25px rgba(0,0,0,0.06)",
+};
+
+
+const nameStyle = {
+  color: "#0057b8",
+  marginTop: 0,
+  fontSize: "22px",
+};
+
+
+const aiCardStyle = {
+  marginTop: "20px",
+  padding: "16px",
+  background: "#eef6ff",
+  borderRadius: "12px",
+  borderLeft: "5px solid #0057b8",
+};
+
+
 const buttonStyle = {
   background: "#0057b8",
   color: "white",
   border: "none",
-  padding: "12px 16px",
-  borderRadius: "7px",
-  marginRight: "8px",
-  marginTop: "8px",
+  padding: "12px 18px",
+  borderRadius: "8px",
+  marginRight: "10px",
+  marginTop: "15px",
   cursor: "pointer",
 };
