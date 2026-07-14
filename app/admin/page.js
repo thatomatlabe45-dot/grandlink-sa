@@ -26,19 +26,25 @@ export default function AdminPage() {
   }
 
   async function openDocument(path) {
-    if (!path) return alert("Document not available");
+  if (!path) return alert("Document not available");
 
-    const { data, error } = await supabase.storage
-      .from("documents")
-      .createSignedUrl(path, 300);
+  let filePath = path;
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    window.location.href = data.signedUrl;
+  if (path.includes("/documents/")) {
+    filePath = decodeURIComponent(path.split("/documents/")[1].split("?")[0]);
   }
+
+  const { data, error } = await supabase.storage
+    .from("documents")
+    .createSignedUrl(filePath, 300);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  window.location.href = data.signedUrl;
+}
 
   const filteredGraduates = graduates.filter((person) =>
     `${person.full_name} ${person.qualification} ${person.field_of_study} ${person.province}`
