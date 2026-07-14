@@ -9,6 +9,41 @@ const supabase = createClient(
 );
 
 export default function AdminPage() {
+function calculateMatch(graduate) {
+  let score = 0;
+  const reasons = [];
+
+  if (graduate.qualification) {
+    score += 40;
+    reasons.push("Qualification provided");
+  }
+
+  if (graduate.institution) {
+    score += 20;
+    reasons.push("Institution verified");
+  }
+
+  if (graduate.cv_url) {
+    score += 25;
+    reasons.push("CV available");
+  }
+
+  if (graduate.qualification_url) {
+    score += 15;
+    reasons.push("Qualification document available");
+  }
+
+  let label = "Possible Match";
+
+  if (score >= 80) label = "Strong Match";
+  else if (score >= 60) label = "Good Match";
+
+  return {
+    score,
+    label,
+    reason: reasons.join(" • "),
+  };
+}
   const [graduates, setGraduates] = useState([]);
   const [search, setSearch] = useState("");
 
@@ -99,8 +134,12 @@ export default function AdminPage() {
             boxSizing: "border-box",
           }}
         />
+         {[...filteredGraduates]
+           .sort((a, b) => calculateMatch(b).score - calculateMatch(a).score)
+           .map((person) => {
+           const match = calculateMatch(person);
 
-        {filteredGraduates.map((person) => (
+           return (
           <div
             key={person.id}
             style={{
@@ -128,7 +167,10 @@ export default function AdminPage() {
             >
               View CV
             </button>
-
+         <div style={{ marginTop: "12px", marginBottom: "12px" }}>
+  <strong>AI Match: {match.score}% — {match.label}</strong>
+  <p style={{ fontSize: "13px" }}>{match.reason}</p>
+</div>
             <button
               onClick={() => openDocument(person.qualification_url)}
               style={buttonStyle}
@@ -136,7 +178,8 @@ export default function AdminPage() {
               View Qualification
             </button>
           </div>
-        ))}
+        );
+        })}
       </section>
     </main>
   );
