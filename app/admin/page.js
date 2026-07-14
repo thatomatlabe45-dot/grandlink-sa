@@ -141,16 +141,24 @@ function calculateMatch(graduate) {
 
            return (
           <div
-            key={person.id}
-            style={{
-              background: "white",
-              padding: "22px",
-              borderRadius: "12px",
-              marginBottom: "18px",
-              boxShadow: "0 3px 10px rgba(0,0,0,0.08)",
-            }}
+  key={person.id}
+  style={{
+    background: "white",
+    padding: "25px",
+    borderRadius: "18px",
+    marginBottom: "20px",
+    border: "1px solid #e5e7eb",
+    boxShadow: "0 8px 25px rgba(0,0,0,0.06)",
+  }}
+>
           >
-            <h3 style={{ color: "#0057b8", marginTop: 0 }}>
+        <h3
+  style={{
+    color: "#0057b8",
+    marginTop: 0,
+    fontSize: "22px",
+  }}
+>
               {person.full_name}
             </h3>
 
