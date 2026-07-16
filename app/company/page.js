@@ -1,6 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 export default function CompanyPage() {
   const [company, setCompany] = useState({
@@ -13,6 +19,8 @@ export default function CompanyPage() {
     description: "",
   });
 
+  const [loading, setLoading] = useState(false);
+
   function handleChange(e) {
     setCompany({
       ...company,
@@ -20,109 +28,163 @@ export default function CompanyPage() {
     });
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    alert("Company profile will be saved!");
+
+    setLoading(true);
+
+    const { error } = await supabase
+      .from("companies")
+      .insert([company]);
+
+    setLoading(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert("✅ Company profile saved successfully!");
+
+    setCompany({
+      company_name: "",
+      industry: "",
+      website: "",
+      location: "",
+      email: "",
+      phone: "",
+      description: "",
+    });
   }
 
   return (
     <div
       style={{
-        maxWidth: "700px",
-        margin: "40px auto",
-        padding: "30px",
-        background: "#fff",
-        borderRadius: "12px",
-        boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
+        minHeight: "100vh",
+        background: "#f4f8fc",
+        padding: "40px 20px",
       }}
     >
-      <h1 style={{ color: "#0057B8" }}>Company Profile</h1>
-      <p>Create your company profile to start hiring graduates.</p>
-
-      <form onSubmit={handleSubmit}>
-        <input
-          name="company_name"
-          placeholder="Company Name"
-          value={company.company_name}
-          onChange={handleChange}
-          style={inputStyle}
-        />
-
-        <input
-          name="industry"
-          placeholder="Industry"
-          value={company.industry}
-          onChange={handleChange}
-          style={inputStyle}
-        />
-
-        <input
-          name="website"
-          placeholder="Website"
-          value={company.website}
-          onChange={handleChange}
-          style={inputStyle}
-        />
-
-        <input
-          name="location"
-          placeholder="Location"
-          value={company.location}
-          onChange={handleChange}
-          style={inputStyle}
-        />
-
-        <input
-          name="email"
-          placeholder="Email"
-          value={company.email}
-          onChange={handleChange}
-          style={inputStyle}
-        />
-
-        <input
-          name="phone"
-          placeholder="Phone"
-          value={company.phone}
-          onChange={handleChange}
-          style={inputStyle}
-        />
-
-        <textarea
-          name="description"
-          placeholder="Tell graduates about your company..."
-          value={company.description}
-          onChange={handleChange}
-          rows={5}
-          style={inputStyle}
-        />
-
-        <button
-          type="submit"
+      <div
+        style={{
+          maxWidth: "800px",
+          margin: "0 auto",
+          background: "#fff",
+          borderRadius: "16px",
+          padding: "35px",
+          boxShadow: "0 8px 30px rgba(0,0,0,0.08)",
+        }}
+      >
+        <h1
           style={{
-            width: "100%",
-            padding: "14px",
-            background: "#0057B8",
-            color: "#fff",
-            border: "none",
-            borderRadius: "8px",
-            fontSize: "16px",
-            cursor: "pointer",
+            color: "#0057B8",
+            marginBottom: "10px",
           }}
         >
-          Save Company Profile
-        </button>
-      </form>
+          Company Profile
+        </h1>
+
+        <p
+          style={{
+            color: "#555",
+            marginBottom: "30px",
+          }}
+        >
+          Create your company profile and start hiring South Africa's best graduates.
+        </p>
+
+        <form onSubmit={handleSubmit}>
+          <input
+            name="company_name"
+            placeholder="Company Name"
+            value={company.company_name}
+            onChange={handleChange}
+            style={inputStyle}
+            required
+          />
+
+          <input
+            name="industry"
+            placeholder="Industry"
+            value={company.industry}
+            onChange={handleChange}
+            style={inputStyle}
+            required
+          />
+
+          <input
+            name="website"
+            placeholder="Website"
+            value={company.website}
+            onChange={handleChange}
+            style={inputStyle}
+          />
+
+          <input
+            name="location"
+            placeholder="Location"
+            value={company.location}
+            onChange={handleChange}
+            style={inputStyle}
+            required
+          />
+
+          <input
+            type="email"
+            name="email"
+            placeholder="Company Email"
+            value={company.email}
+            onChange={handleChange}
+            style={inputStyle}
+            required
+          />
+
+          <input
+            name="phone"
+            placeholder="Phone Number"
+            value={company.phone}
+            onChange={handleChange}
+            style={inputStyle}
+          />
+
+          <textarea
+            name="description"
+            placeholder="Describe your company..."
+            value={company.description}
+            onChange={handleChange}
+            rows={6}
+            style={inputStyle}
+          />
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: "100%",
+              padding: "15px",
+              background: "#0057B8",
+              color: "white",
+              border: "none",
+              borderRadius: "10px",
+              fontSize: "17px",
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            {loading ? "Saving..." : "Save Company Profile"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
 
 const inputStyle = {
   width: "100%",
-  padding: "12px",
-  marginBottom: "15px",
-  borderRadius: "8px",
-  border: "1px solid #ccc",
+  padding: "14px",
+  marginBottom: "18px",
+  border: "1px solid #d9d9d9",
+  borderRadius: "10px",
   fontSize: "16px",
   boxSizing: "border-box",
 };
