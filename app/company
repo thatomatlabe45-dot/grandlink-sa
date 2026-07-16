@@ -1,0 +1,164 @@
+export default function CompanyPage() {
+  return (
+    <main
+      style={{
+        background: "#f5f7fb",
+        minHeight: "100vh",
+        padding: "40px",
+        fontFamily: "Arial, sans-serif",
+      }}
+    >
+      {/* Header Card */}
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: "20px",
+          padding: "30px",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+          display: "flex",
+          alignItems: "center",
+          gap: "20px",
+          marginBottom: "30px",
+        }}
+      >
+        <div
+          style={{
+            width: "90px",
+            height: "90px",
+            borderRadius: "50%",
+            background: "#0057B8",
+            color: "#fff",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            fontSize: "32px",
+            fontWeight: "bold",
+          }}
+        >
+          GS
+        </div>
+
+        <div>
+          <h1 style={{ margin: 0 }}>GradLink Solutions</h1>
+          <p style={{ color: "#666", margin: "6px 0" }}>
+            Information Technology
+          </p>
+
+          <span
+            style={{
+              background: "#e6f7ee",
+              color: "#15803d",
+              padding: "6px 14px",
+              borderRadius: "20px",
+              fontSize: "14px",
+              fontWeight: "bold",
+            }}
+          >
+            ✔ Verified Company
+          </span>
+        </div>
+      </div>
+
+      {/* About */}
+      <div
+        style={{
+          background: "#fff",
+          padding: "25px",
+          borderRadius: "20px",
+          marginBottom: "25px",
+          boxShadow: "0 5px 20px rgba(0,0,0,0.06)",
+        }}
+      >
+        <h2>About Us</h2>
+
+        <p style={{ color: "#555", lineHeight: 1.8 }}>
+          GradLink Solutions connects South African graduates with internship
+          opportunities through modern recruitment technology. Our mission is
+          to reduce graduate unemployment by helping talented young
+          professionals connect with employers quickly and fairly.
+        </p>
+      </div>
+
+      {/* Company Details */}
+      <div
+        style={{
+          background: "#fff",
+          padding: "25px",
+          borderRadius: "20px",
+          marginBottom: "25px",
+          boxShadow: "0 5px 20px rgba(0,0,0,0.06)",
+        }}
+      >
+        <h2>Company Information</h2>
+
+        <p><strong>Industry:</strong> Technology</p>
+        <p><strong>Founded:</strong> 2026</p>
+        <p><strong>Employees:</strong> 1–10</p>
+        <p><strong>Location:</strong> Johannesburg, South Africa</p>
+        <p><strong>Website:</strong> www.gradlinksa.co.za</p>
+      </div>
+
+      {/* Benefits */}
+      <div
+        style={{
+          background: "#fff",
+          padding: "25px",
+          borderRadius: "20px",
+          marginBottom: "25px",
+          boxShadow: "0 5px 20px rgba(0,0,0,0.06)",
+        }}
+      >
+        <h2>Why Join Us?</h2>
+
+        <ul style={{ lineHeight: 2 }}>
+          <li>Paid Internship Opportunities</li>
+          <li>Professional Mentorship</li>
+          <li>Career Development</li>
+          <li>Flexible Working Environment</li>
+          <li>Training Programmes</li>
+        </ul>
+      </div>
+
+      {/* Open Positions */}
+      <div
+        style={{
+          background: "#fff",
+          padding: "25px",
+          borderRadius: "20px",
+          boxShadow: "0 5px 20px rgba(0,0,0,0.06)",
+        }}
+      >
+        <h2>Open Internships</h2>
+
+        <div
+          style={{
+            border: "1px solid #ddd",
+            borderRadius: "12px",
+            padding: "20px",
+            marginTop: "15px",
+          }}
+        >
+          <h3>Software Development Intern</h3>
+
+          <p>📍 Johannesburg</p>
+          <p>⏳ 12 Months</p>
+          <p>💰 Monthly Stipend Available</p>
+
+          <button
+            style={{
+              background: "#0057B8",
+              color: "#fff",
+              padding: "12px 25px",
+              border: "none",
+              borderRadius: "10px",
+              cursor: "pointer",
+              marginTop: "10px",
+            }}
+          >
+            Apply Now
+          </button>
+        </div>
+      </div>
+    </main>
+  );
+}
