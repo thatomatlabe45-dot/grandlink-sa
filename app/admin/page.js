@@ -54,12 +54,27 @@ function calculateMatch(graduate) {
 }
 
 export default function AdminPage() {
+  const router = useRouter();
   const [graduates, setGraduates] = useState([]);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
+  async function checkUser() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
     getGraduates();
-  }, []);
+  }
+
+  checkUser();
+}, [router]);
+
 
   async function getGraduates() {
     const { data, error } = await supabase
