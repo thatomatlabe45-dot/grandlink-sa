@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -9,6 +10,8 @@ const supabase = createClient(
 );
 
 export default function CompanyPage() {
+  const router = useRouter();
+
   const [company, setCompany] = useState({
     company_name: "",
     industry: "",
@@ -20,6 +23,20 @@ export default function CompanyPage() {
   });
 
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    async function checkUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push("/login");
+      }
+    }
+
+    checkUser();
+  }, [router]);
 
   function handleChange(e) {
     setCompany({
