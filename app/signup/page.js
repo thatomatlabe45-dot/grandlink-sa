@@ -14,10 +14,12 @@ export default function SignupPage() {
 
   async function signUp() {
     const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
+  email,
+  password,
+  options: {
+    emailRedirectTo: "https://grandlink-sa.vercel.app",
+  },
+});
     if (error) {
       alert(error.message);
     } else {
