@@ -50,9 +50,33 @@ export default function CompanyPage() {
 
     setLoading(true);
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      alert("Please log in first.");
+      setLoading(false);
+      router.push("/login");
+      return;
+    }
+
+    const companyData = {
+      user_id: user.id,
+      company_name: company.company_name,
+      industry: company.industry,
+      website: company.website,
+      location: company.location,
+      email: company.email,
+      phone: company.phone,
+      description: company.description,
+    };
+
     const { error } = await supabase
       .from("companies")
-      .insert([company]);
+      .upsert(companyData, {
+        onConflict: "user_id",
+      });
 
     setLoading(false);
 
