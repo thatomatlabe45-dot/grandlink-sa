@@ -97,11 +97,15 @@ export default function CompanyPage() {
       error = updateError;
     } else {
       // Create a new company profile
-      const { error: insertError } = await supabase
-        .from("companies")
-        .insert([companyData]);
+     const { data, error: insertError } = await supabase
+  .from("companies")
+  .insert([companyData])
+  .select();
 
-      error = insertError;
+console.log("Inserted:", data);
+console.log("Error:", insertError);
+
+error = insertError;
     }
 
     setLoading(false);
