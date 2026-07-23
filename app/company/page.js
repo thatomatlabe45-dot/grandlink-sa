@@ -72,11 +72,37 @@ export default function CompanyPage() {
       description: company.description,
     };
 
-    const { error } = await supabase
+    // Check if the logged-in user already has a company profile
+    const { data: existingCompany, error: checkError } = await supabase
       .from("companies")
-      .upsert(companyData, {
-        onConflict: "user_id",
-      });
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (checkError) {
+      setLoading(false);
+      alert(checkError.message);
+      return;
+    }
+
+    let error = null;
+
+    if (existingCompany) {
+      // Update existing company profile
+      const { error: updateError } = await supabase
+        .from("companies")
+        .update(companyData)
+        .eq("user_id", user.id);
+
+      error = updateError;
+    } else {
+      // Create a new company profile
+      const { error: insertError } = await supabase
+        .from("companies")
+        .insert([companyData]);
+
+      error = insertError;
+    }
 
     setLoading(false);
 
