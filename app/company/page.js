@@ -111,11 +111,13 @@ error = insertError;
     setLoading(false);
 
     if (error) {
-      alert(error.message);
-      return;
-    }
+  console.log(error);
+  alert("Error: " + JSON.stringify(error));
+  return;
+}
 
-    alert("✅ Company profile saved successfully!");
+console.log("Saved successfully");
+alert("✅ Company profile saved successfully!");
 
     setCompany({
       company_name: "",
