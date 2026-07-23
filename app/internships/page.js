@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -14,6 +14,9 @@ export default function InternshipPage() {
   const [form, setForm] = useState({
     job_title: "",
     company_name: "",
+    company_email: "",
+    company_website: "",
+    province: "",
     location: "",
     internship_type: "",
     stipend: "",
@@ -23,6 +26,33 @@ export default function InternshipPage() {
     description: "",
     skills: "",
   });
+
+  useEffect(() => {
+    loadCompany();
+  }, []);
+
+  async function loadCompany() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return;
+
+    const { data: company, error } = await supabase
+      .from("companies")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error || !company) return;
+
+    setForm((prev) => ({
+      ...prev,
+      company_name: company.company_name || "",
+      company_email: company.email || "",
+      company_website: company.website || "",
+    }));
+  }
 
   function handleChange(e) {
     setForm({
@@ -36,9 +66,36 @@ export default function InternshipPage() {
 
     setLoading(true);
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      alert("Please log in first.");
+      setLoading(false);
+      return;
+    }
+
+    const internshipData = {
+      user_id: user.id,
+      company_name: form.company_name,
+      company_email: form.company_email,
+      company_website: form.company_website,
+      job_title: form.job_title,
+      province: form.province,
+      location: form.location,
+      internship_type: form.internship_type,
+      stipend: form.stipend,
+      qualification: form.qualification,
+      field_of_study: form.field_of_study,
+      deadline: form.deadline,
+      description: form.description,
+      skills: form.skills,
+    };
+
     const { error } = await supabase
       .from("internships")
-      .insert([form]);
+      .insert([internshipData]);
 
     setLoading(false);
 
@@ -51,7 +108,10 @@ export default function InternshipPage() {
 
     setForm({
       job_title: "",
-      company_name: "",
+      company_name: form.company_name,
+      company_email: form.company_email,
+      company_website: form.company_website,
+      province: "",
       location: "",
       internship_type: "",
       stipend: "",
@@ -73,7 +133,7 @@ export default function InternshipPage() {
     >
       <div
         style={{
-          maxWidth: "850px",
+          maxWidth: "900px",
           margin: "auto",
           background: "white",
           borderRadius: "16px",
@@ -94,27 +154,64 @@ export default function InternshipPage() {
           <input
             style={inputStyle}
             name="job_title"
-            placeholder="Job Title"
+            placeholder="Internship Title"
             value={form.job_title}
             onChange={handleChange}
             required
           />
 
           <input
-            style={inputStyle}
-            name="company_name"
-            placeholder="Company Name"
+            style={{
+              ...inputStyle,
+              background: "#f5f5f5",
+            }}
             value={form.company_name}
+            readOnly
+          />
+
+          <input
+            style={{
+              ...inputStyle,
+              background: "#f5f5f5",
+            }}
+            value={form.company_email}
+            readOnly
+          />
+
+          <input
+            style={{
+              ...inputStyle,
+              background: "#f5f5f5",
+            }}
+            value={form.company_website}
+            readOnly
+          />
+                    <select
+            style={inputStyle}
+            name="province"
+            value={form.province}
             onChange={handleChange}
             required
-          />
+          >
+            <option value="">Select Province</option>
+            <option>Eastern Cape</option>
+            <option>Free State</option>
+            <option>Gauteng</option>
+            <option>KwaZulu-Natal</option>
+            <option>Limpopo</option>
+            <option>Mpumalanga</option>
+            <option>North West</option>
+            <option>Northern Cape</option>
+            <option>Western Cape</option>
+          </select>
 
           <input
             style={inputStyle}
             name="location"
-            placeholder="Location"
+            placeholder="Location (City/Town)"
             value={form.location}
             onChange={handleChange}
+            required
           />
 
           <select
@@ -124,7 +221,7 @@ export default function InternshipPage() {
             onChange={handleChange}
             required
           >
-            <option value="">Internship Type</option>
+            <option value="">Work Type</option>
             <option>On-site</option>
             <option>Remote</option>
             <option>Hybrid</option>
@@ -133,7 +230,7 @@ export default function InternshipPage() {
           <input
             style={inputStyle}
             name="stipend"
-            placeholder="Monthly Stipend"
+            placeholder="Monthly Stipend (e.g. R7000)"
             value={form.stipend}
             onChange={handleChange}
           />
@@ -144,6 +241,7 @@ export default function InternshipPage() {
             placeholder="Required Qualification"
             value={form.qualification}
             onChange={handleChange}
+            required
           />
 
           <input
@@ -152,23 +250,7 @@ export default function InternshipPage() {
             placeholder="Field of Study"
             value={form.field_of_study}
             onChange={handleChange}
-          />
-
-          <input
-            style={inputStyle}
-            type="date"
-            name="deadline"
-            value={form.deadline}
-            onChange={handleChange}
-          />
-
-          <textarea
-            style={inputStyle}
-            rows={6}
-            name="description"
-            placeholder="Internship Description"
-            value={form.description}
-            onChange={handleChange}
+            required
           />
 
           <textarea
@@ -180,22 +262,41 @@ export default function InternshipPage() {
             onChange={handleChange}
           />
 
+          <textarea
+            style={inputStyle}
+            rows={6}
+            name="description"
+            placeholder="Internship Description"
+            value={form.description}
+            onChange={handleChange}
+            required
+          />
+
+          <input
+            style={inputStyle}
+            type="date"
+            name="deadline"
+            value={form.deadline}
+            onChange={handleChange}
+            required
+          />
+
           <button
             type="submit"
             disabled={loading}
             style={{
               width: "100%",
-              padding: "15px",
+              padding: "16px",
               background: "#0057B8",
               color: "white",
               border: "none",
               borderRadius: "10px",
-              fontSize: "17px",
+              fontSize: "18px",
               fontWeight: "bold",
               cursor: "pointer",
             }}
           >
-            {loading ? "Posting..." : "Post Internship"}
+            {loading ? "Publishing..." : "🚀 Publish Internship"}
           </button>
 
         </form>
