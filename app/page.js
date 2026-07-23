@@ -1,7 +1,51 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
 export default function Home() {
+  const [internships, setInternships] = useState([]);
+  const [filteredInternships, setFilteredInternships] = useState([]);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    fetchInternships();
+  }, []);
+
+  async function fetchInternships() {
+    const { data, error } = await supabase
+      .from("internships")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      setInternships(data);
+      setFilteredInternships(data);
+    }
+  }
+
+  function handleSearch(value) {
+    setSearch(value);
+
+    const results = internships.filter((job) => {
+      return (
+        job.job_title?.toLowerCase().includes(value.toLowerCase()) ||
+        job.company_name?.toLowerCase().includes(value.toLowerCase()) ||
+        job.location?.toLowerCase().includes(value.toLowerCase())
+      );
+    });
+
+    setFilteredInternships(results);
+  }
+
   return (
+  
     <main
       style={{
         fontFamily: "Arial, sans-serif",
@@ -146,6 +190,46 @@ export default function Home() {
             </button>
           </Link>
         </div>
+        <div
+  style={{
+    marginTop: "60px",
+    maxWidth: "700px",
+    marginInline: "auto",
+    display: "flex",
+    gap: "12px",
+    flexWrap: "wrap",
+    justifyContent: "center",
+  }}
+>
+  <input
+    type="text"
+    placeholder="Search internships..."
+    value={search}
+    onChange={(e) => handleSearch(e.target.value)}
+    style={{
+      flex: 1,
+      minWidth: "280px",
+      padding: "18px",
+      borderRadius: "12px",
+      border: "none",
+      fontSize: "16px",
+    }}
+  />
+
+  <button
+    style={{
+      background: "#0d1b2a",
+      color: "white",
+      border: "none",
+      padding: "18px 30px",
+      borderRadius: "12px",
+      fontWeight: "bold",
+      cursor: "pointer",
+    }}
+  >
+    Search
+  </button>
+</div>
       </section>
 
       {/* Statistics */}
