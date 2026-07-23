@@ -18,7 +18,7 @@ export default function Home() {
           justifyContent: "space-between",
           alignItems: "center",
           padding: "18px 40px",
-          boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+          boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
           position: "sticky",
           top: 0,
           zIndex: 1000,
@@ -28,6 +28,7 @@ export default function Home() {
           style={{
             color: "#0057B8",
             margin: 0,
+            fontWeight: "bold",
           }}
         >
           GradLink SA
@@ -68,49 +69,47 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Hero */}
+      {/* Hero Section */}
 
       <section
         style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          textAlign: "center",
-          padding: "90px 25px",
-          background:
-            "linear-gradient(135deg,#0057B8 0%, #0d7cff 100%)",
+          background: "linear-gradient(135deg,#0057B8,#1f8bff)",
           color: "white",
+          padding: "100px 30px",
+          textAlign: "center",
         }}
       >
         <h1
           style={{
-            fontSize: "56px",
+            fontSize: "58px",
             marginBottom: "20px",
           }}
         >
-          Connecting Graduates With Opportunity
+          Connecting South African Graduates
+          <br />
+          with Internship Opportunities
         </h1>
 
         <p
           style={{
             fontSize: "22px",
             maxWidth: "850px",
+            margin: "0 auto",
             lineHeight: 1.7,
           }}
         >
-          GradLink SA helps South African graduates connect with
-          companies offering internships, graduate programmes and
-          entry-level careers.
+          Discover internships, graduate programmes and entry-level careers.
+          GradLink SA connects talented graduates with trusted South African
+          employers using smart AI-powered matching.
         </p>
 
         <div
           style={{
             display: "flex",
-            gap: "20px",
-            marginTop: "40px",
-            flexWrap: "wrap",
             justifyContent: "center",
+            gap: "20px",
+            marginTop: "45px",
+            flexWrap: "wrap",
           }}
         >
           <Link href="/graduate">
@@ -121,12 +120,12 @@ export default function Home() {
                 border: "none",
                 padding: "18px 35px",
                 borderRadius: "10px",
-                fontSize: "17px",
                 fontWeight: "bold",
+                fontSize: "17px",
                 cursor: "pointer",
               }}
             >
-              🎓 Join as Graduate
+              🔍 Find Internships
             </button>
           </Link>
 
@@ -138,18 +137,112 @@ export default function Home() {
                 border: "2px solid white",
                 padding: "18px 35px",
                 borderRadius: "10px",
-                fontSize: "17px",
                 fontWeight: "bold",
+                fontSize: "17px",
                 cursor: "pointer",
               }}
             >
-              🏢 Hire Graduates
+              🏢 For Companies
             </button>
           </Link>
         </div>
       </section>
 
-      {/* Features */}
+      {/* Statistics */}
+
+      <section
+        style={{
+          maxWidth: "1200px",
+          margin: "-45px auto 60px",
+          padding: "0 25px",
+        }}
+      >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
+            gap: "20px",
+          }}
+        >
+          <div style={card}>
+            <h1 style={{ color: "#0057B8", marginBottom: "10px" }}>
+              10,000+
+            </h1>
+            <p>Graduates</p>
+          </div>
+
+          <div style={card}>
+            <h1 style={{ color: "#0057B8", marginBottom: "10px" }}>
+              500+
+            </h1>
+            <p>Companies</p>
+          </div>
+
+          <div style={card}>
+            <h1 style={{ color: "#0057B8", marginBottom: "10px" }}>
+              AI
+            </h1>
+            <p>Smart Matching</p>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works */}
+
+      <section
+        style={{
+          maxWidth: "1200px",
+          margin: "auto",
+          padding: "70px 30px",
+        }}
+      >
+        <h2
+          style={{
+            textAlign: "center",
+            color: "#0057B8",
+            fontSize: "40px",
+            marginBottom: "50px",
+          }}
+        >
+          How It Works
+        </h2>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
+            gap: "25px",
+          }}
+        >
+          <div style={card}>
+            <h2>🎓 Create Profile</h2>
+
+            <p>
+              Sign up, upload your CV and build a professional graduate profile
+              that showcases your education and skills.
+            </p>
+          </div>
+
+          <div style={card}>
+            <h2>📄 Apply for Internships</h2>
+
+            <p>
+              Browse internship opportunities across South Africa and apply
+              quickly with your GradLink profile.
+            </p>
+          </div>
+
+          <div style={card}>
+            <h2>🏢 Companies Hire</h2>
+
+            <p>
+              Employers discover talented graduates through AI-powered matching
+              and invite the best candidates to interview.
+            </p>
+          </div>
+        </div>
+      </section>
+            {/* Why Choose GradLink SA */}
 
       <section
         style={{
@@ -162,8 +255,8 @@ export default function Home() {
           style={{
             textAlign: "center",
             color: "#0057B8",
+            fontSize: "40px",
             marginBottom: "50px",
-            fontSize: "38px",
           }}
         >
           Why Choose GradLink SA?
@@ -177,67 +270,130 @@ export default function Home() {
           }}
         >
           <div style={card}>
-            <h3>🤖 AI Candidate Matching</h3>
+            <h2>🤖 AI Matching</h2>
 
             <p>
-              Smart matching helps employers discover graduates whose
-              qualifications align with internship requirements.
+              Our intelligent matching system helps connect graduates with
+              internship opportunities that align with their qualifications,
+              skills and career goals.
             </p>
           </div>
 
           <div style={card}>
-            <h3>🎓 Verified Graduate Profiles</h3>
+            <h2>🎓 Verified Profiles</h2>
 
             <p>
-              Graduates upload their CVs and qualifications so employers
-              can review verified information.
+              Build a professional graduate profile with your CV, qualifications
+              and achievements so employers can easily discover your talent.
             </p>
           </div>
 
           <div style={card}>
-            <h3>🏢 Trusted Employers</h3>
+            <h2>🏢 Trusted Companies</h2>
 
             <p>
-              Companies can create professional profiles, advertise
-              internships and manage applications.
+              South African employers can advertise internships, manage
+              applications and recruit promising graduates from one platform.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Statistics */}
+      {/* Featured Internships */}
 
       <section
         style={{
-          background: "#0057B8",
-          color: "white",
-          padding: "70px 30px",
+          background: "#eef5ff",
+          padding: "80px 30px",
         }}
       >
-        <div
+        <h2
           style={{
-            display: "flex",
-            justifyContent: "space-around",
-            flexWrap: "wrap",
             textAlign: "center",
-            gap: "30px",
+            color: "#0057B8",
+            fontSize: "40px",
+            marginBottom: "50px",
           }}
         >
-          <div>
-            <h1>1000+</h1>
-            <p>Graduates</p>
+          Featured Internships
+        </h2>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
+            gap: "25px",
+            maxWidth: "1200px",
+            margin: "auto",
+          }}
+        >
+          <div style={card}>
+            <h3>💻 Software Developer</h3>
+            <p>Johannesburg</p>
+            <p>Full-Time Internship</p>
           </div>
 
-          <div>
-            <h1>200+</h1>
-            <p>Companies</p>
+          <div style={card}>
+            <h3>📈 Marketing Intern</h3>
+            <p>Cape Town</p>
+            <p>Graduate Programme</p>
           </div>
 
-          <div>
-            <h1>500+</h1>
-            <p>Internships</p>
+          <div style={card}>
+            <h3>⚙️ Mechanical Engineer</h3>
+            <p>Pretoria</p>
+            <p>Engineering Internship</p>
           </div>
         </div>
+      </section>
+
+      {/* Ready to Start */}
+
+      <section
+        style={{
+          padding: "90px 30px",
+          textAlign: "center",
+          background: "white",
+        }}
+      >
+        <h2
+          style={{
+            color: "#0057B8",
+            fontSize: "44px",
+            marginBottom: "20px",
+          }}
+        >
+          Ready to Start?
+        </h2>
+
+        <p
+          style={{
+            fontSize: "20px",
+            maxWidth: "700px",
+            margin: "0 auto 40px",
+            lineHeight: 1.7,
+          }}
+        >
+          Join thousands of South African graduates and companies using
+          GradLink SA to discover opportunities and build successful careers.
+        </p>
+
+        <Link href="/signup">
+          <button
+            style={{
+              background: "#0057B8",
+              color: "white",
+              border: "none",
+              padding: "18px 40px",
+              borderRadius: "10px",
+              fontWeight: "bold",
+              fontSize: "18px",
+              cursor: "pointer",
+            }}
+          >
+            Create Account
+          </button>
+        </Link>
       </section>
 
       {/* Footer */}
@@ -247,14 +403,14 @@ export default function Home() {
           background: "#0d1b2a",
           color: "white",
           textAlign: "center",
-          padding: "35px",
+          padding: "45px 25px",
         }}
       >
-        <h2>GradLink SA</h2>
+        <h2 style={{ marginBottom: "10px" }}>GradLink SA</h2>
 
-        <p>
-          Connecting South African graduates with internship
-          opportunities.
+        <p style={{ maxWidth: "700px", margin: "0 auto 20px" }}>
+          Connecting South African graduates with internship opportunities
+          through innovative technology and trusted employer partnerships.
         </p>
 
         <p style={{ opacity: 0.8 }}>
@@ -271,4 +427,5 @@ const card = {
   padding: "30px",
   boxShadow: "0 8px 25px rgba(0,0,0,0.08)",
   textAlign: "center",
+  transition: "0.3s",
 };
