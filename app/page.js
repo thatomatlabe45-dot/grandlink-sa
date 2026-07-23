@@ -417,17 +417,56 @@ export default function Home() {
             <p>Full-Time Internship</p>
           </div>
 
-          <div style={card}>
-            <h3>📈 Marketing Intern</h3>
-            <p>Cape Town</p>
-            <p>Graduate Programme</p>
-          </div>
+          {filteredInternships.length === 0 ? (
+  <div
+    style={{
+      gridColumn: "1 / -1",
+      textAlign: "center",
+      background: "white",
+      padding: "40px",
+      borderRadius: "15px",
+    }}
+  >
+    <h2>No internships found</h2>
+    <p>Companies haven't posted internships yet.</p>
+  </div>
+) : (
+  filteredInternships.slice(0, 6).map((job) => (
+    <div key={job.id} style={card}>
+      <h3 style={{ color: "#0057B8" }}>
+        {job.job_title}
+      </h3>
 
-          <div style={card}>
-            <h3>⚙️ Mechanical Engineer</h3>
-            <p>Pretoria</p>
-            <p>Engineering Internship</p>
-          </div>
+      <p>🏢 {job.company_name}</p>
+
+      <p>📍 {job.location}</p>
+
+      <p>🎓 {job.qualification}</p>
+
+      <p>💰 {job.stipend || "Negotiable"}</p>
+
+      <Link href="/jobs">
+        <button
+          style={{
+            marginTop: "15px",
+            background: "#0057B8",
+            color: "white",
+            border: "none",
+            padding: "12px 24px",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontWeight: "bold",
+          }}
+        >
+          View Internship
+        </button>
+      </Link>
+    </div>
+  ))
+)}
+        
+          
+          
         </div>
       </section>
 
