@@ -14,12 +14,17 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   async function login() {
+    setLoading(true);
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+
+    setLoading(false);
 
     if (error) {
       alert(error.message);
@@ -28,7 +33,7 @@ export default function LoginPage() {
 
     alert("Welcome back!");
 
-    router.push("/graduate");
+    router.push("/choose-profile");
   }
 
   return (
@@ -45,7 +50,7 @@ export default function LoginPage() {
       <div
         style={{
           width: "100%",
-          maxWidth: "400px",
+          maxWidth: "420px",
           background: "#fff",
           padding: "40px",
           borderRadius: "16px",
@@ -106,6 +111,7 @@ export default function LoginPage() {
 
         <button
           onClick={login}
+          disabled={loading}
           style={{
             width: "100%",
             padding: "14px",
@@ -118,7 +124,7 @@ export default function LoginPage() {
             cursor: "pointer",
           }}
         >
-          Sign In
+          {loading ? "Signing In..." : "Sign In"}
         </button>
       </div>
     </div>
