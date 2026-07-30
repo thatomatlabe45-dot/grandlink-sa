@@ -13,9 +13,16 @@ export default function Home() {
   const [internships, setInternships] = useState([]);
   const [companies, setCompanies] = useState([]);
 
+  const [stats, setStats] = useState({
+    graduates: 0,
+    companies: 0,
+    internships: 0,
+  });
+
   useEffect(() => {
     fetchInternships();
     fetchCompanies();
+    fetchStats();
   }, []);
 
   async function fetchInternships() {
@@ -36,6 +43,26 @@ export default function Home() {
       .limit(3);
 
     if (data) setCompanies(data);
+  }
+
+  async function fetchStats() {
+    const { count: graduates } = await supabase
+      .from("graduates")
+      .select("*", { count: "exact", head: true });
+
+    const { count: companies } = await supabase
+      .from("companies")
+      .select("*", { count: "exact", head: true });
+
+    const { count: internships } = await supabase
+      .from("internships")
+      .select("*", { count: "exact", head: true });
+
+    setStats({
+      graduates: graduates || 0,
+      companies: companies || 0,
+      internships: internships || 0,
+    });
   }
 
   return (
@@ -135,6 +162,87 @@ export default function Home() {
               For Companies
             </button>
           </Link>
+        </div>
+      </section>
+
+      {/* Statistics */}
+      <section
+        style={{
+          padding: "60px 40px",
+          background: "#ffffff",
+        }}
+      >
+        <h2
+          style={{
+            textAlign: "center",
+            color: "#0057b8",
+            marginBottom: "40px",
+          }}
+        >
+          GradLink SA in Numbers
+        </h2>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
+            gap: "20px",
+          }}
+        >
+          <div
+            style={{
+              background: "#f5f9ff",
+              padding: "30px",
+              borderRadius: "12px",
+              textAlign: "center",
+            }}
+          >
+            <h1 style={{ color: "#0057b8", fontSize: "42px" }}>
+              {stats.graduates}
+            </h1>
+            <p>🎓 Registered Graduates</p>
+          </div>
+
+          <div
+            style={{
+              background: "#f5f9ff",
+              padding: "30px",
+              borderRadius: "12px",
+              textAlign: "center",
+            }}
+          >
+            <h1 style={{ color: "#0057b8", fontSize: "42px" }}>
+              {stats.companies}
+            </h1>
+            <p>🏢 Registered Companies</p>
+          </div>
+
+          <div
+            style={{
+              background: "#f5f9ff",
+              padding: "30px",
+              borderRadius: "12px",
+              textAlign: "center",
+            }}
+          >
+            <h1 style={{ color: "#0057b8", fontSize: "42px" }}>
+              {stats.internships}
+            </h1>
+            <p>💼 Available Internships</p>
+          </div>
+
+          <div
+            style={{
+              background: "#0057b8",
+              color: "#fff",
+              padding: "30px",
+              borderRadius: "12px",
+              textAlign: "center",
+            }}
+          >
+            <h1 style={{ fontSize: "42px" }}>100%</h1>
+            <p>Free for Graduates</p>
+          </div>
         </div>
       </section>
 
