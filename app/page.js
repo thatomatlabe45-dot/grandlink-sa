@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Hero from "./components/Hero";
+import Stats from "./components/Stats";
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
@@ -167,86 +168,7 @@ export default function Home() {
       
 
       {/* Statistics */}
-      <section
-        style={{
-          padding: "60px 40px",
-          background: "#ffffff",
-        }}
-      >
-        <h2
-          style={{
-            textAlign: "center",
-            color: "#0057b8",
-            marginBottom: "40px",
-          }}
-        >
-          GradLink SA in Numbers
-        </h2>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))",
-            gap: "20px",
-          }}
-        >
-          <div
-            style={{
-              background: "#f5f9ff",
-              padding: "30px",
-              borderRadius: "12px",
-              textAlign: "center",
-            }}
-          >
-            <h1 style={{ color: "#0057b8", fontSize: "42px" }}>
-              {stats.graduates}
-            </h1>
-            <p>🎓 Registered Graduates</p>
-          </div>
-
-          <div
-            style={{
-              background: "#f5f9ff",
-              padding: "30px",
-              borderRadius: "12px",
-              textAlign: "center",
-            }}
-          >
-            <h1 style={{ color: "#0057b8", fontSize: "42px" }}>
-              {stats.companies}
-            </h1>
-            <p>🏢 Registered Companies</p>
-          </div>
-
-          <div
-            style={{
-              background: "#f5f9ff",
-              padding: "30px",
-              borderRadius: "12px",
-              textAlign: "center",
-            }}
-          >
-            <h1 style={{ color: "#0057b8", fontSize: "42px" }}>
-              {stats.internships}
-            </h1>
-            <p>💼 Available Internships</p>
-          </div>
-
-          <div
-            style={{
-              background: "#0057b8",
-              color: "#fff",
-              padding: "30px",
-              borderRadius: "12px",
-              textAlign: "center",
-            }}
-          >
-            <h1 style={{ fontSize: "42px" }}>100%</h1>
-            <p>Free for Graduates</p>
-          </div>
-        </div>
-      </section>
-
+    <Stats stats={stats} />
       {/* Featured Internships */}
       <section style={{ padding: "40px" }}>
         <h2
