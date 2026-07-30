@@ -104,73 +104,7 @@ export default function Home() {
       </nav>
 
       {/* Hero */}
-      <section
-        style={{
-          textAlign: "center",
-          padding: "70px 20px",
-        }}
-      >
-        <h1
-          style={{
-            fontSize: "48px",
-            color: "#0057b8",
-            marginBottom: "20px",
-          }}
-        >
-          Connecting South African Graduates
-        </h1>
-
-        <p
-          style={{
-            fontSize: "20px",
-            color: "#555",
-            maxWidth: "700px",
-            margin: "auto",
-          }}
-        >
-          Find internships, connect with employers and launch your career.
-        </p>
-
-        <div
-          style={{
-            marginTop: "40px",
-            display: "flex",
-            justifyContent: "center",
-            gap: "20px",
-          }}
-        >
-          <Link href="/jobs">
-            <button
-              style={{
-                background: "#0057b8",
-                color: "white",
-                padding: "14px 30px",
-                border: "none",
-                borderRadius: "8px",
-                cursor: "pointer",
-                fontSize: "16px",
-              }}
-            >
-              Find Internships
-            </button>
-          </Link>
-
-          <Link href="/company">
-            <button
-              style={{
-                background: "#fff",
-                color: "#0057b8",
-                border: "2px solid #0057b8",
-                padding: "14px 30px",
-                borderRadius: "8px",
-                cursor: "pointer",
-                fontSize: "16px",
-              }}
-            >
-              For Companies
-            </button>
-          </Link>
-        </div>
+      <Hero />
         <SearchBar />
       
 
