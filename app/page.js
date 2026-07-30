@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Hero from "./components/Hero";
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
@@ -163,7 +164,7 @@ export default function Home() {
             </button>
           </Link>
         </div>
-      </section>
+      
 
       {/* Statistics */}
       <section
