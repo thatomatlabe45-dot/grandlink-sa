@@ -7,6 +7,7 @@ import FeaturedInternships from "./components/FeaturedInternships";
 import FeaturedCompanies from "./components/FeaturedCompanies";
 import Testimonials from "./components/Testimonials";
 import FAQ from "./components/FAQ";
+import Contact from "./components/Contact";
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
@@ -180,6 +181,7 @@ export default function Home() {
      <FeaturedCompanies companies={companies} />
     <Testimonials />
     <FAQ />
+    <Contact />
 
       {/* Footer */}
       <footer
