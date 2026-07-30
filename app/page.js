@@ -4,6 +4,7 @@ import Link from "next/link";
 import Hero from "./components/Hero";
 import Stats from "./components/Stats";
 import FeaturedInternships from "./components/FeaturedInternships";
+import FeaturedCompanies from "./components/FeaturedCompanies";
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
@@ -174,59 +175,7 @@ export default function Home() {
 <FeaturedInternships internships={internships} />
 
       {/* Featured Companies */}
-      <section style={{ padding: "40px" }}>
-        <h2
-          style={{
-            textAlign: "center",
-            color: "#0057b8",
-            marginBottom: "30px",
-          }}
-        >
-          Featured Companies
-        </h2>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
-            gap: "20px",
-          }}
-        >
-          {companies.map((company) => (
-            <div
-              key={company.id}
-              style={{
-                background: "#fff",
-                padding: "20px",
-                borderRadius: "12px",
-                boxShadow: "0 4px 12px rgba(0,0,0,.1)",
-              }}
-            >
-              <h3>{company.company_name}</h3>
-
-              <p>📍 {company.location}</p>
-              <p>💼 {company.industry}</p>
-              <p>🌐 {company.website}</p>
-
-              <Link href="/company">
-                <button
-                  style={{
-                    marginTop: "15px",
-                    background: "#0057b8",
-                    color: "#fff",
-                    border: "none",
-                    padding: "10px 18px",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                  }}
-                >
-                  View Company
-                </button>
-              </Link>
-            </div>
-          ))}
-        </div>
-      </section>
+     <FeaturedCompanies companies={companies} />
 
       {/* Footer */}
       <footer
