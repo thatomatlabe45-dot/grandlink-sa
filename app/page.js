@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Hero from "./components/Hero";
 import Stats from "./components/Stats";
+import FeaturedInternships from "./components/FeaturedInternships";
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
@@ -170,59 +171,7 @@ export default function Home() {
       {/* Statistics */}
     <Stats stats={stats} />
       {/* Featured Internships */}
-      <section style={{ padding: "40px" }}>
-        <h2
-          style={{
-            textAlign: "center",
-            color: "#0057b8",
-            marginBottom: "30px",
-          }}
-        >
-          Featured Internships
-        </h2>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))",
-            gap: "20px",
-          }}
-        >
-          {internships.map((job) => (
-            <div
-              key={job.id}
-              style={{
-                background: "#fff",
-                padding: "20px",
-                borderRadius: "12px",
-                boxShadow: "0 4px 12px rgba(0,0,0,.1)",
-              }}
-            >
-              <h3>{job.job_title}</h3>
-
-              <p>🏢 {job.company_name}</p>
-              <p>📍 {job.location}</p>
-              <p>🎓 {job.qualification}</p>
-
-              <Link href="/jobs">
-                <button
-                  style={{
-                    marginTop: "15px",
-                    background: "#0057b8",
-                    color: "#fff",
-                    border: "none",
-                    padding: "10px 18px",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                  }}
-                >
-                  View Internship
-                </button>
-              </Link>
-            </div>
-          ))}
-        </div>
-      </section>
+<FeaturedInternships internships={internships} />
 
       {/* Featured Companies */}
       <section style={{ padding: "40px" }}>
