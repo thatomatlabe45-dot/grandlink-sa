@@ -9,6 +9,7 @@ import Testimonials from "./components/Testimonials";
 import FAQ from "./components/FAQ";
 import Contact from "./components/Contact";
 import SearchBar from "./components/SearchBar";
+import Navbar from "./components/Navbar";
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 
@@ -85,55 +86,7 @@ export default function Home() {
 >
       {/* Navigation */}
       {/* Navigation */}
-<nav
-  style={{
-    background: "#fff",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-    position: "sticky",
-    top: 0,
-    zIndex: 1000,
-  }}
->
-  <div
-    style={{
-      maxWidth: "1200px",
-      margin: "0 auto",
-      padding: "15px 20px",
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      flexWrap: "wrap",
-      gap: "15px",
-    }}
-  >
-    <h2
-      style={{
-        color: "#0057b8",
-        margin: 0,
-        fontSize: "30px",
-        fontWeight: "bold",
-      }}
-    >
-      GradLink SA
-    </h2>
-
-    <div
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        justifyContent: "center",
-        gap: "18px",
-        fontWeight: "600",
-      }}
-    >
-      <Link href="/">Home</Link>
-      <Link href="/jobs">Jobs</Link>
-      <Link href="/graduate">Graduates</Link>
-      <Link href="/company">Companies</Link>
-      <Link href="/admin">Admin</Link>
-    </div>
-  </div>
-</nav>
+<Navbar />
 
       {/* Hero */}
       <Hero />
