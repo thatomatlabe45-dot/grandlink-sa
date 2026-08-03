@@ -75,6 +75,8 @@ export default function Home() {
   }
 return (
   <main>
+    <Navbar />
+    
     <h1>GradLink SA</h1>
   </main>
 );
