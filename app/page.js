@@ -83,6 +83,7 @@ return (
     <FeaturedCompanies companies={companies} />
     <Testimonials />
     <FAQ />
+    <Contact />
     <h1>GradLink SA</h1>
   </main>
 );
