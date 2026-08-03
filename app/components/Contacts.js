@@ -4,8 +4,8 @@ export default function Contact() {
   return (
     <section
       style={{
-        background: "#ffffff",
-        padding: "80px 30px",
+        background: "linear-gradient(to bottom, #ffffff, #f5f9ff)",
+        padding: "90px 20px",
       }}
     >
       <div
@@ -13,65 +13,89 @@ export default function Contact() {
           maxWidth: "1200px",
           margin: "0 auto",
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(350px,1fr))",
+          gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))",
           gap: "50px",
+          alignItems: "center",
         }}
       >
-        {/* Left Side */}
+        {/* Left */}
         <div>
-          <h2
+          <span
             style={{
+              display: "inline-block",
+              background: "#e8f1ff",
               color: "#0057b8",
-              fontSize: "40px",
+              padding: "8px 18px",
+              borderRadius: "999px",
+              fontWeight: "600",
               marginBottom: "20px",
             }}
           >
-            Contact GradLink SA
+            Get in Touch
+          </span>
+
+          <h2
+            style={{
+              color: "#0057b8",
+              fontSize: "42px",
+              marginBottom: "20px",
+            }}
+          >
+            We'd Love to Hear From You
           </h2>
 
           <p
             style={{
               color: "#555",
               lineHeight: "1.8",
+              fontSize: "17px",
               marginBottom: "35px",
             }}
           >
-            Have questions? Need help? We'd love to hear from you.
-            Send us a message and we'll get back to you as soon as
-            possible.
+            Whether you're a graduate searching for opportunities or a
+            company looking for talented interns, our team is here to help.
           </p>
 
-          <div style={{ marginBottom: "25px" }}>
-            <h3>📧 Email</h3>
-            <p>support@gradlinksa.co.za</p>
+          <div style={{ marginBottom: "22px" }}>
+            <h3 style={{ color: "#003b7a" }}>📧 Email</h3>
+            <p style={{ color: "#666" }}>
+              support@gradlinksa.co.za
+            </p>
           </div>
 
-          <div style={{ marginBottom: "25px" }}>
-            <h3>📞 Phone</h3>
-            <p>+27 XX XXX XXXX</p>
+          <div style={{ marginBottom: "22px" }}>
+            <h3 style={{ color: "#003b7a" }}>📞 Phone</h3>
+            <p style={{ color: "#666" }}>
+              +27 XX XXX XXXX
+            </p>
           </div>
 
           <div>
-            <h3>📍 Location</h3>
-            <p>South Africa</p>
+            <h3 style={{ color: "#003b7a" }}>📍 Location</h3>
+            <p style={{ color: "#666" }}>
+              South Africa
+            </p>
           </div>
         </div>
 
-        {/* Right Side */}
+        {/* Right */}
         <div
           style={{
-            background: "#f5f9ff",
-            padding: "30px",
-            borderRadius: "16px",
+            background: "#fff",
+            padding: "35px",
+            borderRadius: "20px",
+            boxShadow: "0 15px 35px rgba(0,0,0,0.08)",
+            border: "1px solid #e8eef7",
           }}
         >
           <h3
             style={{
               color: "#0057b8",
               marginBottom: "25px",
+              fontSize: "28px",
             }}
           >
-            Send us a Message
+            Send a Message
           </h3>
 
           <form>
@@ -89,7 +113,7 @@ export default function Contact() {
 
             <textarea
               rows="6"
-              placeholder="Your Message"
+              placeholder="How can we help you?"
               style={{
                 ...inputStyle,
                 resize: "vertical",
@@ -102,15 +126,15 @@ export default function Contact() {
                 width: "100%",
                 padding: "16px",
                 background: "#0057b8",
-                color: "white",
+                color: "#fff",
                 border: "none",
-                borderRadius: "10px",
+                borderRadius: "12px",
                 cursor: "pointer",
                 fontSize: "16px",
-                fontWeight: "bold",
+                fontWeight: "600",
               }}
             >
-              Send Message
+              Send Message →
             </button>
           </form>
         </div>
@@ -123,8 +147,9 @@ const inputStyle = {
   width: "100%",
   padding: "15px",
   marginBottom: "18px",
-  borderRadius: "10px",
-  border: "1px solid #ddd",
+  borderRadius: "12px",
+  border: "1px solid #d9e4f2",
   fontSize: "15px",
   boxSizing: "border-box",
+  outline: "none",
 };
