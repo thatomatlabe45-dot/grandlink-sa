@@ -14,15 +14,16 @@ export default function GraduatePage() {
   const router = useRouter();
 
   const [form, setForm] = useState({
-    full_name: "",
-    email: "",
-    phone: "",
-    qualification: "",
-    field_of_study: "",
-    institution: "",
-    province: "",
-    career_goals: "",
-  });
+  full_name: "",
+  email: "",
+  phone: "",
+  qualification: "",
+  field_of_study: "",
+  institution: "",
+  province: "",
+  career_goals: "",
+  skills: "",
+});
 
   const [cv, setCv] = useState(null);
   const [qualificationFile, setQualificationFile] = useState(null);
@@ -209,6 +210,16 @@ const { error } = await supabase.from("graduates").insert([
               rows={5}
               required
             />
+            <label>Skills</label>
+
+<textarea
+  className="input"
+  name="skills"
+  value={form.skills}
+  onChange={handleChange}
+  rows={4}
+  placeholder="Example: JavaScript, React, SQL, Python, Communication, Teamwork"
+/>
           </div>
                     <div className="card">
             <h2>📄 Documents</h2>
