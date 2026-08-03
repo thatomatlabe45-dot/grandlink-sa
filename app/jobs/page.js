@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
+import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -11,161 +11,164 @@ const supabase = createClient(
 
 export default function JobsPage() {
   const [jobs, setJobs] = useState([]);
-  const [selectedJob, setSelectedJob] = useState(null);
-
-  const [application, setApplication] = useState({
-    full_name: "",
-    email: "",
-    phone: "",
-    qualification: "",
-    field_of_study: "",
-    skills: "",
-  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchJobs();
   }, []);
 
   async function fetchJobs() {
-    const { data } = await supabase
+    setLoading(true);
+
+    const { data, error } = await supabase
       .from("internships")
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (data) setJobs(data);
-  }
-
-  function handleChange(e) {
-    setApplication({
-      ...application,
-      [e.target.name]: e.target.value,
-    });
-  }
-
-  async function apply() {
-    const { error } = await supabase.from("applications").insert([
-      {
-        internship_id: selectedJob.id,
-        full_name: application.full_name,
-        email: application.email,
-        phone: application.phone,
-        qualification: application.qualification,
-        field_of_study: application.field_of_study,
-        skills: application.skills,
-      },
-    ]);
-
-    if (error) {
-      alert(error.message);
-      return;
+    if (!error && data) {
+      setJobs(data);
     }
 
-    alert("🎉 Application submitted successfully!");
-
-    setSelectedJob(null);
-
-    setApplication({
-      full_name: "",
-      email: "",
-      phone: "",
-      qualification: "",
-      field_of_study: "",
-      skills: "",
-    });
+    setLoading(false);
   }
 
   return (
-    <div style={{ background:"#f4f7fb", minHeight:"100vh", padding:"40px 20px" }}>
-      <div style={{ maxWidth:"1000px", margin:"auto" }}>
-        <h1 style={{ color:"#0057B8" }}>Available Internships</h1>
+    <main
+      style={{
+        minHeight: "100vh",
+        background: "#f5f9ff",
+        padding: "50px 20px",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: "1200px",
+          margin: "0 auto",
+        }}
+      >
+        <h1
+          style={{
+            color: "#0057B8",
+            fontSize: "42px",
+            textAlign: "center",
+            marginBottom: "10px",
+          }}
+        >
+          Available Internships
+        </h1>
 
-        {jobs.map(job => (
+        <p
+          style={{
+            textAlign: "center",
+            color: "#666",
+            marginBottom: "40px",
+          }}
+        >
+          Explore internship opportunities from companies across South Africa.
+        </p>
+
+        {loading ? (
           <div
-            key={job.id}
             style={{
-              background:"#fff",
-              padding:"25px",
-              borderRadius:"14px",
-              marginBottom:"20px",
-              boxShadow:"0 5px 15px rgba(0,0,0,.08)"
+              textAlign: "center",
+              color: "#0057B8",
+              fontSize: "22px",
             }}
           >
-            <h2>{job.job_title}</h2>
-
-            <p><b>Company:</b> {job.company_name}</p>
-            <p><b>Location:</b> {job.location}</p>
-            <p><b>Type:</b> {job.internship_type}</p>
-            <p><b>Qualification:</b> {job.qualification}</p>
-            <p><b>Field:</b> {job.field_of_study}</p>
-            <p><b>Stipend:</b> {job.stipend}</p>
-
-            <p>{job.description}</p>
-
-           <Link href={`/jobs/${job.id}`}>
-  <button
-    style={{
-      marginTop: 15,
-      padding: "12px 25px",
-      background: "#0057B8",
-      color: "#fff",
-      border: "none",
-      borderRadius: "8px",
-      cursor: "pointer",
-    }}
-  >
-    View Internship
-  </button>
-</Link>
+            Loading internships...
           </div>
-        ))}
-
-        
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))",
+              gap: "25px",
+            }}
           >
-            <h2>Apply for {selectedJob.job_title}</h2>
+                      {jobs.length === 0 ? (
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  textAlign: "center",
+                  color: "#666",
+                  fontSize: "18px",
+                }}
+              >
+                No internships available yet.
+              </div>
+            ) : (
+              jobs.map((job) => (
+                <div
+                  key={job.id}
+                  style={{
+                    background: "#fff",
+                    borderRadius: "18px",
+                    padding: "25px",
+                    boxShadow: "0 8px 25px rgba(0,0,0,.08)",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <div>
+                    <h2
+                      style={{
+                        color: "#0057B8",
+                        marginTop: 0,
+                        marginBottom: "15px",
+                      }}
+                    >
+                      {job.job_title}
+                    </h2>
 
-            <input name="full_name" placeholder="Full Name" value={application.full_name} onChange={handleChange} style={inputStyle} />
-            <input name="email" placeholder="Email" value={application.email} onChange={handleChange} style={inputStyle} />
-            <input name="phone" placeholder="Phone" value={application.phone} onChange={handleChange} style={inputStyle} />
-            <input name="qualification" placeholder="Qualification" value={application.qualification} onChange={handleChange} style={inputStyle} />
-            <input name="field_of_study" placeholder="Field of Study" value={application.field_of_study} onChange={handleChange} style={inputStyle} />
+                    <p><strong>🏢 Company:</strong> {job.company_name}</p>
+                    <p><strong>📍 Location:</strong> {job.location}</p>
+                    <p><strong>💼 Type:</strong> {job.internship_type}</p>
+                    <p><strong>🎓 Qualification:</strong> {job.qualification}</p>
+                    <p><strong>💰 Stipend:</strong> {job.stipend || "Not specified"}</p>
 
-            <textarea
-              name="skills"
-              placeholder="Skills"
-              rows={4}
-              value={application.skills}
-              onChange={handleChange}
-              style={inputStyle}
-            />
+                    <p
+                      style={{
+                        color: "#555",
+                        marginTop: "15px",
+                        lineHeight: "1.6",
+                      }}
+                    >
+                      {job.description?.length > 120
+                        ? job.description.substring(0, 120) + "..."
+                        : job.description}
+                    </p>
+                  </div>
 
-            <button
-              onClick={apply}
-              style={{
-                width:"100%",
-                padding:"14px",
-                background:"#0057B8",
-                color:"#fff",
-                border:"none",
-                borderRadius:"10px",
-                fontSize:"16px",
-                cursor:"pointer"
-              }}
-            >
-              Submit Application
-            </button>
+                  <Link
+                    href={`/jobs/${job.id}`}
+                    style={{
+                      marginTop: "20px",
+                      textDecoration: "none",
+                    }}
+                  >
+                    <button
+                      style={{
+                        width: "100%",
+                        padding: "14px",
+                        background: "#0057B8",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "10px",
+                        fontSize: "16px",
+                        fontWeight: "600",
+                        cursor: "pointer",
+                      }}
+                    >
+                      View Internship
+                    </button>
+                  </Link>
+                </div>
+              ))
+            )}
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }
-
-const inputStyle = {
-  width:"100%",
-  padding:"14px",
-  marginBottom:"15px",
-  border:"1px solid #ccc",
-  borderRadius:"10px",
-  fontSize:"16px",
-  boxSizing:"border-box"
-};
