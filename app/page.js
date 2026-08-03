@@ -79,6 +79,7 @@ return (
     <Hero />
     <SearchBar />
     <Stats stats={stats} />
+    <FeaturedInternships internships={internships} />
     <h1>GradLink SA</h1>
   </main>
 );
