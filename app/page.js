@@ -28,11 +28,11 @@ export default function Home() {
     internships: 0,
   });
 
-  useEffect(() => {
-    fetchInternships();
-    fetchCompanies();
-    fetchStats();
-  }, []);
+ useEffect(() => {
+  // fetchInternships();
+  // fetchCompanies();
+  // fetchStats();
+}, []);
 
   async function fetchInternships() {
     const { data } = await supabase
