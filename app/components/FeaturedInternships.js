@@ -50,7 +50,7 @@ export default function FeaturedInternships({ internships }) {
               <p>📍 {job.location}</p>
               <p>🎓 {job.qualification}</p>
 
-              <Link href="/jobs">
+              <Link href={`/jobs/${internship.id}`}>
                 <button
                   style={{
                     marginTop: "15px",
