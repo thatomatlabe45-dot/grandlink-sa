@@ -73,17 +73,12 @@ export default function Home() {
       internships: internships || 0,
     });
   }
+return (
+  <main>
+    <h1>GradLink SA</h1>
+  </main>
+);
 
-  return (
-   <main
-  style={{
-    fontFamily: "Arial, sans-serif",
-    background: "#f5f9ff",
-    minHeight: "100vh",
-    width: "100%",
-    overflowX: "hidden",
-  }}
->
       {/* Navigation */}
       {/* Navigation */}
 <Navbar />
