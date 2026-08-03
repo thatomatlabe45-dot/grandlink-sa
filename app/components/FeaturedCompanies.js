@@ -157,7 +157,7 @@ export default function FeaturedCompanies({ companies = [] }) {
                   </p>
                 )}
 
-                <Link href="/company">
+                <Link href={`/company/${company.id}`}>
                   <button
                     style={{
                       width: "100%",
