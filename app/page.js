@@ -76,7 +76,7 @@ export default function Home() {
 return (
   <main>
     <Navbar />
-    
+    <Hero />
     <h1>GradLink SA</h1>
   </main>
 );
