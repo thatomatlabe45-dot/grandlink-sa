@@ -1,31 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function Navbar() {
-  const [mobile, setMobile] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobile, setMobile] = useState(false);
 
   useEffect(() => {
-    function handleResize() {
-      setMobile(window.innerWidth < 768);
+    function updateScreen() {
+      const isMobile = window.innerWidth <= 768;
+      setMobile(isMobile);
 
-      if (window.innerWidth >= 768) {
+      if (!isMobile) {
         setMenuOpen(false);
       }
     }
 
-    handleResize();
+    updateScreen();
 
-    window.addEventListener("resize", handleResize);
+    window.addEventListener("resize", updateScreen);
 
-    return () => window.removeEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", updateScreen);
   }, []);
 
-  const linkStyle = {
+  const navLink = {
     textDecoration: "none",
-    color: "#333",
+    color: "#1f2937",
     fontWeight: "600",
     fontSize: "16px",
   };
@@ -33,18 +34,18 @@ export default function Navbar() {
   return (
     <nav
       style={{
-        background: "#fff",
         position: "sticky",
         top: 0,
         zIndex: 1000,
-        boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+        background: "#ffffff",
+        boxShadow: "0 2px 15px rgba(0,0,0,.08)",
       }}
     >
       <div
         style={{
           maxWidth: "1200px",
           margin: "0 auto",
-          padding: "18px 20px",
+          padding: "16px 20px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
@@ -55,57 +56,92 @@ export default function Navbar() {
           style={{
             textDecoration: "none",
             color: "#0057b8",
-            fontSize: "32px",
-            fontWeight: "bold",
+            fontSize: "clamp(24px,4vw,32px)",
+            fontWeight: "800",
           }}
         >
           GradLink SA
         </Link>
 
-        {mobile ? (
-          <button
-            onClick={() => setMenuOpen(!menuOpen)}
-            style={{
-              fontSize: "30px",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-            }}
-          >
-            ☰
-          </button>
-        ) : (
+        {!mobile ? (
           <div
             style={{
               display: "flex",
               gap: "28px",
+              alignItems: "center",
             }}
           >
-            <Link href="/" style={linkStyle}>Home</Link>
-            <Link href="/jobs" style={linkStyle}>Jobs</Link>
-            <Link href="/graduate" style={linkStyle}>Graduates</Link>
-            <Link href="/company" style={linkStyle}>Companies</Link>
-            <Link href="/admin" style={linkStyle}>Admin</Link>
+            <Link href="/" style={navLink}>Home</Link>
+            <Link href="/jobs" style={navLink}>Internships</Link>
+            <Link href="/graduate" style={navLink}>Graduates</Link>
+            <Link href="/company" style={navLink}>Companies</Link>
+            <Link href="/admin" style={navLink}>Admin</Link>
+
+            <Link href="/graduate">
+              <button
+                style={{
+                  background: "#0057b8",
+                  color: "#fff",
+                  border: "none",
+                  padding: "12px 20px",
+                  borderRadius: "10px",
+                  cursor: "pointer",
+                  fontWeight: "700",
+                }}
+              >
+                Get Started
+              </button>
+            </Link>
           </div>
+        ) : (
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            style={{
+              border: "none",
+              background: "none",
+              fontSize: "32px",
+              cursor: "pointer",
+              color: "#0057b8",
+            }}
+          >
+            ☰
+          </button>
         )}
       </div>
 
       {mobile && menuOpen && (
         <div
           style={{
-            display: "flex",
-            flexDirection: "column",
-            padding: "15px 20px",
             borderTop: "1px solid #eee",
             background: "#fff",
-            gap: "18px",
+            padding: "15px 20px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "16px",
           }}
         >
-          <Link href="/" style={linkStyle}>Home</Link>
-          <Link href="/jobs" style={linkStyle}>Jobs</Link>
-          <Link href="/graduate" style={linkStyle}>Graduates</Link>
-          <Link href="/company" style={linkStyle}>Companies</Link>
-          <Link href="/admin" style={linkStyle}>Admin</Link>
+          <Link href="/" style={navLink}>Home</Link>
+          <Link href="/jobs" style={navLink}>Internships</Link>
+          <Link href="/graduate" style={navLink}>Graduates</Link>
+          <Link href="/company" style={navLink}>Companies</Link>
+          <Link href="/admin" style={navLink}>Admin</Link>
+
+          <Link href="/graduate">
+            <button
+              style={{
+                width: "100%",
+                background: "#0057b8",
+                color: "#fff",
+                border: "none",
+                padding: "14px",
+                borderRadius: "10px",
+                fontWeight: "700",
+                cursor: "pointer",
+              }}
+            >
+              Get Started
+            </button>
+          </Link>
         </div>
       )}
     </nav>
