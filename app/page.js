@@ -80,6 +80,7 @@ return (
     <SearchBar />
     <Stats stats={stats} />
     <FeaturedInternships internships={internships} />
+    <FeaturedCompanies companies={companies} />
     <h1>GradLink SA</h1>
   </main>
 );
