@@ -77,6 +77,7 @@ return (
   <main>
     <Navbar />
     <Hero />
+    <SearchBar />
     <h1>GradLink SA</h1>
   </main>
 );
