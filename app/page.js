@@ -78,6 +78,7 @@ return (
     <Navbar />
     <Hero />
     <SearchBar />
+    <Stats stats={stats} />
     <h1>GradLink SA</h1>
   </main>
 );
