@@ -98,6 +98,36 @@ const { error } = await supabase.from("graduates").insert([
   return (
     <>
       <Navbar />
+      
+      <section
+  style={{
+    background: "linear-gradient(135deg,#0057b8,#0a84ff)",
+    color: "white",
+    padding: "50px 20px",
+    textAlign: "center",
+  }}
+>
+  <h1
+    style={{
+      fontSize: "clamp(2rem,5vw,3rem)",
+      marginBottom: "15px",
+    }}
+  >
+    🎓 Graduate Dashboard
+  </h1>
+
+  <p
+    style={{
+      maxWidth: "700px",
+      margin: "0 auto",
+      lineHeight: "1.8",
+      opacity: .95,
+    }}
+  >
+    Complete your graduate profile to unlock AI internship
+    matching and apply to opportunities across South Africa.
+  </p>
+</section>
 
       <main className="page">
         <section className="hero">
@@ -108,7 +138,42 @@ const { error } = await supabase.from("graduates").insert([
             across South Africa.
           </p>
         </section>
+       
+      <div
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))",
+    gap: "20px",
+    maxWidth: "1200px",
+    margin: "40px auto",
+    padding: "0 20px",
+  }}
+>
+  {[
+    ["📝", "Applications", "0"],
+    ["❤️", "Saved Jobs", "0"],
+    ["🎯", "AI Match", "0%"],
+    ["📄", "Profile", "0%"],
+  ].map(([icon, title, value]) => (
+    <div
+      key={title}
+      style={{
+        background: "#fff",
+        borderRadius: "16px",
+        padding: "25px",
+        textAlign: "center",
+        boxShadow: "0 10px 25px rgba(0,0,0,.08)",
+      }}
+    >
+      <div style={{ fontSize: "36px" }}>{icon}</div>
 
+      <h3>{value}</h3>
+
+      <p style={{ color: "#666" }}>{title}</p>
+    </div>
+  ))}
+</div>
+      
         <form onSubmit={handleSubmit}>
           <div className="card">
             <h2>👤 Personal Information</h2>
