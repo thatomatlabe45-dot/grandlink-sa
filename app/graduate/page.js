@@ -73,13 +73,18 @@ export default function GraduatePage() {
         "qualifications"
       );
 
-      const { error } = await supabase.from("graduates").insert([
-        {
-          ...form,
-          cv_url: cvPath,
-          qualification_url: qualificationPath,
-        },
-      ]);
+      const {
+  data: { user },
+} = await supabase.auth.getUser();
+
+const { error } = await supabase.from("graduates").insert([
+  {
+    user_id: user.id,
+    ...form,
+    cv_url: cvPath,
+    qualification_url: qualificationPath,
+  },
+]);
 
       if (error) throw error;
 
