@@ -6,9 +6,9 @@ export default function Hero() {
   return (
     <section
       style={{
-        background: "linear-gradient(135deg, #0057b8 0%, #0088ff 100%)",
-        color: "white",
-        padding: "80px 40px",
+        background: "linear-gradient(135deg,#0057b8 0%,#0a84ff 100%)",
+        color: "#fff",
+        padding: "70px 20px",
       }}
     >
       <div
@@ -16,68 +16,71 @@ export default function Hero() {
           maxWidth: "1200px",
           margin: "0 auto",
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(350px,1fr))",
+          gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))",
           gap: "50px",
           alignItems: "center",
         }}
       >
-        {/* Left Side */}
+        {/* Left */}
         <div>
-          <span
+          <div
             style={{
+              display: "inline-block",
               background: "rgba(255,255,255,0.15)",
-              padding: "8px 16px",
-              borderRadius: "20px",
+              padding: "8px 18px",
+              borderRadius: "999px",
+              marginBottom: "20px",
+              fontWeight: 600,
               fontSize: "14px",
             }}
           >
             🇿🇦 South Africa's Graduate Internship Platform
-          </span>
+          </div>
 
           <h1
             style={{
-              fontSize: "56px",
-              lineHeight: "1.1",
-              marginTop: "25px",
+              fontSize: "clamp(2.3rem,6vw,4.2rem)",
+              lineHeight: 1.1,
               marginBottom: "20px",
+              fontWeight: 800,
             }}
           >
-            Connecting Graduates
+            Launch Your Career
             <br />
-            with Opportunities.
+            With Confidence.
           </h1>
 
           <p
             style={{
-              fontSize: "20px",
+              fontSize: "clamp(1rem,2.5vw,1.25rem)",
+              lineHeight: 1.7,
               opacity: 0.95,
               maxWidth: "600px",
-              lineHeight: "1.6",
             }}
           >
-            Discover internships, connect with verified companies,
-            and launch your career with GradLink SA.
+            Discover internships from trusted South African companies,
+            create your graduate profile, and get matched with opportunities
+            that fit your qualifications.
           </p>
 
           <div
             style={{
               display: "flex",
-              gap: "20px",
-              marginTop: "35px",
               flexWrap: "wrap",
+              gap: "15px",
+              marginTop: "35px",
             }}
           >
             <Link href="/jobs">
               <button
                 style={{
-                  background: "#ffffff",
+                  background: "#fff",
                   color: "#0057b8",
                   border: "none",
-                  padding: "16px 30px",
-                  borderRadius: "10px",
+                  padding: "16px 28px",
+                  borderRadius: "12px",
+                  fontWeight: 700,
                   cursor: "pointer",
-                  fontWeight: "bold",
-                  fontSize: "16px",
                 }}
               >
                 Find Internships
@@ -88,16 +91,15 @@ export default function Hero() {
               <button
                 style={{
                   background: "transparent",
-                  color: "white",
-                  border: "2px solid white",
-                  padding: "16px 30px",
-                  borderRadius: "10px",
+                  color: "#fff",
+                  border: "2px solid #fff",
+                  padding: "16px 28px",
+                  borderRadius: "12px",
+                  fontWeight: 700,
                   cursor: "pointer",
-                  fontWeight: "bold",
-                  fontSize: "16px",
                 }}
               >
-                Register Company
+                For Companies
               </button>
             </Link>
           </div>
@@ -105,60 +107,56 @@ export default function Hero() {
           <div
             style={{
               display: "flex",
-              gap: "25px",
-              marginTop: "40px",
               flexWrap: "wrap",
+              gap: "18px",
+              marginTop: "35px",
+              fontWeight: 600,
             }}
           >
-            <span>✔ Verified Companies</span>
             <span>✔ Free for Graduates</span>
+            <span>✔ Verified Companies</span>
             <span>✔ AI Matching</span>
           </div>
         </div>
 
-        {/* Right Side */}
+        {/* Right */}
         <div
           style={{
-            background: "rgba(255,255,255,0.15)",
-            borderRadius: "20px",
-            padding: "35px",
+            background: "rgba(255,255,255,0.12)",
+            borderRadius: "22px",
+            padding: "30px",
             backdropFilter: "blur(10px)",
           }}
         >
-          <h2 style={{ marginBottom: "25px" }}>
-            Why Choose GradLink SA?
-          </h2>
+          <h2 style={{ marginBottom: "25px" }}>Platform Highlights</h2>
 
           <div style={{ marginBottom: "20px" }}>
-            <h3>🎓 Graduates</h3>
-            <p>Create your profile and apply for internships.</p>
+            <h3>🎓 Graduate Profiles</h3>
+            <p>Create a professional profile and upload your CV.</p>
           </div>
 
           <div style={{ marginBottom: "20px" }}>
-            <h3>🏢 Companies</h3>
-            <p>Find talented graduates across South Africa.</p>
+            <h3>🏢 Company Dashboard</h3>
+            <p>Post internships and manage applications in one place.</p>
           </div>
 
           <div style={{ marginBottom: "20px" }}>
             <h3>🤖 Smart Matching</h3>
-            <p>
-              Connect graduates with internships based on skills and
-              qualifications.
-            </p>
+            <p>Help employers find graduates based on skills and qualifications.</p>
           </div>
 
           <div
             style={{
-              background: "#ffffff",
-              color: "#0057b8",
-              borderRadius: "12px",
-              padding: "15px",
               marginTop: "30px",
-              fontWeight: "bold",
+              background: "#fff",
+              color: "#0057b8",
+              padding: "18px",
+              borderRadius: "14px",
               textAlign: "center",
+              fontWeight: 700,
             }}
           >
-            🚀 Launch Your Career Today
+            🚀 Your future starts with GradLink SA
           </div>
         </div>
       </div>
