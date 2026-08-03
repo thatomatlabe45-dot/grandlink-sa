@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
+import Link from "next/link";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -100,32 +101,25 @@ export default function JobsPage() {
 
             <p>{job.description}</p>
 
-            <button
-              onClick={() => setSelectedJob(job)}
-              style={{
-                marginTop:15,
-                padding:"12px 25px",
-                background:"#0057B8",
-                color:"#fff",
-                border:"none",
-                borderRadius:"8px",
-                cursor:"pointer"
-              }}
-            >
-              Apply Now
-            </button>
+           <Link href={`/jobs/${job.id}`}>
+  <button
+    style={{
+      marginTop: 15,
+      padding: "12px 25px",
+      background: "#0057B8",
+      color: "#fff",
+      border: "none",
+      borderRadius: "8px",
+      cursor: "pointer",
+    }}
+  >
+    View Internship
+  </button>
+</Link>
           </div>
         ))}
 
-        {selectedJob && (
-          <div
-            style={{
-              marginTop:"30px",
-              background:"#fff",
-              padding:"25px",
-              borderRadius:"14px",
-              boxShadow:"0 5px 15px rgba(0,0,0,.08)"
-            }}
+        
           >
             <h2>Apply for {selectedJob.job_title}</h2>
 
