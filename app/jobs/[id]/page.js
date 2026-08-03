@@ -15,12 +15,17 @@ export default function InternshipPage() {
 
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  const [applying, setApplying] = useState(false);
+const [message, setMessage] = useState("");
 
   useEffect(() => {
     if (id) {
       loadInternship();
     }
   }, [id]);
+  
+  
 
   async function loadInternship() {
     setLoading(true);
@@ -39,7 +44,75 @@ export default function InternshipPage() {
     setJob(data);
     setLoading(false);
   }
+  
+  async function handleApply() {
+  setApplying(true);
+  setMessage("");
 
+  // Logged in user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    setMessage("Please log in before applying.");
+    setApplying(false);
+    return;
+  }
+
+  // Graduate profile
+  const { data: graduate, error: graduateError } = await supabase
+    .from("graduates")
+    .select("*")
+    .eq("user_id", user.id)
+    .single();
+
+  if (graduateError || !graduate) {
+    setMessage("Please complete your graduate profile first.");
+    setApplying(false);
+    return;
+  }
+
+  // Duplicate application check
+  const { data: existing } = await supabase
+    .from("applications")
+    .select("id")
+    .eq("graduate_id", graduate.id)
+    .eq("internship_id", job.id)
+    .maybeSingle();
+
+  if (existing) {
+    setMessage("You have already applied for this internship.");
+    setApplying(false);
+    return;
+  }
+
+  // Save application
+  const { error } = await supabase
+    .from("applications")
+    .insert([
+      {
+        internship_id: job.id,
+        graduate_id: graduate.id,
+        full_name: graduate.full_name,
+        email: graduate.email,
+        phone: graduate.phone,
+        qualification: graduate.qualification,
+        field_of_study: graduate.field_of_study,
+        skills: graduate.skills,
+        status: "Pending",
+        ai_score: 0,
+      },
+    ]);
+
+  if (error) {
+    setMessage(error.message);
+  } else {
+    setMessage("🎉 Application submitted successfully!");
+  }
+
+  setApplying(false);
+}
   if (loading) {
     return (
       <div
@@ -232,22 +305,34 @@ export default function InternshipPage() {
             Submit your application and take the next step in your career.
           </p>
 
-          <Link href="/graduate">
-            <button
-              style={{
-                background: "#0057B8",
-                color: "#fff",
-                border: "none",
-                padding: "16px 30px",
-                borderRadius: "12px",
-                fontSize: "17px",
-                fontWeight: "600",
-                cursor: "pointer",
-              }}
-            >
-              Apply Now
-            </button>
-          </Link>
+        <button
+  onClick={handleApply}
+  disabled={applying}
+  style={{
+    background: "#0057B8",
+    color: "#fff",
+    border: "none",
+    padding: "16px 30px",
+    borderRadius: "12px",
+    fontSize: "17px",
+    fontWeight: "600",
+    cursor: applying ? "not-allowed" : "pointer",
+  }}
+>
+  {applying ? "Applying..." : "Apply Now"}
+</button>
+
+{message && (
+  <p
+    style={{
+      marginTop: "20px",
+      color: "#0057B8",
+      fontWeight: "bold",
+    }}
+  >
+    {message}
+  </p>
+)}
         </div>
       </div>
     </main>
