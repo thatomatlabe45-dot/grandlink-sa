@@ -173,7 +173,71 @@ const { error } = await supabase.from("graduates").insert([
     </div>
   ))}
 </div>
-      
+     <div
+  style={{
+    maxWidth: "1200px",
+    margin: "0 auto 30px",
+    padding: "0 20px",
+  }}
+>
+  <div
+    style={{
+      background: "#fff",
+      borderRadius: "16px",
+      padding: "25px",
+      boxShadow: "0 10px 25px rgba(0,0,0,.08)",
+    }}
+  >
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: "15px",
+        flexWrap: "wrap",
+        gap: "10px",
+      }}
+    >
+      <h2
+        style={{
+          margin: 0,
+          color: "#0057b8",
+        }}
+      >
+        📈 Profile Completion
+      </h2>
+
+      <strong>0%</strong>
+    </div>
+
+    <div
+      style={{
+        width: "100%",
+        height: "12px",
+        background: "#e5e7eb",
+        borderRadius: "999px",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          width: "0%",
+          height: "100%",
+          background: "#0057b8",
+        }}
+      />
+    </div>
+
+    <p
+      style={{
+        marginTop: "15px",
+        color: "#666",
+      }}
+    >
+      Complete your profile, upload your documents and improve your AI internship matching.
+    </p>
+  </div>
+</div> 
         <form onSubmit={handleSubmit}>
           <div className="card">
             <h2>👤 Personal Information</h2>
