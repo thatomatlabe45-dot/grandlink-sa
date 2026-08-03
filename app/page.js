@@ -81,6 +81,7 @@ return (
     <Stats stats={stats} />
     <FeaturedInternships internships={internships} />
     <FeaturedCompanies companies={companies} />
+    <Testimonials />
     <h1>GradLink SA</h1>
   </main>
 );
