@@ -1,132 +1,149 @@
 "use client";
 
-import { useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+export default function Navbar() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [mobile, setMobile] = useState(false);
 
-export default function LoginPage() {
-  const router = useRouter();
+  useEffect(() => {
+    function updateScreen() {
+      const isMobile = window.innerWidth <= 768;
+      setMobile(isMobile);
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function login() {
-    setLoading(true);
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    setLoading(false);
-
-    if (error) {
-      alert(error.message);
-      return;
+      if (!isMobile) {
+        setMenuOpen(false);
+      }
     }
 
-    alert("Welcome back!");
+    updateScreen();
 
-    router.push("/choose-profile");
-  }
+    window.addEventListener("resize", updateScreen);
+
+    return () => window.removeEventListener("resize", updateScreen);
+  }, []);
+
+  const navLink = {
+    textDecoration: "none",
+    color: "#1f2937",
+    fontWeight: "600",
+    fontSize: "16px",
+  };
 
   return (
-    <div
+    <nav
       style={{
-        minHeight: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        background: "#f4f8fc",
-        fontFamily: "Arial, sans-serif",
+        position: "sticky",
+        top: 0,
+        zIndex: 1000,
+        background: "#ffffff",
+        boxShadow: "0 2px 15px rgba(0,0,0,.08)",
       }}
     >
       <div
         style={{
-          width: "100%",
-          maxWidth: "420px",
-          background: "#fff",
-          padding: "40px",
-          borderRadius: "16px",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
+          maxWidth: "1200px",
+          margin: "0 auto",
+          padding: "16px 20px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
         }}
       >
-        <h1
+        <Link
+          href="/"
           style={{
-            textAlign: "center",
-            color: "#0057B8",
-            marginBottom: "10px",
+            textDecoration: "none",
+            color: "#0057b8",
+            fontSize: "clamp(24px,4vw,32px)",
+            fontWeight: "800",
           }}
         >
           GradLink SA
-        </h1>
+        </Link>
 
-        <p
-          style={{
-            textAlign: "center",
-            color: "#666",
-            marginBottom: "30px",
-          }}
-        >
-          Sign in to your account
-        </p>
+        {!mobile ? (
+          <div
+            style={{
+              display: "flex",
+              gap: "28px",
+              alignItems: "center",
+            }}
+          >
+            <Link href="/" style={navLink}>Home</Link>
+            <Link href="/jobs" style={navLink}>Internships</Link>
+            <Link href="/graduate" style={navLink}>Graduates</Link>
+            <Link href="/company" style={navLink}>Companies</Link>
+            <Link href="/admin" style={navLink}>Admin</Link>
 
-        <input
-          type="email"
-          placeholder="Email Address"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "14px",
-            marginBottom: "15px",
-            borderRadius: "8px",
-            border: "1px solid #ddd",
-            fontSize: "16px",
-            boxSizing: "border-box",
-          }}
-        />
-
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "14px",
-            marginBottom: "20px",
-            borderRadius: "8px",
-            border: "1px solid #ddd",
-            fontSize: "16px",
-            boxSizing: "border-box",
-          }}
-        />
-
-        <button
-          onClick={login}
-          disabled={loading}
-          style={{
-            width: "100%",
-            padding: "14px",
-            background: "#0057B8",
-            color: "#fff",
-            border: "none",
-            borderRadius: "8px",
-            fontSize: "16px",
-            fontWeight: "bold",
-            cursor: "pointer",
-          }}
-        >
-          {loading ? "Signing In..." : "Sign In"}
-        </button>
+            <Link href="/graduate">
+              <button
+                style={{
+                  background: "#0057b8",
+                  color: "#fff",
+                  border: "none",
+                  padding: "12px 20px",
+                  borderRadius: "10px",
+                  cursor: "pointer",
+                  fontWeight: "700",
+                }}
+              >
+                Get Started
+              </button>
+            </Link>
+          </div>
+        ) : (
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            style={{
+              border: "none",
+              background: "none",
+              fontSize: "32px",
+              cursor: "pointer",
+              color: "#0057b8",
+            }}
+          >
+            ☰
+          </button>
+        )}
       </div>
-    </div>
+
+      {mobile && menuOpen && (
+        <div
+          style={{
+            borderTop: "1px solid #eee",
+            background: "#fff",
+            padding: "15px 20px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "16px",
+          }}
+        >
+          <Link href="/" style={navLink}>Home</Link>
+          <Link href="/jobs" style={navLink}>Internships</Link>
+          <Link href="/graduate" style={navLink}>Graduates</Link>
+          <Link href="/company" style={navLink}>Companies</Link>
+          <Link href="/admin" style={navLink}>Admin</Link>
+
+          <Link href="/graduate">
+            <button
+              style={{
+                width: "100%",
+                background: "#0057b8",
+                color: "#fff",
+                border: "none",
+                padding: "14px",
+                borderRadius: "10px",
+                fontWeight: "700",
+                cursor: "pointer",
+              }}
+            >
+              Get Started
+            </button>
+          </Link>
+        </div>
+      )}
+    </nav>
   );
 }
