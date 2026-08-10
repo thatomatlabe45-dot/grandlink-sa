@@ -35,7 +35,15 @@ export default function LoginPage() {
 
     setLoading(false);
 
-    router.push("/");
+    const savedProfile = localStorage.getItem("gradlink_profile");
+
+if (savedProfile === "graduate") {
+  router.push("/graduate");
+} else if (savedProfile === "company") {
+  router.push("/company");
+} else {
+  router.push("/choose-profile");
+}
   }
 
   return (
