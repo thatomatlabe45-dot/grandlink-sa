@@ -6,15 +6,10 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 export default function Navbar() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [mobile, setMobile] = useState(false);
   const router = useRouter();
 
-async function handleLogout() {
-  await supabase.auth.signOut();
-  localStorage.removeItem("gradlink_profile");
-  router.push("/login");
-}
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [mobile, setMobile] = useState(false);
 
   useEffect(() => {
     function updateScreen() {
@@ -32,6 +27,12 @@ async function handleLogout() {
 
     return () => window.removeEventListener("resize", updateScreen);
   }, []);
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    setMenuOpen(false);
+    router.push("/login");
+  }
 
   const navLink = {
     textDecoration: "none",
@@ -80,42 +81,40 @@ async function handleLogout() {
               alignItems: "center",
             }}
           >
-            <Link href="/" style={navLink}>Home</Link>
-            <Link href="/jobs" style={navLink}>Internships</Link>
-            <Link href="/graduate" style={navLink}>Graduates</Link>
-            <Link href="/company" style={navLink}>Companies</Link>
-            <Link href="/admin" style={navLink}>Admin</Link>
-            <button
-  onClick={handleLogout}
-  style={{
-    background: "none",
-    border: "none",
-    color: "#dc2626",
-    fontWeight: "600",
-    fontSize: "16px",
-    cursor: "pointer",
-  }}
->
-  Logout
-</button>
-            
-            
-
-            <Link href="/graduate">
-              <button
-                style={{
-                  background: "#0057b8",
-                  color: "#fff",
-                  border: "none",
-                  padding: "12px 20px",
-                  borderRadius: "10px",
-                  cursor: "pointer",
-                  fontWeight: "700",
-                }}
-              >
-                Get Started
-              </button>
+            <Link href="/" style={navLink}>
+              Home
             </Link>
+
+            <Link href="/jobs" style={navLink}>
+              Internships
+            </Link>
+
+            <Link href="/graduate" style={navLink}>
+              Graduates
+            </Link>
+
+            <Link href="/company" style={navLink}>
+              Companies
+            </Link>
+
+            <Link href="/admin" style={navLink}>
+              Admin
+            </Link>
+
+            <button
+              onClick={handleLogout}
+              style={{
+                background: "#dc2626",
+                color: "#fff",
+                border: "none",
+                padding: "12px 20px",
+                borderRadius: "10px",
+                cursor: "pointer",
+                fontWeight: "700",
+              }}
+            >
+              Logout
+            </button>
           </div>
         ) : (
           <button
@@ -144,43 +143,42 @@ async function handleLogout() {
             gap: "16px",
           }}
         >
-          <Link href="/" style={navLink}>Home</Link>
-          <Link href="/jobs" style={navLink}>Internships</Link>
-          <Link href="/graduate" style={navLink}>Graduates</Link>
-          <Link href="/company" style={navLink}>Companies</Link>
-          <Link href="/admin" style={navLink}>Admin</Link>
-          <button
-  onClick={handleLogout}
-  style={{
-    width: "100%",
-    background: "#fee2e2",
-    color: "#dc2626",
-    border: "none",
-    padding: "14px",
-    borderRadius: "10px",
-    fontWeight: "700",
-    cursor: "pointer",
-  }}
->
-  Logout
-</button>
-
-          <Link href="/graduate">
-            <button
-              style={{
-                width: "100%",
-                background: "#0057b8",
-                color: "#fff",
-                border: "none",
-                padding: "14px",
-                borderRadius: "10px",
-                fontWeight: "700",
-                cursor: "pointer",
-              }}
-            >
-              Get Started
-            </button>
+          <Link href="/" style={navLink}>
+            Home
           </Link>
+
+          <Link href="/jobs" style={navLink}>
+            Internships
+          </Link>
+
+          <Link href="/graduate" style={navLink}>
+            Graduates
+          </Link>
+
+          <Link href="/company" style={navLink}>
+            Companies
+          </Link>
+
+          <Link href="/admin" style={navLink}>
+            Admin
+          </Link>
+
+          <button
+            onClick={handleLogout}
+            style={{
+              width: "100%",
+              background: "#dc2626",
+              color: "#fff",
+              border: "none",
+              padding: "14px",
+              borderRadius: "10px",
+              fontWeight: "700",
+              cursor: "pointer",
+              fontSize: "16px",
+            }}
+          >
+            Logout
+          </button>
         </div>
       )}
     </nav>
