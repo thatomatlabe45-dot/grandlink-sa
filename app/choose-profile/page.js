@@ -77,7 +77,7 @@ export default function ChooseProfilePage() {
             marginBottom: "10px",
           }}
         >
-          Welcome to GradLink SA
+          WELCOME TEST 123
         </h1>
 
         <p
