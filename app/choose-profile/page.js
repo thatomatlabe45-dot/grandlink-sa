@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Navbar from "../components/Navbar";
 
 export default function ChooseProfilePage() {
   const router = useRouter();
@@ -15,7 +16,11 @@ export default function ChooseProfilePage() {
 }
 
   return (
+  <>
+    <Navbar />
+
     <div
+  
       style={{
         minHeight: "100vh",
         background: "#f4f8fc",
@@ -127,7 +132,9 @@ export default function ChooseProfilePage() {
             </p>
           </div>
         </div>
-      </div>
-    </div>
-  );
+          </div>
+  </>
+);
+    
+  
 }
