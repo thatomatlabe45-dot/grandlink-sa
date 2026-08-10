@@ -85,6 +85,21 @@ async function handleLogout() {
             <Link href="/graduate" style={navLink}>Graduates</Link>
             <Link href="/company" style={navLink}>Companies</Link>
             <Link href="/admin" style={navLink}>Admin</Link>
+            <button
+  onClick={handleLogout}
+  style={{
+    background: "none",
+    border: "none",
+    color: "#dc2626",
+    fontWeight: "600",
+    fontSize: "16px",
+    cursor: "pointer",
+  }}
+>
+  Logout
+</button>
+            
+            
 
             <Link href="/graduate">
               <button
@@ -134,6 +149,21 @@ async function handleLogout() {
           <Link href="/graduate" style={navLink}>Graduates</Link>
           <Link href="/company" style={navLink}>Companies</Link>
           <Link href="/admin" style={navLink}>Admin</Link>
+          <button
+  onClick={handleLogout}
+  style={{
+    width: "100%",
+    background: "#fee2e2",
+    color: "#dc2626",
+    border: "none",
+    padding: "14px",
+    borderRadius: "10px",
+    fontWeight: "700",
+    cursor: "pointer",
+  }}
+>
+  Logout
+</button>
 
           <Link href="/graduate">
             <button
