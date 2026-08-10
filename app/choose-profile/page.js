@@ -4,6 +4,15 @@ import { useRouter } from "next/navigation";
 
 export default function ChooseProfilePage() {
   const router = useRouter();
+  function selectProfile(profile) {
+  localStorage.setItem("gradlink_profile", profile);
+
+  if (profile === "graduate") {
+    router.push("/graduate");
+  } else {
+    router.push("/company");
+  }
+}
 
   return (
     <div
@@ -53,7 +62,7 @@ export default function ChooseProfilePage() {
           }}
         >
           <div
-            onClick={() => router.push("/graduate")}
+            onClick={() => selectProfile("graduate")}
             style={{
               width: "320px",
               background: "#fff",
@@ -86,7 +95,7 @@ export default function ChooseProfilePage() {
           </div>
 
           <div
-            onClick={() => router.push("/company")}
+            onClick={() => selectProfile("company")}
             style={{
               width: "320px",
               background: "#fff",
