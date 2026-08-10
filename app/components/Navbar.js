@@ -2,10 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobile, setMobile] = useState(false);
+  const router = useRouter();
+
+async function handleLogout() {
+  await supabase.auth.signOut();
+  localStorage.removeItem("gradlink_profile");
+  router.push("/login");
+}
 
   useEffect(() => {
     function updateScreen() {
