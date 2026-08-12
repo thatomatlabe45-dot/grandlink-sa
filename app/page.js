@@ -87,7 +87,7 @@ return (
     <h1>GradLink SA</h1>
   </main>
 );
-
+}
       {/* Navigation */}
       {/* Navigation */}
 <Navbar />
