@@ -15,6 +15,7 @@ export default function CompanyDashboard() {
   const [company, setCompany] = useState(null);
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState(null);
 
   useEffect(() => {
     loadDashboard();
@@ -52,7 +53,10 @@ export default function CompanyDashboard() {
       return 4;
     }
 
-    if (value.includes("honours") || value.includes("honors")) {
+    if (
+      value.includes("honours") ||
+      value.includes("honors")
+    ) {
       return 5;
     }
 
@@ -95,13 +99,10 @@ export default function CompanyDashboard() {
     const requiredLevel =
       getQualificationLevel(required);
 
-    // If both are recognized qualification levels,
-    // higher qualifications meet lower requirements.
     if (applicantLevel > 0 && requiredLevel > 0) {
       return applicantLevel >= requiredLevel;
     }
 
-    // Otherwise use text matching.
     return (
       applicant === required ||
       applicant.includes(required) ||
@@ -115,7 +116,6 @@ export default function CompanyDashboard() {
 
   function calculateMatch(application, internship) {
     let score = 0;
-
     const reasons = [];
 
     const applicantField = (
@@ -299,6 +299,46 @@ export default function CompanyDashboard() {
   }
 
   // ----------------------------------------
+  // UPDATE APPLICATION STATUS
+  // ----------------------------------------
+
+  async function updateApplicationStatus(
+    applicationId,
+    newStatus
+  ) {
+    setUpdatingId(applicationId);
+
+    const { error } = await supabase
+      .from("applications")
+      .update({
+        status: newStatus,
+      })
+      .eq("id", applicationId);
+
+    if (error) {
+      alert(
+        `Could not update application status: ${error.message}`
+      );
+
+      setUpdatingId(null);
+      return;
+    }
+
+    setApplications((currentApplications) =>
+      currentApplications.map((application) =>
+        application.id === applicationId
+          ? {
+              ...application,
+              status: newStatus,
+            }
+          : application
+      )
+    );
+
+    setUpdatingId(null);
+  }
+
+  // ----------------------------------------
   // LOAD DASHBOARD
   // ----------------------------------------
 
@@ -314,12 +354,14 @@ export default function CompanyDashboard() {
       return;
     }
 
-    const { data: companyData, error: companyError } =
-      await supabase
-        .from("companies")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
+    const {
+      data: companyData,
+      error: companyError,
+    } = await supabase
+      .from("companies")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
     if (companyError || !companyData) {
       setLoading(false);
@@ -398,7 +440,6 @@ export default function CompanyDashboard() {
         };
       });
 
-      // Highest score first
       applicationsWithJobs.sort(
         (a, b) => b.ai_score - a.ai_score
       );
@@ -628,6 +669,9 @@ export default function CompanyDashboard() {
                   application.ai_score
                 );
 
+                const currentStatus =
+                  application.status || "Pending";
+
                 return (
                   <div
                     key={application.id}
@@ -656,6 +700,8 @@ export default function CompanyDashboard() {
                     >
                       #{index + 1} Applicant
                     </div>
+
+                    {/* NAME + STATUS */}
 
                     <div
                       style={{
@@ -687,18 +733,35 @@ export default function CompanyDashboard() {
                         </p>
                       </div>
 
+                      {/* STATUS */}
+
                       <div
                         style={{
-                          background: "#eef5ff",
-                          color: "#0057B8",
+                          background:
+                            currentStatus ===
+                            "Shortlisted"
+                              ? "#e8f7ee"
+                              : currentStatus ===
+                                "Rejected"
+                              ? "#fff0f0"
+                              : "#eef5ff",
+
+                          color:
+                            currentStatus ===
+                            "Shortlisted"
+                              ? "#16803c"
+                              : currentStatus ===
+                                "Rejected"
+                              ? "#c62828"
+                              : "#0057B8",
+
                           padding: "8px 12px",
                           borderRadius: "20px",
                           height: "fit-content",
                           fontWeight: "bold",
                         }}
                       >
-                        {application.status ||
-                          "Pending"}
+                        {currentStatus}
                       </div>
                     </div>
 
@@ -710,6 +773,8 @@ export default function CompanyDashboard() {
                         margin: "18px 0",
                       }}
                     />
+
+                    {/* APPLICANT DETAILS */}
 
                     <p>
                       <strong>
@@ -854,6 +919,209 @@ export default function CompanyDashboard() {
                         </p>
                       )}
                     </div>
+
+                    {/* RECRUITMENT ACTIONS */}
+
+                    <div
+                      style={{
+                        marginTop: "20px",
+                        paddingTop: "18px",
+                        borderTop:
+                          "1px solid #eee",
+                      }}
+                    >
+                      <h4
+                        style={{
+                          marginTop: 0,
+                          color: "#003b7a",
+                        }}
+                      >
+                        Recruitment Decision
+                      </h4>
+
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "10px",
+                          flexWrap: "wrap",
+                        }}
+                      >
+
+                        {/* SHORTLIST */}
+
+                        <button
+                          onClick={() =>
+                            updateApplicationStatus(
+                              application.id,
+                              "Shortlisted"
+                            )
+                          }
+                          disabled={
+                            updatingId ===
+                            application.id ||
+                            currentStatus ===
+                              "Shortlisted"
+                          }
+                          style={{
+                            background:
+                              currentStatus ===
+                              "Shortlisted"
+                                ? "#16803c"
+                                : "#e8f7ee",
+
+                            color:
+                              currentStatus ===
+                              "Shortlisted"
+                                ? "#fff"
+                                : "#16803c",
+
+                            border:
+                              "1px solid #16803c",
+
+                            padding:
+                              "11px 16px",
+
+                            borderRadius:
+                              "9px",
+
+                            fontWeight:
+                              "bold",
+
+                            cursor:
+                              currentStatus ===
+                              "Shortlisted"
+                                ? "default"
+                                : "pointer",
+
+                            opacity:
+                              updatingId ===
+                              application.id
+                                ? 0.6
+                                : 1,
+                          }}
+                        >
+                          {updatingId ===
+                          application.id
+                            ? "Updating..."
+                            : currentStatus ===
+                              "Shortlisted"
+                            ? "✅ Shortlisted"
+                            : "🟢 Shortlist"}
+                        </button>
+
+                        {/* REJECT */}
+
+                        <button
+                          onClick={() =>
+                            updateApplicationStatus(
+                              application.id,
+                              "Rejected"
+                            )
+                          }
+                          disabled={
+                            updatingId ===
+                            application.id ||
+                            currentStatus ===
+                              "Rejected"
+                          }
+                          style={{
+                            background:
+                              currentStatus ===
+                              "Rejected"
+                                ? "#c62828"
+                                : "#fff0f0",
+
+                            color:
+                              currentStatus ===
+                              "Rejected"
+                                ? "#fff"
+                                : "#c62828",
+
+                            border:
+                              "1px solid #c62828",
+
+                            padding:
+                              "11px 16px",
+
+                            borderRadius:
+                              "9px",
+
+                            fontWeight:
+                              "bold",
+
+                            cursor:
+                              currentStatus ===
+                              "Rejected"
+                                ? "default"
+                                : "pointer",
+
+                            opacity:
+                              updatingId ===
+                              application.id
+                                ? 0.6
+                                : 1,
+                          }}
+                        >
+                          {updatingId ===
+                          application.id
+                            ? "Updating..."
+                            : currentStatus ===
+                              "Rejected"
+                            ? "❌ Rejected"
+                            : "🔴 Reject"}
+                        </button>
+
+                        {/* RESET */}
+
+                        {currentStatus !==
+                          "Pending" && (
+                          <button
+                            onClick={() =>
+                              updateApplicationStatus(
+                                application.id,
+                                "Pending"
+                              )
+                            }
+                            disabled={
+                              updatingId ===
+                              application.id
+                            }
+                            style={{
+                              background:
+                                "#fff",
+
+                              color:
+                                "#555",
+
+                              border:
+                                "1px solid #aaa",
+
+                              padding:
+                                "11px 16px",
+
+                              borderRadius:
+                                "9px",
+
+                              fontWeight:
+                                "bold",
+
+                              cursor:
+                                "pointer",
+
+                              opacity:
+                                updatingId ===
+                                application.id
+                                  ? 0.6
+                                  : 1,
+                            }}
+                          >
+                            🔄 Reset to Pending
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* APPLIED DATE */}
 
                     <p
                       style={{
