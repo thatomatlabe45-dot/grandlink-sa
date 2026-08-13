@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
+import Navbar from "../components/Navbar";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -15,6 +16,11 @@ export default function GraduateDashboard() {
   const [user, setUser] = useState(null);
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // ----------------------------------------
+  // LOAD DASHBOARD
+  // ----------------------------------------
 
   useEffect(() => {
     loadDashboard();
@@ -24,26 +30,30 @@ export default function GraduateDashboard() {
     setLoading(true);
 
     const {
-      data: { user: currentUser },
+      data: { user },
     } = await supabase.auth.getUser();
 
-    if (!currentUser) {
+    if (!user) {
       router.push("/login");
       return;
     }
 
-    setUser(currentUser);
+    setUser(user);
 
-    const { data, error } = await supabase
+    // Get applications belonging to this graduate
+    const {
+      data,
+      error,
+    } = await supabase
       .from("applications")
       .select("*")
-      .eq("graduate_id", currentUser.id)
+      .eq("graduate_id", user.id)
       .order("created_at", {
         ascending: false,
       });
 
     if (error) {
-      console.error("Error loading applications:", error);
+      console.error("Applications error:", error);
       setApplications([]);
     } else {
       setApplications(data || []);
@@ -52,25 +62,60 @@ export default function GraduateDashboard() {
     setLoading(false);
   }
 
-  function getStatusStyle(status) {
-    const currentStatus = (
-      status || "Pending"
-    ).toLowerCase();
+  // ----------------------------------------
+  // REFRESH
+  // ----------------------------------------
 
-    if (currentStatus === "shortlisted") {
+  async function handleRefresh() {
+    setRefreshing(true);
+
+    await loadDashboard();
+
+    setRefreshing(false);
+  }
+
+  // ----------------------------------------
+  // COUNTS
+  // ----------------------------------------
+
+  const totalApplications = applications.length;
+
+  const shortlistedApplications =
+    applications.filter(
+      (application) =>
+        application.status === "Shortlisted"
+    ).length;
+
+  const pendingApplications =
+    applications.filter(
+      (application) =>
+        !application.status ||
+        application.status === "Pending"
+    ).length;
+
+  const rejectedApplications =
+    applications.filter(
+      (application) =>
+        application.status === "Rejected"
+    ).length;
+
+  // ----------------------------------------
+  // STATUS STYLE
+  // ----------------------------------------
+
+  function getStatusStyle(status) {
+    if (status === "Shortlisted") {
       return {
         background: "#e8f7ee",
         color: "#16803c",
-        border: "1px solid #16803c",
         icon: "🟢",
       };
     }
 
-    if (currentStatus === "rejected") {
+    if (status === "Rejected") {
       return {
         background: "#fff0f0",
         color: "#c62828",
-        border: "1px solid #c62828",
         icon: "🔴",
       };
     }
@@ -78,538 +123,513 @@ export default function GraduateDashboard() {
     return {
       background: "#fff7e6",
       color: "#b26a00",
-      border: "1px solid #f0b429",
       icon: "🟡",
     };
   }
 
-  function getStatusMessage(status) {
-    const currentStatus = (
-      status || "Pending"
-    ).toLowerCase();
-
-    if (currentStatus === "shortlisted") {
-      return "Congratulations! You have been shortlisted by the company.";
-    }
-
-    if (currentStatus === "rejected") {
-      return "Unfortunately, your application was not selected this time.";
-    }
-
-    return "Your application is currently being reviewed.";
-  }
+  // ----------------------------------------
+  // LOADING
+  // ----------------------------------------
 
   if (loading) {
     return (
-      <main
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          background: "#f5f9ff",
-          color: "#0057B8",
-          fontSize: "22px",
-          fontWeight: "bold",
-          padding: "20px",
-          textAlign: "center",
-        }}
-      >
-        Loading your applications...
-      </main>
+      <>
+        <Navbar />
+
+        <main
+          style={{
+            minHeight: "80vh",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            background: "#f5f9ff",
+            color: "#0057B8",
+            fontSize: "20px",
+            fontWeight: "bold",
+          }}
+        >
+          Loading your dashboard...
+        </main>
+      </>
     );
   }
 
+  // ----------------------------------------
+  // DASHBOARD
+  // ----------------------------------------
+
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#f5f9ff",
-        padding: "25px 15px 60px",
-      }}
-    >
-      <div
+    <>
+      <Navbar />
+
+      <main
         style={{
-          maxWidth: "900px",
-          margin: "0 auto",
+          minHeight: "100vh",
+          background: "#f5f9ff",
+          padding: "30px 20px 60px",
         }}
       >
-
-        {/* HEADER */}
-
         <div
           style={{
-            background:
-              "linear-gradient(135deg,#0057B8,#0a84ff)",
-            color: "#fff",
-            borderRadius: "20px",
-            padding: "30px 25px",
-            marginBottom: "25px",
-            boxShadow:
-              "0 10px 30px rgba(0,87,184,.2)",
+            maxWidth: "1100px",
+            margin: "0 auto",
           }}
         >
-          <h1
-            style={{
-              marginTop: 0,
-              marginBottom: "8px",
-            }}
-          >
-            🎓 Graduate Dashboard
-          </h1>
+          {/* HEADER */}
 
-          <p
-            style={{
-              margin: 0,
-              fontSize: "16px",
-              opacity: 0.95,
-            }}
-          >
-            Track your internship applications
-            and recruitment status.
-          </p>
-        </div>
-
-        {/* STATISTICS */}
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit,minmax(150px,1fr))",
-            gap: "15px",
-            marginBottom: "25px",
-          }}
-        >
-          <div style={statCard}>
-            <div style={{ fontSize: "30px" }}>
-              📋
-            </div>
-
-            <h2
-              style={{
-                margin: "8px 0 3px",
-                color: "#0057B8",
-              }}
-            >
-              {applications.length}
-            </h2>
-
-            <p
-              style={{
-                margin: 0,
-                color: "#666",
-              }}
-            >
-              Applications
-            </p>
-          </div>
-
-          <div style={statCard}>
-            <div style={{ fontSize: "30px" }}>
-              🟢
-            </div>
-
-            <h2
-              style={{
-                margin: "8px 0 3px",
-                color: "#16803c",
-              }}
-            >
-              {
-                applications.filter(
-                  (application) =>
-                    (
-                      application.status ||
-                      "Pending"
-                    ).toLowerCase() ===
-                    "shortlisted"
-                ).length
-              }
-            </h2>
-
-            <p
-              style={{
-                margin: 0,
-                color: "#666",
-              }}
-            >
-              Shortlisted
-            </p>
-          </div>
-
-          <div style={statCard}>
-            <div style={{ fontSize: "30px" }}>
-              🟡
-            </div>
-
-            <h2
-              style={{
-                margin: "8px 0 3px",
-                color: "#b26a00",
-              }}
-            >
-              {
-                applications.filter(
-                  (application) =>
-                    (
-                      application.status ||
-                      "Pending"
-                    ).toLowerCase() ===
-                    "pending"
-                ).length
-              }
-            </h2>
-
-            <p
-              style={{
-                margin: 0,
-                color: "#666",
-              }}
-            >
-              Pending
-            </p>
-          </div>
-        </div>
-
-        {/* APPLICATIONS */}
-
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: "18px",
-            padding: "25px",
-            boxShadow:
-              "0 10px 30px rgba(0,0,0,.08)",
-          }}
-        >
           <div
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "10px",
-              flexWrap: "wrap",
-              marginBottom: "20px",
+              background:
+                "linear-gradient(135deg,#0057B8,#0a84ff)",
+              color: "#fff",
+              borderRadius: "20px",
+              padding: "35px",
+              marginBottom: "25px",
             }}
           >
-            <h2
+            <h1
               style={{
-                color: "#0057B8",
-                margin: 0,
+                marginTop: 0,
+                marginBottom: "10px",
               }}
             >
-              📋 My Applications
-            </h2>
+              🎓 Graduate Dashboard
+            </h1>
 
-            <button
-              onClick={loadDashboard}
+            <p
               style={{
-                background: "#eef5ff",
-                color: "#0057B8",
-                border: "1px solid #0057B8",
-                padding: "9px 14px",
-                borderRadius: "9px",
-                fontWeight: "bold",
-                cursor: "pointer",
+                margin: 0,
+                fontSize: "17px",
+                lineHeight: "1.6",
               }}
             >
-              🔄 Refresh
-            </button>
+              Track your internship applications
+              and recruitment status.
+            </p>
           </div>
 
-          {applications.length === 0 ? (
+          {/* STATISTICS */}
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit,minmax(180px,1fr))",
+              gap: "18px",
+              marginBottom: "30px",
+            }}
+          >
+            {/* APPLICATIONS */}
+
+            <div style={statCard}>
+              <div style={{ fontSize: "32px" }}>
+                📋
+              </div>
+
+              <h2>{totalApplications}</h2>
+
+              <p>Applications</p>
+            </div>
+
+            {/* SHORTLISTED */}
+
+            <div style={statCard}>
+              <div style={{ fontSize: "32px" }}>
+                🟢
+              </div>
+
+              <h2
+                style={{
+                  color: "#16803c",
+                }}
+              >
+                {shortlistedApplications}
+              </h2>
+
+              <p>Shortlisted</p>
+            </div>
+
+            {/* PENDING */}
+
+            <div style={statCard}>
+              <div style={{ fontSize: "32px" }}>
+                🟡
+              </div>
+
+              <h2
+                style={{
+                  color: "#b26a00",
+                }}
+              >
+                {pendingApplications}
+              </h2>
+
+              <p>Pending</p>
+            </div>
+
+            {/* REJECTED */}
+
+            <div style={statCard}>
+              <div style={{ fontSize: "32px" }}>
+                🔴
+              </div>
+
+              <h2
+                style={{
+                  color: "#c62828",
+                }}
+              >
+                {rejectedApplications}
+              </h2>
+
+              <p>Rejected</p>
+            </div>
+          </div>
+
+          {/* APPLICATIONS */}
+
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: "18px",
+              padding: "30px",
+              boxShadow:
+                "0 10px 30px rgba(0,0,0,.08)",
+            }}
+          >
+            {/* TITLE + REFRESH */}
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent:
+                  "space-between",
+                alignItems: "center",
+                gap: "15px",
+                flexWrap: "wrap",
+                marginBottom: "20px",
+              }}
+            >
+              <h2
+                style={{
+                  color: "#0057B8",
+                  margin: 0,
+                }}
+              >
+                📋 My Applications
+              </h2>
+
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                style={{
+                  background: "#eef5ff",
+                  color: "#0057B8",
+                  border:
+                    "1px solid #0057B8",
+                  padding: "10px 16px",
+                  borderRadius: "9px",
+                  fontWeight: "bold",
+                  cursor: refreshing
+                    ? "default"
+                    : "pointer",
+                  opacity: refreshing
+                    ? 0.6
+                    : 1,
+                }}
+              >
+                {refreshing
+                  ? "🔄 Refreshing..."
+                  : "🔄 Refresh"}
+              </button>
+            </div>
+
+            {/* NO APPLICATIONS */}
+
+            {applications.length === 0 ? (
+              <div
+                style={{
+                  padding: "45px 15px",
+                  textAlign: "center",
+                  color: "#777",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "50px",
+                  }}
+                >
+                  📭
+                </div>
+
+                <h3
+                  style={{
+                    color: "#333",
+                  }}
+                >
+                  No applications yet
+                </h3>
+
+                <p>
+                  You haven't applied for any
+                  internships yet.
+                </p>
+
+                <button
+                  onClick={() =>
+                    router.push("/jobs")
+                  }
+                  style={{
+                    marginTop: "10px",
+                    background: "#0057B8",
+                    color: "#fff",
+                    border: "none",
+                    padding: "13px 22px",
+                    borderRadius: "10px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
+                >
+                  🔎 Browse Internships
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* APPLICATION CARDS */}
+
+                {applications.map(
+                  (application, index) => {
+                    const statusStyle =
+                      getStatusStyle(
+                        application.status
+                      );
+
+                    return (
+                      <div
+                        key={application.id}
+                        style={{
+                          border:
+                            "1px solid #e1e7ef",
+                          borderRadius: "14px",
+                          padding: "22px",
+                          marginBottom:
+                            "18px",
+                        }}
+                      >
+                        {/* TOP */}
+
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent:
+                              "space-between",
+                            alignItems:
+                              "flex-start",
+                            gap: "15px",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <div>
+                            <div
+                              style={{
+                                fontSize:
+                                  "13px",
+                                color:
+                                  "#888",
+                                marginBottom:
+                                  "6px",
+                              }}
+                            >
+                              Application #
+                              {index + 1}
+                            </div>
+
+                            <h3
+                              style={{
+                                margin:
+                                  "0 0 7px",
+                                color:
+                                  "#003b7a",
+                              }}
+                            >
+                              {application.job_title ||
+                                "Internship"}
+                            </h3>
+                          </div>
+
+                          {/* STATUS */}
+
+                          <div
+                            style={{
+                              background:
+                                statusStyle.background,
+                              color:
+                                statusStyle.color,
+                              padding:
+                                "9px 14px",
+                              borderRadius:
+                                "20px",
+                              fontWeight:
+                                "bold",
+                              whiteSpace:
+                                "nowrap",
+                            }}
+                          >
+                            {
+                              statusStyle.icon
+                            }{" "}
+                            {application.status ||
+                              "Pending"}
+                          </div>
+                        </div>
+
+                        <hr
+                          style={{
+                            border: "none",
+                            borderTop:
+                              "1px solid #eee",
+                            margin:
+                              "18px 0",
+                          }}
+                        />
+
+                        {/* DETAILS */}
+
+                        <p
+                          style={{
+                            margin:
+                              "8px 0",
+                          }}
+                        >
+                          <strong>
+                            🎓 Qualification:
+                          </strong>{" "}
+                          {application.qualification ||
+                            "Not provided"}
+                        </p>
+
+                        <p
+                          style={{
+                            margin:
+                              "8px 0",
+                          }}
+                        >
+                          <strong>
+                            💻 Field of Study:
+                          </strong>{" "}
+                          {application.field_of_study ||
+                            "Not provided"}
+                        </p>
+
+                        <p
+                          style={{
+                            margin:
+                              "8px 0",
+                          }}
+                        >
+                          <strong>
+                            🛠️ Skills:
+                          </strong>{" "}
+                          {application.skills ||
+                            "Not provided"}
+                        </p>
+
+                        {/* AI SCORE */}
+
+                        {application.ai_score !==
+                          null &&
+                          application.ai_score !==
+                            undefined && (
+                            <div
+                              style={{
+                                marginTop:
+                                  "18px",
+                                background:
+                                  "#eef6ff",
+                                borderRadius:
+                                  "12px",
+                                padding:
+                                  "15px",
+                                color:
+                                  "#0057B8",
+                                fontWeight:
+                                  "bold",
+                              }}
+                            >
+                              🎯 AI Match Score:{" "}
+                              {
+                                application.ai_score
+                              }
+                              %
+                            </div>
+                          )}
+
+                        {/* APPLIED DATE */}
+
+                        <p
+                          style={{
+                            color:
+                              "#888",
+                            fontSize:
+                              "14px",
+                            marginTop:
+                              "18px",
+                            marginBottom: 0,
+                          }}
+                        >
+                          Applied:{" "}
+                          {application.created_at
+                            ? new Date(
+                                application.created_at
+                              ).toLocaleDateString()
+                            : "Unknown"}
+                        </p>
+                      </div>
+                    );
+                  }
+                )}
+              </>
+            )}
+          </div>
+
+          {/* BROWSE BUTTON */}
+
+          {applications.length > 0 && (
             <div
               style={{
                 textAlign: "center",
-                padding: "40px 15px",
-                color: "#777",
+                marginTop: "25px",
               }}
             >
-              <div
-                style={{
-                  fontSize: "50px",
-                  marginBottom: "10px",
-                }}
-              >
-                📭
-              </div>
-
-              <h3
-                style={{
-                  color: "#555",
-                }}
-              >
-                No applications yet
-              </h3>
-
-              <p>
-                You haven't applied for any
-                internships yet.
-              </p>
-
               <button
                 onClick={() =>
                   router.push("/jobs")
                 }
-                style={actionButton}
+                style={{
+                  background: "#0057B8",
+                  color: "#fff",
+                  border: "none",
+                  padding: "14px 24px",
+                  borderRadius: "10px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                }}
               >
-                🔎 Browse Internships
+                🔎 Browse More Internships
               </button>
             </div>
-          ) : (
-            applications.map((application) => {
-              const statusStyle =
-                getStatusStyle(
-                  application.status
-                );
-
-              const status =
-                application.status ||
-                "Pending";
-
-              return (
-                <div
-                  key={application.id}
-                  style={{
-                    border:
-                      "1px solid #e1e7ef",
-                    borderRadius: "15px",
-                    padding: "20px",
-                    marginBottom: "18px",
-                  }}
-                >
-
-                  {/* TITLE + STATUS */}
-
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent:
-                        "space-between",
-                      alignItems: "flex-start",
-                      gap: "15px",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <div>
-                      <h3
-                        style={{
-                          marginTop: 0,
-                          marginBottom: "7px",
-                          color: "#003b7a",
-                        }}
-                      >
-                        {application.job_title ||
-                          application.internship_title ||
-                          "Internship"}
-                      </h3>
-
-                      <p
-                        style={{
-                          margin: 0,
-                          color: "#666",
-                        }}
-                      >
-                        🏢{" "}
-                        {application.company_name ||
-                          "Company"}
-                      </p>
-                    </div>
-
-                    {/* STATUS */}
-
-                    <div
-                      style={{
-                        background:
-                          statusStyle.background,
-                        color:
-                          statusStyle.color,
-                        border:
-                          statusStyle.border,
-                        padding:
-                          "9px 14px",
-                        borderRadius: "20px",
-                        fontWeight: "bold",
-                        whiteSpace:
-                          "nowrap",
-                      }}
-                    >
-                      {statusStyle.icon}{" "}
-                      {status}
-                    </div>
-                  </div>
-
-                  <hr
-                    style={{
-                      border: "none",
-                      borderTop:
-                        "1px solid #eee",
-                      margin: "18px 0",
-                    }}
-                  />
-
-                  {/* APPLICATION DETAILS */}
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns:
-                        "repeat(auto-fit,minmax(200px,1fr))",
-                      gap: "12px",
-                    }}
-                  >
-                    <div>
-                      <strong>
-                        🆔 Application ID
-                      </strong>
-
-                      <p
-                        style={{
-                          margin:
-                            "5px 0 0",
-                          color: "#666",
-                          wordBreak:
-                            "break-all",
-                          fontSize: "14px",
-                        }}
-                      >
-                        {application.id}
-                      </p>
-                    </div>
-
-                    <div>
-                      <strong>
-                        🎓 Qualification
-                      </strong>
-
-                      <p
-                        style={{
-                          margin:
-                            "5px 0 0",
-                          color: "#666",
-                        }}
-                      >
-                        {application.qualification ||
-                          "Not provided"}
-                      </p>
-                    </div>
-
-                    <div>
-                      <strong>
-                        💻 Field of Study
-                      </strong>
-
-                      <p
-                        style={{
-                          margin:
-                            "5px 0 0",
-                          color: "#666",
-                        }}
-                      >
-                        {application.field_of_study ||
-                          "Not provided"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* STATUS MESSAGE */}
-
-                  <div
-                    style={{
-                      marginTop: "18px",
-                      padding: "16px",
-                      background:
-                        statusStyle.background,
-                      borderRadius: "12px",
-                      color:
-                        statusStyle.color,
-                    }}
-                  >
-                    <strong>
-                      {status ===
-                      "Shortlisted"
-                        ? "🎉 Great news!"
-                        : status ===
-                          "Rejected"
-                        ? "Application Update"
-                        : "Application Status"}
-                    </strong>
-
-                    <p
-                      style={{
-                        margin:
-                          "7px 0 0",
-                      }}
-                    >
-                      {getStatusMessage(
-                        status
-                      )}
-                    </p>
-                  </div>
-
-                  {/* APPLIED DATE */}
-
-                  <p
-                    style={{
-                      color: "#777",
-                      fontSize: "14px",
-                      marginBottom: 0,
-                      marginTop: "18px",
-                    }}
-                  >
-                    📅 Applied:{" "}
-                    {application.created_at
-                      ? new Date(
-                          application.created_at
-                        ).toLocaleDateString()
-                      : "Unknown"}
-                  </p>
-                </div>
-              );
-            })
           )}
         </div>
-
-        {/* BROWSE BUTTON */}
-
-        {applications.length > 0 && (
-          <div
-            style={{
-              marginTop: "25px",
-              textAlign: "center",
-            }}
-          >
-            <button
-              onClick={() =>
-                router.push("/jobs")
-              }
-              style={actionButton}
-            >
-              🔎 Browse More Internships
-            </button>
-          </div>
-        )}
-      </div>
-    </main>
+      </main>
+    </>
   );
 }
 
 const statCard = {
   background: "#fff",
   borderRadius: "16px",
-  padding: "20px",
+  padding: "25px",
   textAlign: "center",
   boxShadow:
-    "0 8px 22px rgba(0,0,0,.06)",
-};
-
-const actionButton = {
-  background: "#0057B8",
-  color: "#fff",
-  border: "none",
-  padding: "13px 20px",
-  borderRadius: "10px",
-  fontWeight: "bold",
-  cursor: "pointer",
+    "0 10px 25px rgba(0,0,0,.07)",
 };
