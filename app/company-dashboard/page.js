@@ -358,7 +358,7 @@ export default function CompanyDashboard() {
           }}
         >
           <button
-            onClick={() => router.push("/internship")}
+            onClick={() => router.push("/internships")}
             style={actionButton}
           >
             🚀 Post Internship
