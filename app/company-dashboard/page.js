@@ -21,23 +21,102 @@ export default function CompanyDashboard() {
   }, []);
 
   // ----------------------------------------
+  // QUALIFICATION LEVEL
+  // ----------------------------------------
+
+  function getQualificationLevel(qualification) {
+    const value = (qualification || "").toLowerCase().trim();
+
+    if (
+      value.includes("grade 12") ||
+      value.includes("matric")
+    ) {
+      return 1;
+    }
+
+    if (value.includes("certificate")) {
+      return 2;
+    }
+
+    if (
+      value.includes("diploma") ||
+      value.includes("national diploma")
+    ) {
+      return 3;
+    }
+
+    if (
+      value.includes("degree") ||
+      value.includes("bachelor")
+    ) {
+      return 4;
+    }
+
+    if (value.includes("honours") || value.includes("honors")) {
+      return 5;
+    }
+
+    if (
+      value.includes("masters") ||
+      value.includes("master") ||
+      value.includes("postgraduate") ||
+      value.includes("phd") ||
+      value.includes("doctorate")
+    ) {
+      return 6;
+    }
+
+    return 0;
+  }
+
+  // ----------------------------------------
+  // QUALIFICATION MATCH
+  // ----------------------------------------
+
+  function qualificationMatches(
+    applicantQualification,
+    requiredQualification
+  ) {
+    const applicant = (applicantQualification || "")
+      .toLowerCase()
+      .trim();
+
+    const required = (requiredQualification || "")
+      .toLowerCase()
+      .trim();
+
+    if (!applicant || !required) {
+      return false;
+    }
+
+    const applicantLevel =
+      getQualificationLevel(applicant);
+
+    const requiredLevel =
+      getQualificationLevel(required);
+
+    // If both are recognized qualification levels,
+    // higher qualifications meet lower requirements.
+    if (applicantLevel > 0 && requiredLevel > 0) {
+      return applicantLevel >= requiredLevel;
+    }
+
+    // Otherwise use text matching.
+    return (
+      applicant === required ||
+      applicant.includes(required) ||
+      required.includes(applicant)
+    );
+  }
+
+  // ----------------------------------------
   // MATCHING SCORE
   // ----------------------------------------
 
-  function calculateMatchScore(application, internship) {
+  function calculateMatch(application, internship) {
     let score = 0;
 
-    const applicantQualification = (
-      application.qualification || ""
-    )
-      .toLowerCase()
-      .trim();
-
-    const requiredQualification = (
-      internship.qualification || ""
-    )
-      .toLowerCase()
-      .trim();
+    const reasons = [];
 
     const applicantField = (
       application.field_of_study || ""
@@ -71,60 +150,116 @@ export default function CompanyDashboard() {
     // QUALIFICATION = 35 POINTS
     // ----------------------------------------
 
+    const qualificationMatch = qualificationMatches(
+      application.qualification,
+      internship.qualification
+    );
+
     if (
-      applicantQualification &&
-      requiredQualification &&
-      (
-        applicantQualification === requiredQualification ||
-        applicantQualification.includes(requiredQualification) ||
-        requiredQualification.includes(applicantQualification)
-      )
+      qualificationMatch &&
+      application.qualification &&
+      internship.qualification
     ) {
       score += 35;
+
+      reasons.push(
+        `✅ Qualification requirement met (${application.qualification} vs ${internship.qualification})`
+      );
+    } else if (
+      application.qualification &&
+      internship.qualification
+    ) {
+      reasons.push(
+        `❌ Qualification requirement not met (${application.qualification} vs ${internship.qualification})`
+      );
     }
 
     // ----------------------------------------
     // FIELD OF STUDY = 35 POINTS
     // ----------------------------------------
 
-    if (
+    const fieldMatch =
       applicantField &&
       requiredField &&
       (
         applicantField === requiredField ||
         applicantField.includes(requiredField) ||
         requiredField.includes(applicantField)
-      )
-    ) {
+      );
+
+    if (fieldMatch) {
       score += 35;
+
+      reasons.push(
+        `✅ Field of study matches (${application.field_of_study})`
+      );
+    } else if (
+      application.field_of_study &&
+      internship.field_of_study
+    ) {
+      reasons.push(
+        `❌ Field of study does not match (${application.field_of_study} vs ${internship.field_of_study})`
+      );
     }
 
     // ----------------------------------------
     // SKILLS = 30 POINTS
     // ----------------------------------------
 
-    if (requiredSkills.length > 0 && applicantSkills.length > 0) {
-      let matchingSkills = 0;
+    let matchingSkills = [];
 
+    if (
+      requiredSkills.length > 0 &&
+      applicantSkills.length > 0
+    ) {
       requiredSkills.forEach((requiredSkill) => {
-        const matched = applicantSkills.some(
+        const matchedSkill = applicantSkills.find(
           (applicantSkill) =>
             applicantSkill.includes(requiredSkill) ||
             requiredSkill.includes(applicantSkill)
         );
 
-        if (matched) {
-          matchingSkills++;
+        if (matchedSkill) {
+          matchingSkills.push(requiredSkill);
         }
       });
 
       const skillScore =
-        (matchingSkills / requiredSkills.length) * 30;
+        (matchingSkills.length /
+          requiredSkills.length) *
+        30;
 
       score += skillScore;
+
+      if (matchingSkills.length > 0) {
+        reasons.push(
+          `✅ Skills matched: ${matchingSkills.join(", ")}`
+        );
+      }
+
+      const missingSkills = requiredSkills.filter(
+        (skill) => !matchingSkills.includes(skill)
+      );
+
+      if (missingSkills.length > 0) {
+        reasons.push(
+          `❌ Missing skills: ${missingSkills.join(", ")}`
+        );
+      }
+    } else if (requiredSkills.length === 0) {
+      reasons.push(
+        "ℹ️ No specific skills were required"
+      );
+    } else {
+      reasons.push(
+        "❌ Applicant did not provide skills"
+      );
     }
 
-    return Math.round(Math.min(score, 100));
+    return {
+      score: Math.round(Math.min(score, 100)),
+      reasons,
+    };
   }
 
   // ----------------------------------------
@@ -179,7 +314,6 @@ export default function CompanyDashboard() {
       return;
     }
 
-    // Find company profile
     const { data: companyData, error: companyError } =
       await supabase
         .from("companies")
@@ -194,14 +328,15 @@ export default function CompanyDashboard() {
 
     setCompany(companyData);
 
-    // Find internships belonging to this company
-    const { data: internships, error: internshipError } =
-      await supabase
-        .from("internships")
-        .select(
-          "id, job_title, company_name, qualification, field_of_study, skills"
-        )
-        .eq("company_name", companyData.company_name);
+    const {
+      data: internships,
+      error: internshipError,
+    } = await supabase
+      .from("internships")
+      .select(
+        "id, job_title, company_name, qualification, field_of_study, skills"
+      )
+      .eq("company_name", companyData.company_name);
 
     if (
       internshipError ||
@@ -217,7 +352,6 @@ export default function CompanyDashboard() {
       (internship) => internship.id
     );
 
-    // Find applications
     const {
       data: applicationData,
       error: applicationError,
@@ -232,15 +366,20 @@ export default function CompanyDashboard() {
         applicationData || []
       ).map((application) => {
         const internship = internships.find(
-          (job) => job.id === application.internship_id
+          (job) =>
+            job.id === application.internship_id
         );
 
-        const aiScore = internship
-          ? calculateMatchScore(application, internship)
-          : 0;
+        const match = internship
+          ? calculateMatch(application, internship)
+          : {
+              score: 0,
+              reasons: [],
+            };
 
         return {
           ...application,
+
           job_title:
             internship?.job_title || "Internship",
 
@@ -253,11 +392,13 @@ export default function CompanyDashboard() {
           internship_skills:
             internship?.skills || "",
 
-          ai_score: aiScore,
+          ai_score: match.score,
+
+          match_reasons: match.reasons,
         };
       });
 
-      // Rank applicants from highest score to lowest
+      // Highest score first
       applicationsWithJobs.sort(
         (a, b) => b.ai_score - a.ai_score
       );
@@ -292,7 +433,7 @@ export default function CompanyDashboard() {
   }
 
   // ----------------------------------------
-  // NO COMPANY PROFILE
+  // NO COMPANY
   // ----------------------------------------
 
   if (!company) {
@@ -314,20 +455,28 @@ export default function CompanyDashboard() {
             borderRadius: "18px",
             textAlign: "center",
             maxWidth: "500px",
-            boxShadow: "0 10px 30px rgba(0,0,0,.08)",
+            boxShadow:
+              "0 10px 30px rgba(0,0,0,.08)",
           }}
         >
           <h2 style={{ color: "#0057B8" }}>
             Company Profile Required
           </h2>
 
-          <p style={{ color: "#666", lineHeight: "1.6" }}>
-            Please complete your company profile before accessing
-            the dashboard.
+          <p
+            style={{
+              color: "#666",
+              lineHeight: "1.6",
+            }}
+          >
+            Please complete your company profile
+            before accessing the dashboard.
           </p>
 
           <button
-            onClick={() => router.push("/company")}
+            onClick={() =>
+              router.push("/company")
+            }
             style={{
               marginTop: "15px",
               background: "#0057B8",
@@ -473,208 +622,257 @@ export default function CompanyDashboard() {
               </p>
             </div>
           ) : (
-            applications.map((application, index) => {
-              const match = getMatchLabel(
-                application.ai_score
-              );
+            applications.map(
+              (application, index) => {
+                const match = getMatchLabel(
+                  application.ai_score
+                );
 
-              return (
-                <div
-                  key={application.id}
-                  style={{
-                    border:
-                      index === 0 &&
-                      application.ai_score >= 70
-                        ? "2px solid #0057B8"
-                        : "1px solid #e1e7ef",
-
-                    borderRadius: "14px",
-                    padding: "22px",
-                    marginBottom: "18px",
-                  }}
-                >
-
-                  {/* RANK */}
-
+                return (
                   <div
+                    key={application.id}
                     style={{
-                      fontSize: "14px",
-                      fontWeight: "bold",
-                      color: "#777",
-                      marginBottom: "10px",
-                    }}
-                  >
-                    #{index + 1} Applicant
-                  </div>
+                      border:
+                        index === 0 &&
+                        application.ai_score >= 70
+                          ? "2px solid #0057B8"
+                          : "1px solid #e1e7ef",
 
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent:
-                        "space-between",
-                      gap: "15px",
-                      flexWrap: "wrap",
+                      borderRadius: "14px",
+                      padding: "22px",
+                      marginBottom: "18px",
                     }}
                   >
 
-                    <div>
-                      <h3
-                        style={{
-                          marginTop: 0,
-                          marginBottom: "6px",
-                          color: "#003b7a",
-                        }}
-                      >
-                        {application.full_name}
-                      </h3>
-
-                      <p
-                        style={{
-                          margin: "5px 0",
-                          color: "#666",
-                        }}
-                      >
-                        💼 {application.job_title}
-                      </p>
-                    </div>
-
-                    {/* STATUS */}
+                    {/* RANK */}
 
                     <div
                       style={{
-                        background: "#eef5ff",
-                        color: "#0057B8",
-                        padding: "8px 12px",
-                        borderRadius: "20px",
-                        height: "fit-content",
+                        fontSize: "14px",
                         fontWeight: "bold",
+                        color: "#777",
+                        marginBottom: "10px",
                       }}
                     >
-                      {application.status ||
-                        "Pending"}
+                      #{index + 1} Applicant
                     </div>
-                  </div>
 
-                  <hr
-                    style={{
-                      border: "none",
-                      borderTop:
-                        "1px solid #eee",
-                      margin: "18px 0",
-                    }}
-                  />
-
-                  <p>
-                    <strong>
-                      📧 Email:
-                    </strong>{" "}
-                    {application.email}
-                  </p>
-
-                  <p>
-                    <strong>
-                      📱 Phone:
-                    </strong>{" "}
-                    {application.phone}
-                  </p>
-
-                  <p>
-                    <strong>
-                      🎓 Qualification:
-                    </strong>{" "}
-                    {application.qualification}
-                  </p>
-
-                  <p>
-                    <strong>
-                      💻 Field of Study:
-                    </strong>{" "}
-                    {application.field_of_study}
-                  </p>
-
-                  <p>
-                    <strong>
-                      🛠️ Skills:
-                    </strong>{" "}
-                    {application.skills ||
-                      "Not provided"}
-                  </p>
-
-                  {/* AI SCORE */}
-
-                  <div
-                    style={{
-                      marginTop: "20px",
-                      padding: "18px",
-                      borderRadius: "14px",
-                      background: match.background,
-                    }}
-                  >
                     <div
                       style={{
                         display: "flex",
                         justifyContent:
                           "space-between",
-                        alignItems: "center",
-                        gap: "10px",
+                        gap: "15px",
                         flexWrap: "wrap",
                       }}
                     >
                       <div>
-                        <div
+                        <h3
                           style={{
-                            fontWeight: "bold",
-                            fontSize: "16px",
-                            color: match.color,
+                            marginTop: 0,
+                            marginBottom: "6px",
+                            color: "#003b7a",
                           }}
                         >
-                          🎯 AI Match Score
-                        </div>
+                          {application.full_name}
+                        </h3>
 
-                        <div
+                        <p
                           style={{
-                            fontSize: "28px",
-                            fontWeight: "bold",
-                            color: match.color,
-                            marginTop: "5px",
+                            margin: "5px 0",
+                            color: "#666",
                           }}
                         >
-                          {application.ai_score}%
-                        </div>
+                          💼 {application.job_title}
+                        </p>
                       </div>
 
                       <div
                         style={{
-                          background: "#fff",
-                          color: match.color,
-                          padding: "9px 14px",
+                          background: "#eef5ff",
+                          color: "#0057B8",
+                          padding: "8px 12px",
                           borderRadius: "20px",
+                          height: "fit-content",
                           fontWeight: "bold",
                         }}
                       >
-                        {match.label}
+                        {application.status ||
+                          "Pending"}
                       </div>
                     </div>
+
+                    <hr
+                      style={{
+                        border: "none",
+                        borderTop:
+                          "1px solid #eee",
+                        margin: "18px 0",
+                      }}
+                    />
+
+                    <p>
+                      <strong>
+                        📧 Email:
+                      </strong>{" "}
+                      {application.email}
+                    </p>
+
+                    <p>
+                      <strong>
+                        📱 Phone:
+                      </strong>{" "}
+                      {application.phone}
+                    </p>
+
+                    <p>
+                      <strong>
+                        🎓 Qualification:
+                      </strong>{" "}
+                      {application.qualification}
+                    </p>
+
+                    <p>
+                      <strong>
+                        💻 Field of Study:
+                      </strong>{" "}
+                      {application.field_of_study}
+                    </p>
+
+                    <p>
+                      <strong>
+                        🛠️ Skills:
+                      </strong>{" "}
+                      {application.skills ||
+                        "Not provided"}
+                    </p>
+
+                    {/* AI SCORE */}
+
+                    <div
+                      style={{
+                        marginTop: "20px",
+                        padding: "18px",
+                        borderRadius: "14px",
+                        background:
+                          match.background,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent:
+                            "space-between",
+                          alignItems: "center",
+                          gap: "10px",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <div>
+                          <div
+                            style={{
+                              fontWeight: "bold",
+                              fontSize: "16px",
+                              color: match.color,
+                            }}
+                          >
+                            🎯 AI Match Score
+                          </div>
+
+                          <div
+                            style={{
+                              fontSize: "28px",
+                              fontWeight: "bold",
+                              color: match.color,
+                              marginTop: "5px",
+                            }}
+                          >
+                            {application.ai_score}%
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            background: "#fff",
+                            color: match.color,
+                            padding: "9px 14px",
+                            borderRadius: "20px",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {match.label}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* WHY THIS SCORE */}
+
+                    <div
+                      style={{
+                        marginTop: "15px",
+                        padding: "18px",
+                        background: "#f8fafc",
+                        borderRadius: "12px",
+                        border:
+                          "1px solid #e5eaf0",
+                      }}
+                    >
+                      <h4
+                        style={{
+                          marginTop: 0,
+                          color: "#003b7a",
+                        }}
+                      >
+                        🔎 Why this score?
+                      </h4>
+
+                      {application.match_reasons &&
+                      application.match_reasons
+                        .length > 0 ? (
+                        application.match_reasons.map(
+                          (reason, reasonIndex) => (
+                            <p
+                              key={reasonIndex}
+                              style={{
+                                margin:
+                                  "8px 0",
+                                color: "#555",
+                              }}
+                            >
+                              {reason}
+                            </p>
+                          )
+                        )
+                      ) : (
+                        <p
+                          style={{
+                            color: "#777",
+                          }}
+                        >
+                          No matching information
+                          available.
+                        </p>
+                      )}
+                    </div>
+
+                    <p
+                      style={{
+                        color: "#777",
+                        fontSize: "14px",
+                        marginTop: "18px",
+                      }}
+                    >
+                      Applied:{" "}
+                      {application.created_at
+                        ? new Date(
+                            application.created_at
+                          ).toLocaleDateString()
+                        : "Unknown"}
+                    </p>
                   </div>
-
-                  <p
-                    style={{
-                      color: "#777",
-                      fontSize: "14px",
-                      marginTop: "18px",
-                    }}
-                  >
-                    Applied:{" "}
-                    {application.created_at
-                      ? new Date(
-                          application.created_at
-                        ).toLocaleDateString()
-                      : "Unknown"}
-                  </p>
-
-                </div>
-              );
-            })
+                );
+              }
+            )
           )}
         </div>
 
@@ -706,7 +904,6 @@ export default function CompanyDashboard() {
             ⚙️ Edit Company Profile
           </button>
         </div>
-
       </div>
     </main>
   );
