@@ -23,82 +23,109 @@ export default function GraduateDashboard() {
   // ----------------------------------------
 
   useEffect(() => {
-    loadDashboard();
-  }, []);
+  loadDashboard();
+}, [router]);
 
   async function loadDashboard() {
-    setLoading(true);
+  setLoading(true);
+
+  try {
+    // ----------------------------------------
+    // GET LOGGED-IN USER
+    // ----------------------------------------
 
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (userError || !user) {
+      console.error("User error:", userError);
+
       router.push("/login");
       return;
     }
 
     setUser(user);
 
- // ----------------------------------------
-// GET GRADUATE PROFILE
-// ----------------------------------------
+    // ----------------------------------------
+    // GET GRADUATE PROFILE
+    // ----------------------------------------
 
-const {
-  data: graduate,
-  error: graduateError,
-} = await supabase
-  .from("graduates")
-  .select("id")
-  .eq("user_id", user.id)
-  .single();
+    const {
+      data: graduate,
+      error: graduateError,
+    } = await supabase
+      .from("graduates")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-if (graduateError || !graduate) {
-  console.error(
-    "Graduate profile error:",
-    graduateError
-  );
+    if (graduateError) {
+      console.error(
+        "Graduate profile error:",
+        graduateError
+      );
 
-  setApplications([]);
-  setLoading(false);
-  return;
-}
-
-// ----------------------------------------
-// GET APPLICATIONS
-// ----------------------------------------
-
-const {
-  data: applicationData,
-  error: applicationError,
-} = await supabase
-  .from("applications")
-  .select("*")
-  .eq("graduate_id", graduate.id)
-  .order("created_at", {
-    ascending: false,
-  });
-
-if (applicationError) {
-  console.error(
-    "Applications error:",
-    applicationError
-  );
-
-  setApplications([]);
-} else {
-  setApplications(applicationData || []);
-}
-
-    if (error) {
-      console.error("Applications error:", error);
       setApplications([]);
-    } else {
-      setApplications(data || []);
+      return;
     }
 
+    if (!graduate) {
+      console.log("No graduate profile found.");
+
+      setApplications([]);
+      return;
+    }
+
+    console.log("Graduate ID:", graduate.id);
+
+    // ----------------------------------------
+    // GET APPLICATIONS
+    // ----------------------------------------
+
+    const {
+      data: applicationData,
+      error: applicationError,
+    } = await supabase
+      .from("applications")
+      .select("*")
+      .eq("graduate_id", graduate.id)
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (applicationError) {
+      console.error(
+        "Applications error:",
+        applicationError
+      );
+
+      setApplications([]);
+      return;
+    }
+
+    console.log(
+      "Applications found:",
+      applicationData
+    );
+
+    setApplications(applicationData || []);
+
+  } catch (error) {
+    console.error(
+      "Dashboard loading error:",
+      error
+    );
+
+    setApplications([]);
+
+  } finally {
+    // 🔥 VERY IMPORTANT
+    // Always stop loading
     setLoading(false);
   }
+}
 
   // ----------------------------------------
   // REFRESH
