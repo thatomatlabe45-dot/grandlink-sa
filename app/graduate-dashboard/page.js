@@ -40,17 +40,55 @@ export default function GraduateDashboard() {
 
     setUser(user);
 
-    // Get applications belonging to this graduate
-    const {
-      data,
-      error,
-    } = await supabase
-      .from("applications")
-      .select("*")
-      .eq("graduate_id", user.id)
-      .order("created_at", {
-        ascending: false,
-      });
+ // ----------------------------------------
+// GET GRADUATE PROFILE
+// ----------------------------------------
+
+const {
+  data: graduate,
+  error: graduateError,
+} = await supabase
+  .from("graduates")
+  .select("id")
+  .eq("user_id", user.id)
+  .single();
+
+if (graduateError || !graduate) {
+  console.error(
+    "Graduate profile error:",
+    graduateError
+  );
+
+  setApplications([]);
+  setLoading(false);
+  return;
+}
+
+// ----------------------------------------
+// GET APPLICATIONS
+// ----------------------------------------
+
+const {
+  data: applicationData,
+  error: applicationError,
+} = await supabase
+  .from("applications")
+  .select("*")
+  .eq("graduate_id", graduate.id)
+  .order("created_at", {
+    ascending: false,
+  });
+
+if (applicationError) {
+  console.error(
+    "Applications error:",
+    applicationError
+  );
+
+  setApplications([]);
+} else {
+  setApplications(applicationData || []);
+}
 
     if (error) {
       console.error("Applications error:", error);
