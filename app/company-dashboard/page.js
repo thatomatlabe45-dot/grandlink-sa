@@ -146,9 +146,7 @@ export default function CompanyDashboard() {
       .map((skill) => skill.trim())
       .filter(Boolean);
 
-    // ----------------------------------------
-    // QUALIFICATION = 35 POINTS
-    // ----------------------------------------
+    // Qualification = 35 points
 
     const qualificationMatch = qualificationMatches(
       application.qualification,
@@ -174,9 +172,7 @@ export default function CompanyDashboard() {
       );
     }
 
-    // ----------------------------------------
-    // FIELD OF STUDY = 35 POINTS
-    // ----------------------------------------
+    // Field of study = 35 points
 
     const fieldMatch =
       applicantField &&
@@ -202,9 +198,7 @@ export default function CompanyDashboard() {
       );
     }
 
-    // ----------------------------------------
-    // SKILLS = 30 POINTS
-    // ----------------------------------------
+    // Skills = 30 points
 
     let matchingSkills = [];
 
@@ -738,23 +732,28 @@ export default function CompanyDashboard() {
                       <div
                         style={{
                           background:
-  currentStatus === "Shortlisted"
-    ? "#e8f7ee"
-    : currentStatus === "Rejected"
-    ? "#fff0f0"
-    : currentStatus === "Review"
-    ? "#eef6ff"
-    : "#f5f5f5",
+                            currentStatus ===
+                            "Shortlisted"
+                              ? "#e8f7ee"
+                              : currentStatus ===
+                                "Rejected"
+                              ? "#fff0f0"
+                              : currentStatus ===
+                                "Review"
+                              ? "#eef6ff"
+                              : "#f5f5f5",
 
                           color:
-                            color:
-  currentStatus === "Shortlisted"
-    ? "#16803c"
-    : currentStatus === "Rejected"
-    ? "#c62828"
-    : currentStatus === "Review"
-    ? "#0057B8"
-    : "#666",
+                            currentStatus ===
+                            "Shortlisted"
+                              ? "#16803c"
+                              : currentStatus ===
+                                "Rejected"
+                              ? "#c62828"
+                              : currentStatus ===
+                                "Review"
+                              ? "#0057B8"
+                              : "#666",
 
                           padding: "8px 12px",
                           borderRadius: "20px",
@@ -948,6 +947,68 @@ export default function CompanyDashboard() {
                         }}
                       >
 
+                        {/* REVIEW */}
+
+                        <button
+                          onClick={() =>
+                            updateApplicationStatus(
+                              application.id,
+                              "Review"
+                            )
+                          }
+                          disabled={
+                            updatingId ===
+                              application.id ||
+                            currentStatus ===
+                              "Review"
+                          }
+                          style={{
+                            background:
+                              currentStatus ===
+                              "Review"
+                                ? "#0057B8"
+                                : "#eef6ff",
+
+                            color:
+                              currentStatus ===
+                              "Review"
+                                ? "#fff"
+                                : "#0057B8",
+
+                            border:
+                              "1px solid #0057B8",
+
+                            padding:
+                              "11px 16px",
+
+                            borderRadius:
+                              "9px",
+
+                            fontWeight:
+                              "bold",
+
+                            cursor:
+                              currentStatus ===
+                              "Review"
+                                ? "default"
+                                : "pointer",
+
+                            opacity:
+                              updatingId ===
+                              application.id
+                                ? 0.6
+                                : 1,
+                          }}
+                        >
+                          {updatingId ===
+                          application.id
+                            ? "Updating..."
+                            : currentStatus ===
+                              "Review"
+                            ? "🔵 Under Review"
+                            : "🔵 Review"}
+                        </button>
+
                         {/* SHORTLIST */}
 
                         <button
@@ -959,7 +1020,7 @@ export default function CompanyDashboard() {
                           }
                           disabled={
                             updatingId ===
-                            application.id ||
+                              application.id ||
                             currentStatus ===
                               "Shortlisted"
                           }
@@ -1009,57 +1070,6 @@ export default function CompanyDashboard() {
                             ? "✅ Shortlisted"
                             : "🟢 Shortlist"}
                         </button>
-                        
-                        {/* REVIEW */}
-
-<button
-  onClick={() =>
-    updateApplicationStatus(
-      application.id,
-      "Review"
-    )
-  }
-  disabled={
-    updatingId === application.id ||
-    currentStatus === "Review"
-  }
-  style={{
-    background:
-      currentStatus === "Review"
-        ? "#0057B8"
-        : "#eef6ff",
-
-    color:
-      currentStatus === "Review"
-        ? "#fff"
-        : "#0057B8",
-
-    border:
-      "1px solid #0057B8",
-
-    padding: "11px 16px",
-
-    borderRadius: "9px",
-
-    fontWeight: "bold",
-
-    cursor:
-      currentStatus === "Review"
-        ? "default"
-        : "pointer",
-
-    opacity:
-      updatingId === application.id
-        ? 0.6
-        : 1,
-  }}
->
-  {updatingId === application.id
-    ? "Updating..."
-    : currentStatus === "Review"
-    ? "🔵 Under Review"
-    : "🔵 Review"}
-</button>
 
                         {/* REJECT */}
 
@@ -1072,7 +1082,7 @@ export default function CompanyDashboard() {
                           }
                           disabled={
                             updatingId ===
-                            application.id ||
+                              application.id ||
                             currentStatus ===
                               "Rejected"
                           }
@@ -1141,25 +1151,18 @@ export default function CompanyDashboard() {
                             style={{
                               background:
                                 "#fff",
-
                               color:
                                 "#555",
-
                               border:
                                 "1px solid #aaa",
-
                               padding:
                                 "11px 16px",
-
                               borderRadius:
                                 "9px",
-
                               fontWeight:
                                 "bold",
-
                               cursor:
                                 "pointer",
-
                               opacity:
                                 updatingId ===
                                 application.id
