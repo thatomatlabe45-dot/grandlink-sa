@@ -16,6 +16,7 @@ export default function CompanyDashboard() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
+  const [selectedApplication, setSelectedApplication] = useState(null);
 
   useEffect(() => {
     loadDashboard();
@@ -331,6 +332,44 @@ export default function CompanyDashboard() {
 
     setUpdatingId(null);
   }
+  
+  // ----------------------------------------
+// OPEN CV
+// ----------------------------------------
+
+async function openCV(application) {
+  const cvPath =
+    application.cv_url ||
+    application.cv ||
+    application.resume_url ||
+    application.document_url;
+
+  if (!cvPath) {
+    alert("No CV has been uploaded for this application.");
+    return;
+  }
+
+  // If the database already contains a full URL
+  if (
+    cvPath.startsWith("http://") ||
+    cvPath.startsWith("https://")
+  ) {
+    window.open(cvPath, "_blank");
+    return;
+  }
+
+  // If the database contains a Supabase Storage path
+  const { data, error } = await supabase.storage
+    .from("documents")
+    .createSignedUrl(cvPath, 60 * 10);
+
+  if (error || !data?.signedUrl) {
+    alert("Could not open the CV. Please try again.");
+    return;
+  }
+
+  window.open(data.signedUrl, "_blank");
+}
 
   // ----------------------------------------
   // LOAD DASHBOARD
@@ -947,15 +986,38 @@ export default function CompanyDashboard() {
                         }}
                       >
 
-                        {/* REVIEW */}
+                     {/* VIEW APPLICATION */}
 
-                        <button
-                          onClick={() =>
-                            updateApplicationStatus(
-                              application.id,
-                              "Review"
-                            )
-                          }
+<button
+  onClick={() => {
+    setSelectedApplication(application);
+
+    if (currentStatus === "Pending") {
+      updateApplicationStatus(
+        application.id,
+        "Review"
+      );
+    }
+  }}
+  disabled={
+    updatingId === application.id
+  }
+  style={{
+    background: "#eef6ff",
+    color: "#0057B8",
+    border: "1px solid #0057B8",
+    padding: "11px 16px",
+    borderRadius: "9px",
+    fontWeight: "bold",
+    cursor: "pointer",
+    opacity:
+      updatingId === application.id
+        ? 0.6
+        : 1,
+  }}
+>
+  👁️ View Application
+</button>
                           disabled={
                             updatingId ===
                               application.id ||
@@ -1228,6 +1290,457 @@ export default function CompanyDashboard() {
           </button>
         </div>
       </div>
+      
+      {/* ----------------------------------------
+    REVIEW APPLICATION MODAL
+---------------------------------------- */}
+
+{selectedApplication && (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.55)",
+      zIndex: 9999,
+      padding: "20px",
+      overflowY: "auto",
+    }}
+  >
+    <div
+      style={{
+        maxWidth: "750px",
+        margin: "30px auto",
+        background: "#fff",
+        borderRadius: "20px",
+        padding: "30px",
+        boxShadow:
+          "0 20px 60px rgba(0,0,0,.25)",
+      }}
+    >
+
+      {/* HEADER */}
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: "15px",
+          marginBottom: "25px",
+        }}
+      >
+        <div>
+          <div
+            style={{
+              color: "#0057B8",
+              fontSize: "14px",
+              fontWeight: "bold",
+              marginBottom: "6px",
+            }}
+          >
+            APPLICATION REVIEW
+          </div>
+
+          <h2
+            style={{
+              margin: 0,
+              color: "#003b7a",
+            }}
+          >
+            👤 {selectedApplication.full_name}
+          </h2>
+
+          <p
+            style={{
+              color: "#666",
+              marginBottom: 0,
+            }}
+          >
+            💼 {selectedApplication.job_title}
+          </p>
+        </div>
+
+        <button
+          onClick={() =>
+            setSelectedApplication(null)
+          }
+          style={{
+            background: "#f1f3f5",
+            border: "none",
+            width: "40px",
+            height: "40px",
+            borderRadius: "50%",
+            fontSize: "20px",
+            cursor: "pointer",
+          }}
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* STATUS */}
+
+      <div
+        style={{
+          padding: "15px",
+          background: "#f5f9ff",
+          borderRadius: "12px",
+          marginBottom: "20px",
+        }}
+      >
+        <strong>Status:</strong>{" "}
+        {selectedApplication.status || "Pending"}
+      </div>
+
+      {/* PERSONAL INFORMATION */}
+
+      <div
+        style={{
+          border: "1px solid #e5eaf0",
+          borderRadius: "14px",
+          padding: "20px",
+          marginBottom: "18px",
+        }}
+      >
+        <h3
+          style={{
+            color: "#0057B8",
+            marginTop: 0,
+          }}
+        >
+          👤 Personal Information
+        </h3>
+
+        <p>
+          <strong>Full Name:</strong>{" "}
+          {selectedApplication.full_name ||
+            "Not provided"}
+        </p>
+
+        <p>
+          <strong>Email:</strong>{" "}
+          {selectedApplication.email ||
+            "Not provided"}
+        </p>
+
+        <p>
+          <strong>Phone:</strong>{" "}
+          {selectedApplication.phone ||
+            "Not provided"}
+        </p>
+
+        <p>
+          <strong>Province:</strong>{" "}
+          {selectedApplication.province ||
+            "Not provided"}
+        </p>
+      </div>
+
+      {/* EDUCATION */}
+
+      <div
+        style={{
+          border: "1px solid #e5eaf0",
+          borderRadius: "14px",
+          padding: "20px",
+          marginBottom: "18px",
+        }}
+      >
+        <h3
+          style={{
+            color: "#0057B8",
+            marginTop: 0,
+          }}
+        >
+          🎓 Education
+        </h3>
+
+        <p>
+          <strong>Qualification:</strong>{" "}
+          {selectedApplication.qualification ||
+            "Not provided"}
+        </p>
+
+        <p>
+          <strong>Field of Study:</strong>{" "}
+          {selectedApplication.field_of_study ||
+            "Not provided"}
+        </p>
+
+        <p>
+          <strong>Institution:</strong>{" "}
+          {selectedApplication.institution ||
+            "Not provided"}
+        </p>
+      </div>
+
+      {/* SKILLS */}
+
+      <div
+        style={{
+          border: "1px solid #e5eaf0",
+          borderRadius: "14px",
+          padding: "20px",
+          marginBottom: "18px",
+        }}
+      >
+        <h3
+          style={{
+            color: "#0057B8",
+            marginTop: 0,
+          }}
+        >
+          🛠️ Skills
+        </h3>
+
+        <p
+          style={{
+            lineHeight: "1.7",
+            color: "#555",
+          }}
+        >
+          {selectedApplication.skills ||
+            "No skills provided"}
+        </p>
+      </div>
+
+      {/* CAREER GOALS */}
+
+      <div
+        style={{
+          border: "1px solid #e5eaf0",
+          borderRadius: "14px",
+          padding: "20px",
+          marginBottom: "18px",
+        }}
+      >
+        <h3
+          style={{
+            color: "#0057B8",
+            marginTop: 0,
+          }}
+        >
+          🎯 Career Goals
+        </h3>
+
+        <p
+          style={{
+            lineHeight: "1.7",
+            color: "#555",
+          }}
+        >
+          {selectedApplication.career_goals ||
+            "No career goals provided"}
+        </p>
+      </div>
+
+      {/* AI MATCH */}
+
+      <div
+        style={{
+          background: getMatchLabel(
+            selectedApplication.ai_score
+          ).background,
+          borderRadius: "14px",
+          padding: "20px",
+          marginBottom: "18px",
+        }}
+      >
+        <h3
+          style={{
+            marginTop: 0,
+            color: "#003b7a",
+          }}
+        >
+          🎯 AI Match Assessment
+        </h3>
+
+        <div
+          style={{
+            fontSize: "36px",
+            fontWeight: "bold",
+            color: getMatchLabel(
+              selectedApplication.ai_score
+            ).color,
+          }}
+        >
+          {selectedApplication.ai_score}%
+        </div>
+
+        <p
+          style={{
+            fontWeight: "bold",
+            color: getMatchLabel(
+              selectedApplication.ai_score
+            ).color,
+          }}
+        >
+          {
+            getMatchLabel(
+              selectedApplication.ai_score
+            ).label
+          }
+        </p>
+
+        {selectedApplication.match_reasons?.map(
+          (reason, index) => (
+            <p
+              key={index}
+              style={{
+                margin: "7px 0",
+                color: "#555",
+              }}
+            >
+              {reason}
+            </p>
+          )
+        )}
+      </div>
+
+      {/* CV */}
+
+      <div
+        style={{
+          border: "1px solid #e5eaf0",
+          borderRadius: "14px",
+          padding: "20px",
+          marginBottom: "25px",
+          textAlign: "center",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "45px",
+            marginBottom: "10px",
+          }}
+        >
+          📄
+        </div>
+
+        <h3
+          style={{
+            color: "#003b7a",
+            marginTop: 0,
+          }}
+        >
+          Applicant CV
+        </h3>
+
+        <button
+          onClick={() =>
+            openCV(selectedApplication)
+          }
+          style={{
+            background: "#0057B8",
+            color: "#fff",
+            border: "none",
+            padding: "13px 22px",
+            borderRadius: "10px",
+            fontWeight: "bold",
+            cursor: "pointer",
+          }}
+        >
+          📄 View CV
+        </button>
+      </div>
+
+      {/* DECISION BUTTONS */}
+
+      <div
+        style={{
+          borderTop: "1px solid #eee",
+          paddingTop: "20px",
+        }}
+      >
+        <h3
+          style={{
+            color: "#003b7a",
+            marginTop: 0,
+          }}
+        >
+          Recruitment Decision
+        </h3>
+
+        <div
+          style={{
+            display: "flex",
+            gap: "10px",
+            flexWrap: "wrap",
+          }}
+        >
+
+          {/* SHORTLIST */}
+
+          <button
+            onClick={async () => {
+              await updateApplicationStatus(
+                selectedApplication.id,
+                "Shortlisted"
+              );
+
+              setSelectedApplication(null);
+            }}
+            style={{
+              background: "#16803c",
+              color: "#fff",
+              border: "none",
+              padding: "13px 18px",
+              borderRadius: "9px",
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            🟢 Shortlist
+          </button>
+
+          {/* REJECT */}
+
+          <button
+            onClick={async () => {
+              await updateApplicationStatus(
+                selectedApplication.id,
+                "Rejected"
+              );
+
+              setSelectedApplication(null);
+            }}
+            style={{
+              background: "#c62828",
+              color: "#fff",
+              border: "none",
+              padding: "13px 18px",
+              borderRadius: "9px",
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            🔴 Reject
+          </button>
+
+          {/* CLOSE */}
+
+          <button
+            onClick={() =>
+              setSelectedApplication(null)
+            }
+            style={{
+              background: "#fff",
+              color: "#555",
+              border: "1px solid #aaa",
+              padding: "13px 18px",
+              borderRadius: "9px",
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+)}
     </main>
   );
 }
