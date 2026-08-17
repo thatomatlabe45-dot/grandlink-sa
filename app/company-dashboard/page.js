@@ -29,10 +29,7 @@ export default function CompanyDashboard() {
   function getQualificationLevel(qualification) {
     const value = (qualification || "").toLowerCase().trim();
 
-    if (
-      value.includes("grade 12") ||
-      value.includes("matric")
-    ) {
+    if (value.includes("grade 12") || value.includes("matric")) {
       return 1;
     }
 
@@ -220,9 +217,7 @@ export default function CompanyDashboard() {
       });
 
       const skillScore =
-        (matchingSkills.length /
-          requiredSkills.length) *
-        30;
+        (matchingSkills.length / requiredSkills.length) * 30;
 
       score += skillScore;
 
@@ -316,7 +311,7 @@ export default function CompanyDashboard() {
       );
 
       setUpdatingId(null);
-      return;
+      return false;
     }
 
     setApplications((currentApplications) =>
@@ -330,46 +325,73 @@ export default function CompanyDashboard() {
       )
     );
 
+    setSelectedApplication((currentApplication) =>
+      currentApplication?.id === applicationId
+        ? {
+            ...currentApplication,
+            status: newStatus,
+          }
+        : currentApplication
+    );
+
     setUpdatingId(null);
+
+    return true;
   }
-  
+
   // ----------------------------------------
-// OPEN CV
-// ----------------------------------------
+  // OPEN CV
+  // ----------------------------------------
 
-async function openCV(application) {
-  const cvPath =
-    application.cv_url ||
-    application.cv ||
-    application.resume_url ||
-    application.document_url;
+  async function openCV(application) {
+    const cvPath =
+      application.cv_url ||
+      application.cv ||
+      application.resume_url ||
+      application.document_url;
 
-  if (!cvPath) {
-    alert("No CV has been uploaded for this application.");
-    return;
+    if (!cvPath) {
+      alert("No CV has been uploaded for this application.");
+      return;
+    }
+
+    // If the database already contains a full URL
+    if (
+      cvPath.startsWith("http://") ||
+      cvPath.startsWith("https://")
+    ) {
+      window.open(cvPath, "_blank");
+      return;
+    }
+
+    // If the database contains a Supabase Storage path
+    const { data, error } = await supabase.storage
+      .from("documents")
+      .createSignedUrl(cvPath, 60 * 10);
+
+    if (error || !data?.signedUrl) {
+      alert("Could not open the CV. Please try again.");
+      return;
+    }
+
+    window.open(data.signedUrl, "_blank");
   }
 
-  // If the database already contains a full URL
-  if (
-    cvPath.startsWith("http://") ||
-    cvPath.startsWith("https://")
-  ) {
-    window.open(cvPath, "_blank");
-    return;
+  // ----------------------------------------
+  // VIEW APPLICATION
+  // ----------------------------------------
+
+  async function viewApplication(application) {
+    setSelectedApplication(application);
+
+    // Automatically move Pending applications to Review
+    if (application.status === "Pending") {
+      await updateApplicationStatus(
+        application.id,
+        "Review"
+      );
+    }
   }
-
-  // If the database contains a Supabase Storage path
-  const { data, error } = await supabase.storage
-    .from("documents")
-    .createSignedUrl(cvPath, 60 * 10);
-
-  if (error || !data?.signedUrl) {
-    alert("Could not open the CV. Please try again.");
-    return;
-  }
-
-  window.open(data.signedUrl, "_blank");
-}
 
   // ----------------------------------------
   // LOAD DASHBOARD
@@ -436,49 +458,97 @@ async function openCV(application) {
       .in("internship_id", internshipIds)
       .order("created_at", { ascending: false });
 
-    if (!applicationError) {
-      const applicationsWithJobs = (
-        applicationData || []
-      ).map((application) => {
-        const internship = internships.find(
-          (job) =>
-            job.id === application.internship_id
-        );
+    if (applicationError) {
+      setApplications([]);
+      setLoading(false);
+      return;
+    }
 
-        const match = internship
-          ? calculateMatch(application, internship)
-          : {
-              score: 0,
-              reasons: [],
-            };
+    // ----------------------------------------
+    // GET GRADUATE CVs
+    // ----------------------------------------
 
-        return {
-          ...application,
+    const graduateIds = [
+      ...new Set(
+        (applicationData || [])
+          .map((application) => application.graduate_id)
+          .filter(Boolean)
+      ),
+    ];
 
-          job_title:
-            internship?.job_title || "Internship",
+    let graduates = [];
 
-          internship_qualification:
-            internship?.qualification || "",
+    if (graduateIds.length > 0) {
+      const {
+        data: graduateData,
+        error: graduateError,
+      } = await supabase
+        .from("graduates")
+        .select("id, cv_url")
+        .in("id", graduateIds);
 
-          internship_field_of_study:
-            internship?.field_of_study || "",
+      if (!graduateError && graduateData) {
+        graduates = graduateData;
+      }
+    }
 
-          internship_skills:
-            internship?.skills || "",
+    // ----------------------------------------
+    // ADD INTERNSHIP + MATCH DATA
+    // ----------------------------------------
 
-          ai_score: match.score,
-
-          match_reasons: match.reasons,
-        };
-      });
-
-      applicationsWithJobs.sort(
-        (a, b) => b.ai_score - a.ai_score
+    const applicationsWithJobs = (
+      applicationData || []
+    ).map((application) => {
+      const internship = internships.find(
+        (job) =>
+          job.id === application.internship_id
       );
 
-      setApplications(applicationsWithJobs);
-    }
+      const graduate = graduates.find(
+        (item) =>
+          item.id === application.graduate_id
+      );
+
+      const match = internship
+        ? calculateMatch(application, internship)
+        : {
+            score: 0,
+            reasons: [],
+          };
+
+      return {
+        ...application,
+
+        job_title:
+          internship?.job_title || "Internship",
+
+        internship_qualification:
+          internship?.qualification || "",
+
+        internship_field_of_study:
+          internship?.field_of_study || "",
+
+        internship_skills:
+          internship?.skills || "",
+
+        ai_score: match.score,
+
+        match_reasons: match.reasons,
+
+        // Keep the existing application CV fields.
+        // Use graduates.cv_url as a fallback.
+        cv_url:
+          application.cv_url ||
+          graduate?.cv_url ||
+          null,
+      };
+    });
+
+    applicationsWithJobs.sort(
+      (a, b) => b.ai_score - a.ai_score
+    );
+
+    setApplications(applicationsWithJobs);
 
     setLoading(false);
   }
@@ -587,7 +657,6 @@ async function openCV(application) {
           margin: "0 auto",
         }}
       >
-
         {/* HEADER */}
 
         <div
@@ -720,7 +789,6 @@ async function openCV(application) {
                       marginBottom: "18px",
                     }}
                   >
-
                     {/* RANK */}
 
                     <div
@@ -938,8 +1006,7 @@ async function openCV(application) {
                             <p
                               key={reasonIndex}
                               style={{
-                                margin:
-                                  "8px 0",
+                                margin: "8px 0",
                                 color: "#555",
                               }}
                             >
@@ -985,76 +1052,25 @@ async function openCV(application) {
                           flexWrap: "wrap",
                         }}
                       >
+                        {/* VIEW APPLICATION */}
 
-                     {/* VIEW APPLICATION */}
-
-<button
-  onClick={() => {
-    setSelectedApplication(application);
-
-    if (currentStatus === "Pending") {
-      updateApplicationStatus(
-        application.id,
-        "Review"
-      );
-    }
-  }}
-  disabled={
-    updatingId === application.id
-  }
-  style={{
-    background: "#eef6ff",
-    color: "#0057B8",
-    border: "1px solid #0057B8",
-    padding: "11px 16px",
-    borderRadius: "9px",
-    fontWeight: "bold",
-    cursor: "pointer",
-    opacity:
-      updatingId === application.id
-        ? 0.6
-        : 1,
-  }}
->
-  👁️ View Application
-</button>
+                        <button
+                          onClick={() =>
+                            viewApplication(application)
+                          }
                           disabled={
                             updatingId ===
-                              application.id ||
-                            currentStatus ===
-                              "Review"
+                            application.id
                           }
                           style={{
-                            background:
-                              currentStatus ===
-                              "Review"
-                                ? "#0057B8"
-                                : "#eef6ff",
-
-                            color:
-                              currentStatus ===
-                              "Review"
-                                ? "#fff"
-                                : "#0057B8",
-
+                            background: "#eef6ff",
+                            color: "#0057B8",
                             border:
                               "1px solid #0057B8",
-
-                            padding:
-                              "11px 16px",
-
-                            borderRadius:
-                              "9px",
-
-                            fontWeight:
-                              "bold",
-
-                            cursor:
-                              currentStatus ===
-                              "Review"
-                                ? "default"
-                                : "pointer",
-
+                            padding: "11px 16px",
+                            borderRadius: "9px",
+                            fontWeight: "bold",
+                            cursor: "pointer",
                             opacity:
                               updatingId ===
                               application.id
@@ -1062,13 +1078,7 @@ async function openCV(application) {
                                 : 1,
                           }}
                         >
-                          {updatingId ===
-                          application.id
-                            ? "Updating..."
-                            : currentStatus ===
-                              "Review"
-                            ? "🔵 Under Review"
-                            : "🔵 Review"}
+                          👁️ View Application
                         </button>
 
                         {/* SHORTLIST */}
@@ -1102,14 +1112,11 @@ async function openCV(application) {
                             border:
                               "1px solid #16803c",
 
-                            padding:
-                              "11px 16px",
+                            padding: "11px 16px",
 
-                            borderRadius:
-                              "9px",
+                            borderRadius: "9px",
 
-                            fontWeight:
-                              "bold",
+                            fontWeight: "bold",
 
                             cursor:
                               currentStatus ===
@@ -1164,14 +1171,11 @@ async function openCV(application) {
                             border:
                               "1px solid #c62828",
 
-                            padding:
-                              "11px 16px",
+                            padding: "11px 16px",
 
-                            borderRadius:
-                              "9px",
+                            borderRadius: "9px",
 
-                            fontWeight:
-                              "bold",
+                            fontWeight: "bold",
 
                             cursor:
                               currentStatus ===
@@ -1211,20 +1215,14 @@ async function openCV(application) {
                               application.id
                             }
                             style={{
-                              background:
-                                "#fff",
-                              color:
-                                "#555",
+                              background: "#fff",
+                              color: "#555",
                               border:
                                 "1px solid #aaa",
-                              padding:
-                                "11px 16px",
-                              borderRadius:
-                                "9px",
-                              fontWeight:
-                                "bold",
-                              cursor:
-                                "pointer",
+                              padding: "11px 16px",
+                              borderRadius: "9px",
+                              fontWeight: "bold",
+                              cursor: "pointer",
                               opacity:
                                 updatingId ===
                                 application.id
@@ -1290,457 +1288,493 @@ async function openCV(application) {
           </button>
         </div>
       </div>
-      
+
       {/* ----------------------------------------
-    REVIEW APPLICATION MODAL
----------------------------------------- */}
+          VIEW APPLICATION MODAL
+      ---------------------------------------- */}
 
-{selectedApplication && (
-  <div
-    style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,0.55)",
-      zIndex: 9999,
-      padding: "20px",
-      overflowY: "auto",
-    }}
-  >
-    <div
-      style={{
-        maxWidth: "750px",
-        margin: "30px auto",
-        background: "#fff",
-        borderRadius: "20px",
-        padding: "30px",
-        boxShadow:
-          "0 20px 60px rgba(0,0,0,.25)",
-      }}
-    >
-
-      {/* HEADER */}
-
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          gap: "15px",
-          marginBottom: "25px",
-        }}
-      >
-        <div>
+      {selectedApplication && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            zIndex: 9999,
+            padding: "20px",
+            overflowY: "auto",
+          }}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setSelectedApplication(null);
+            }
+          }}
+        >
           <div
             style={{
-              color: "#0057B8",
-              fontSize: "14px",
-              fontWeight: "bold",
-              marginBottom: "6px",
+              maxWidth: "750px",
+              margin: "30px auto",
+              background: "#fff",
+              borderRadius: "20px",
+              padding: "30px",
+              boxShadow:
+                "0 20px 60px rgba(0,0,0,.25)",
             }}
           >
-            APPLICATION REVIEW
-          </div>
+            {/* HEADER */}
 
-          <h2
-            style={{
-              margin: 0,
-              color: "#003b7a",
-            }}
-          >
-            👤 {selectedApplication.full_name}
-          </h2>
-
-          <p
-            style={{
-              color: "#666",
-              marginBottom: 0,
-            }}
-          >
-            💼 {selectedApplication.job_title}
-          </p>
-        </div>
-
-        <button
-          onClick={() =>
-            setSelectedApplication(null)
-          }
-          style={{
-            background: "#f1f3f5",
-            border: "none",
-            width: "40px",
-            height: "40px",
-            borderRadius: "50%",
-            fontSize: "20px",
-            cursor: "pointer",
-          }}
-        >
-          ✕
-        </button>
-      </div>
-
-      {/* STATUS */}
-
-      <div
-        style={{
-          padding: "15px",
-          background: "#f5f9ff",
-          borderRadius: "12px",
-          marginBottom: "20px",
-        }}
-      >
-        <strong>Status:</strong>{" "}
-        {selectedApplication.status || "Pending"}
-      </div>
-
-      {/* PERSONAL INFORMATION */}
-
-      <div
-        style={{
-          border: "1px solid #e5eaf0",
-          borderRadius: "14px",
-          padding: "20px",
-          marginBottom: "18px",
-        }}
-      >
-        <h3
-          style={{
-            color: "#0057B8",
-            marginTop: 0,
-          }}
-        >
-          👤 Personal Information
-        </h3>
-
-        <p>
-          <strong>Full Name:</strong>{" "}
-          {selectedApplication.full_name ||
-            "Not provided"}
-        </p>
-
-        <p>
-          <strong>Email:</strong>{" "}
-          {selectedApplication.email ||
-            "Not provided"}
-        </p>
-
-        <p>
-          <strong>Phone:</strong>{" "}
-          {selectedApplication.phone ||
-            "Not provided"}
-        </p>
-
-        <p>
-          <strong>Province:</strong>{" "}
-          {selectedApplication.province ||
-            "Not provided"}
-        </p>
-      </div>
-
-      {/* EDUCATION */}
-
-      <div
-        style={{
-          border: "1px solid #e5eaf0",
-          borderRadius: "14px",
-          padding: "20px",
-          marginBottom: "18px",
-        }}
-      >
-        <h3
-          style={{
-            color: "#0057B8",
-            marginTop: 0,
-          }}
-        >
-          🎓 Education
-        </h3>
-
-        <p>
-          <strong>Qualification:</strong>{" "}
-          {selectedApplication.qualification ||
-            "Not provided"}
-        </p>
-
-        <p>
-          <strong>Field of Study:</strong>{" "}
-          {selectedApplication.field_of_study ||
-            "Not provided"}
-        </p>
-
-        <p>
-          <strong>Institution:</strong>{" "}
-          {selectedApplication.institution ||
-            "Not provided"}
-        </p>
-      </div>
-
-      {/* SKILLS */}
-
-      <div
-        style={{
-          border: "1px solid #e5eaf0",
-          borderRadius: "14px",
-          padding: "20px",
-          marginBottom: "18px",
-        }}
-      >
-        <h3
-          style={{
-            color: "#0057B8",
-            marginTop: 0,
-          }}
-        >
-          🛠️ Skills
-        </h3>
-
-        <p
-          style={{
-            lineHeight: "1.7",
-            color: "#555",
-          }}
-        >
-          {selectedApplication.skills ||
-            "No skills provided"}
-        </p>
-      </div>
-
-      {/* CAREER GOALS */}
-
-      <div
-        style={{
-          border: "1px solid #e5eaf0",
-          borderRadius: "14px",
-          padding: "20px",
-          marginBottom: "18px",
-        }}
-      >
-        <h3
-          style={{
-            color: "#0057B8",
-            marginTop: 0,
-          }}
-        >
-          🎯 Career Goals
-        </h3>
-
-        <p
-          style={{
-            lineHeight: "1.7",
-            color: "#555",
-          }}
-        >
-          {selectedApplication.career_goals ||
-            "No career goals provided"}
-        </p>
-      </div>
-
-      {/* AI MATCH */}
-
-      <div
-        style={{
-          background: getMatchLabel(
-            selectedApplication.ai_score
-          ).background,
-          borderRadius: "14px",
-          padding: "20px",
-          marginBottom: "18px",
-        }}
-      >
-        <h3
-          style={{
-            marginTop: 0,
-            color: "#003b7a",
-          }}
-        >
-          🎯 AI Match Assessment
-        </h3>
-
-        <div
-          style={{
-            fontSize: "36px",
-            fontWeight: "bold",
-            color: getMatchLabel(
-              selectedApplication.ai_score
-            ).color,
-          }}
-        >
-          {selectedApplication.ai_score}%
-        </div>
-
-        <p
-          style={{
-            fontWeight: "bold",
-            color: getMatchLabel(
-              selectedApplication.ai_score
-            ).color,
-          }}
-        >
-          {
-            getMatchLabel(
-              selectedApplication.ai_score
-            ).label
-          }
-        </p>
-
-        {selectedApplication.match_reasons?.map(
-          (reason, index) => (
-            <p
-              key={index}
+            <div
               style={{
-                margin: "7px 0",
-                color: "#555",
+                display: "flex",
+                justifyContent:
+                  "space-between",
+                alignItems: "flex-start",
+                gap: "15px",
+                marginBottom: "25px",
               }}
             >
-              {reason}
-            </p>
-          )
-        )}
-      </div>
+              <div>
+                <div
+                  style={{
+                    color: "#0057B8",
+                    fontSize: "14px",
+                    fontWeight: "bold",
+                    marginBottom: "6px",
+                  }}
+                >
+                  APPLICATION DETAILS
+                </div>
 
-      {/* CV */}
+                <h2
+                  style={{
+                    margin: 0,
+                    color: "#003b7a",
+                  }}
+                >
+                  👤{" "}
+                  {selectedApplication.full_name}
+                </h2>
 
-      <div
-        style={{
-          border: "1px solid #e5eaf0",
-          borderRadius: "14px",
-          padding: "20px",
-          marginBottom: "25px",
-          textAlign: "center",
-        }}
-      >
-        <div
-          style={{
-            fontSize: "45px",
-            marginBottom: "10px",
-          }}
-        >
-          📄
+                <p
+                  style={{
+                    color: "#666",
+                    marginBottom: 0,
+                  }}
+                >
+                  💼{" "}
+                  {selectedApplication.job_title}
+                </p>
+              </div>
+
+              <button
+                onClick={() =>
+                  setSelectedApplication(null)
+                }
+                style={{
+                  background: "#f1f3f5",
+                  border: "none",
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "50%",
+                  fontSize: "20px",
+                  cursor: "pointer",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* STATUS */}
+
+            <div
+              style={{
+                padding: "15px",
+                background: "#f5f9ff",
+                borderRadius: "12px",
+                marginBottom: "20px",
+              }}
+            >
+              <strong>Status:</strong>{" "}
+              {selectedApplication.status ||
+                "Pending"}
+            </div>
+
+            {/* PERSONAL INFORMATION */}
+
+            <div
+              style={{
+                border: "1px solid #e5eaf0",
+                borderRadius: "14px",
+                padding: "20px",
+                marginBottom: "18px",
+              }}
+            >
+              <h3
+                style={{
+                  color: "#0057B8",
+                  marginTop: 0,
+                }}
+              >
+                👤 Personal Information
+              </h3>
+
+              <p>
+                <strong>Full Name:</strong>{" "}
+                {selectedApplication.full_name ||
+                  "Not provided"}
+              </p>
+
+              <p>
+                <strong>Email:</strong>{" "}
+                {selectedApplication.email ||
+                  "Not provided"}
+              </p>
+
+              <p>
+                <strong>Phone:</strong>{" "}
+                {selectedApplication.phone ||
+                  "Not provided"}
+              </p>
+
+              <p>
+                <strong>Province:</strong>{" "}
+                {selectedApplication.province ||
+                  "Not provided"}
+              </p>
+            </div>
+
+            {/* EDUCATION */}
+
+            <div
+              style={{
+                border: "1px solid #e5eaf0",
+                borderRadius: "14px",
+                padding: "20px",
+                marginBottom: "18px",
+              }}
+            >
+              <h3
+                style={{
+                  color: "#0057B8",
+                  marginTop: 0,
+                }}
+              >
+                🎓 Education
+              </h3>
+
+              <p>
+                <strong>
+                  Qualification:
+                </strong>{" "}
+                {selectedApplication.qualification ||
+                  "Not provided"}
+              </p>
+
+              <p>
+                <strong>
+                  Field of Study:
+                </strong>{" "}
+                {selectedApplication.field_of_study ||
+                  "Not provided"}
+              </p>
+
+              <p>
+                <strong>Institution:</strong>{" "}
+                {selectedApplication.institution ||
+                  "Not provided"}
+              </p>
+            </div>
+
+            {/* SKILLS */}
+
+            <div
+              style={{
+                border: "1px solid #e5eaf0",
+                borderRadius: "14px",
+                padding: "20px",
+                marginBottom: "18px",
+              }}
+            >
+              <h3
+                style={{
+                  color: "#0057B8",
+                  marginTop: 0,
+                }}
+              >
+                🛠️ Skills
+              </h3>
+
+              <p
+                style={{
+                  lineHeight: "1.7",
+                  color: "#555",
+                }}
+              >
+                {selectedApplication.skills ||
+                  "No skills provided"}
+              </p>
+            </div>
+
+            {/* CAREER GOALS */}
+
+            <div
+              style={{
+                border: "1px solid #e5eaf0",
+                borderRadius: "14px",
+                padding: "20px",
+                marginBottom: "18px",
+              }}
+            >
+              <h3
+                style={{
+                  color: "#0057B8",
+                  marginTop: 0,
+                }}
+              >
+                🎯 Career Goals
+              </h3>
+
+              <p
+                style={{
+                  lineHeight: "1.7",
+                  color: "#555",
+                }}
+              >
+                {selectedApplication.career_goals ||
+                  "No career goals provided"}
+              </p>
+            </div>
+
+            {/* AI MATCH */}
+
+            <div
+              style={{
+                background:
+                  getMatchLabel(
+                    selectedApplication.ai_score
+                  ).background,
+                borderRadius: "14px",
+                padding: "20px",
+                marginBottom: "18px",
+              }}
+            >
+              <h3
+                style={{
+                  marginTop: 0,
+                  color: "#003b7a",
+                }}
+              >
+                🎯 AI Match Assessment
+              </h3>
+
+              <div
+                style={{
+                  fontSize: "36px",
+                  fontWeight: "bold",
+                  color:
+                    getMatchLabel(
+                      selectedApplication.ai_score
+                    ).color,
+                }}
+              >
+                {selectedApplication.ai_score}%
+              </div>
+
+              <p
+                style={{
+                  fontWeight: "bold",
+                  color:
+                    getMatchLabel(
+                      selectedApplication.ai_score
+                    ).color,
+                }}
+              >
+                {
+                  getMatchLabel(
+                    selectedApplication.ai_score
+                  ).label
+                }
+              </p>
+
+              {selectedApplication.match_reasons
+                ?.map((reason, index) => (
+                  <p
+                    key={index}
+                    style={{
+                      margin: "7px 0",
+                      color: "#555",
+                    }}
+                  >
+                    {reason}
+                  </p>
+                ))}
+            </div>
+
+            {/* CV */}
+
+            <div
+              style={{
+                border: "1px solid #e5eaf0",
+                borderRadius: "14px",
+                padding: "20px",
+                marginBottom: "25px",
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "45px",
+                  marginBottom: "10px",
+                }}
+              >
+                📄
+              </div>
+
+              <h3
+                style={{
+                  color: "#003b7a",
+                  marginTop: 0,
+                }}
+              >
+                Applicant CV
+              </h3>
+
+              <button
+                onClick={() =>
+                  openCV(selectedApplication)
+                }
+                style={{
+                  background: "#0057B8",
+                  color: "#fff",
+                  border: "none",
+                  padding: "13px 22px",
+                  borderRadius: "10px",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                }}
+              >
+                📄 View CV
+              </button>
+            </div>
+
+            {/* DECISION BUTTONS */}
+
+            <div
+              style={{
+                borderTop: "1px solid #eee",
+                paddingTop: "20px",
+              }}
+            >
+              <h3
+                style={{
+                  color: "#003b7a",
+                  marginTop: 0,
+                }}
+              >
+                Recruitment Decision
+              </h3>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: "10px",
+                  flexWrap: "wrap",
+                }}
+              >
+                {/* SHORTLIST */}
+
+                <button
+                  onClick={async () => {
+                    const success =
+                      await updateApplicationStatus(
+                        selectedApplication.id,
+                        "Shortlisted"
+                      );
+
+                    if (success) {
+                      setSelectedApplication(null);
+                    }
+                  }}
+                  disabled={
+                    updatingId ===
+                    selectedApplication.id
+                  }
+                  style={{
+                    background: "#16803c",
+                    color: "#fff",
+                    border: "none",
+                    padding: "13px 18px",
+                    borderRadius: "9px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    opacity:
+                      updatingId ===
+                      selectedApplication.id
+                        ? 0.6
+                        : 1,
+                  }}
+                >
+                  🟢 Shortlist
+                </button>
+
+                {/* REJECT */}
+
+                <button
+                  onClick={async () => {
+                    const success =
+                      await updateApplicationStatus(
+                        selectedApplication.id,
+                        "Rejected"
+                      );
+
+                    if (success) {
+                      setSelectedApplication(null);
+                    }
+                  }}
+                  disabled={
+                    updatingId ===
+                    selectedApplication.id
+                  }
+                  style={{
+                    background: "#c62828",
+                    color: "#fff",
+                    border: "none",
+                    padding: "13px 18px",
+                    borderRadius: "9px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                    opacity:
+                      updatingId ===
+                      selectedApplication.id
+                        ? 0.6
+                        : 1,
+                  }}
+                >
+                  🔴 Reject
+                </button>
+
+                {/* CLOSE */}
+
+                <button
+                  onClick={() =>
+                    setSelectedApplication(null)
+                  }
+                  style={{
+                    background: "#fff",
+                    color: "#555",
+                    border: "1px solid #aaa",
+                    padding: "13px 18px",
+                    borderRadius: "9px",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-
-        <h3
-          style={{
-            color: "#003b7a",
-            marginTop: 0,
-          }}
-        >
-          Applicant CV
-        </h3>
-
-        <button
-          onClick={() =>
-            openCV(selectedApplication)
-          }
-          style={{
-            background: "#0057B8",
-            color: "#fff",
-            border: "none",
-            padding: "13px 22px",
-            borderRadius: "10px",
-            fontWeight: "bold",
-            cursor: "pointer",
-          }}
-        >
-          📄 View CV
-        </button>
-      </div>
-
-      {/* DECISION BUTTONS */}
-
-      <div
-        style={{
-          borderTop: "1px solid #eee",
-          paddingTop: "20px",
-        }}
-      >
-        <h3
-          style={{
-            color: "#003b7a",
-            marginTop: 0,
-          }}
-        >
-          Recruitment Decision
-        </h3>
-
-        <div
-          style={{
-            display: "flex",
-            gap: "10px",
-            flexWrap: "wrap",
-          }}
-        >
-
-          {/* SHORTLIST */}
-
-          <button
-            onClick={async () => {
-              await updateApplicationStatus(
-                selectedApplication.id,
-                "Shortlisted"
-              );
-
-              setSelectedApplication(null);
-            }}
-            style={{
-              background: "#16803c",
-              color: "#fff",
-              border: "none",
-              padding: "13px 18px",
-              borderRadius: "9px",
-              fontWeight: "bold",
-              cursor: "pointer",
-            }}
-          >
-            🟢 Shortlist
-          </button>
-
-          {/* REJECT */}
-
-          <button
-            onClick={async () => {
-              await updateApplicationStatus(
-                selectedApplication.id,
-                "Rejected"
-              );
-
-              setSelectedApplication(null);
-            }}
-            style={{
-              background: "#c62828",
-              color: "#fff",
-              border: "none",
-              padding: "13px 18px",
-              borderRadius: "9px",
-              fontWeight: "bold",
-              cursor: "pointer",
-            }}
-          >
-            🔴 Reject
-          </button>
-
-          {/* CLOSE */}
-
-          <button
-            onClick={() =>
-              setSelectedApplication(null)
-            }
-            style={{
-              background: "#fff",
-              color: "#555",
-              border: "1px solid #aaa",
-              padding: "13px 18px",
-              borderRadius: "9px",
-              fontWeight: "bold",
-              cursor: "pointer",
-            }}
-          >
-            Close
-          </button>
-        </div>
-      </div>
-
-    </div>
-  </div>
-)}
+      )}
     </main>
   );
 }
