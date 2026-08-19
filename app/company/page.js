@@ -1,4 +1,3 @@
-```javascript
 "use client";
 
 import { useState, useEffect } from "react";
@@ -140,20 +139,13 @@ export default function CompanyPage() {
 
       const companyData = {
         user_id: user.id,
-        company_name:
-          company.company_name.trim(),
-        industry:
-          company.industry.trim(),
-        website:
-          company.website.trim(),
-        location:
-          company.location.trim(),
-        email:
-          company.email.trim(),
-        phone:
-          company.phone.trim(),
-        description:
-          company.description.trim(),
+        company_name: company.company_name.trim(),
+        industry: company.industry.trim(),
+        website: company.website.trim(),
+        location: company.location.trim(),
+        email: company.email.trim(),
+        phone: company.phone.trim(),
+        description: company.description.trim(),
       };
 
       // ----------------------------------------
@@ -236,7 +228,6 @@ export default function CompanyPage() {
         }
 
         setCompanyId(existingCompany.id);
-
         setCompany(companyData);
 
         setMessage(
@@ -250,10 +241,12 @@ export default function CompanyPage() {
       // CREATE NEW COMPANY PROFILE
       // ----------------------------------------
 
-      const { error: insertError } =
+      const { data: createdCompany, error: insertError } =
         await supabase
           .from("companies")
-          .insert([companyData]);
+          .insert([companyData])
+          .select("id")
+          .single();
 
       if (insertError) {
         console.error(
@@ -264,26 +257,8 @@ export default function CompanyPage() {
         throw insertError;
       }
 
-      // ----------------------------------------
-      // GET NEW PROFILE ID
-      // ----------------------------------------
-
-      const {
-        data: createdCompanies,
-        error: createdError,
-      } = await supabase
-        .from("companies")
-        .select("id")
-        .eq("user_id", user.id)
-        .order("created_at", {
-          ascending: false,
-        })
-        .limit(1);
-
-      if (!createdError && createdCompanies?.length) {
-        setCompanyId(
-          createdCompanies[0].id
-        );
+      if (createdCompany?.id) {
+        setCompanyId(createdCompany.id);
       }
 
       setCompany(companyData);
@@ -304,6 +279,14 @@ export default function CompanyPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // ----------------------------------------
+  // GO BACK TO COMPANY DASHBOARD
+  // ----------------------------------------
+
+  function goToDashboard() {
+    router.push("/company-dashboard");
   }
 
   // ----------------------------------------
@@ -386,8 +369,7 @@ export default function CompanyPage() {
             style={{
               background: "#e8f7ee",
               color: "#16803c",
-              border:
-                "1px solid #b7e4c7",
+              border: "1px solid #b7e4c7",
               padding: "14px 16px",
               borderRadius: "10px",
               marginBottom: "20px",
@@ -405,8 +387,7 @@ export default function CompanyPage() {
             style={{
               background: "#fff0f0",
               color: "#c62828",
-              border:
-                "1px solid #f0b8b8",
+              border: "1px solid #f0b8b8",
               padding: "14px 16px",
               borderRadius: "10px",
               marginBottom: "20px",
@@ -543,29 +524,24 @@ export default function CompanyPage() {
 
           {/* BACK TO DASHBOARD */}
 
-          {companyId && (
-            <button
-              type="button"
-              onClick={() =>
-                router.push("/company")
-              }
-              style={{
-                width: "100%",
-                padding: "14px",
-                marginTop: "12px",
-                background: "#fff",
-                color: "#0057B8",
-                border:
-                  "2px solid #0057B8",
-                borderRadius: "10px",
-                fontSize: "16px",
-                fontWeight: "bold",
-                cursor: "pointer",
-              }}
-            >
-              ← Back
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={goToDashboard}
+            style={{
+              width: "100%",
+              padding: "14px",
+              marginTop: "12px",
+              background: "#fff",
+              color: "#0057B8",
+              border: "2px solid #0057B8",
+              borderRadius: "10px",
+              fontSize: "16px",
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+          >
+            ← Back to Dashboard
+          </button>
         </form>
       </div>
     </div>
@@ -588,4 +564,3 @@ const inputStyle = {
   fontSize: "16px",
   boxSizing: "border-box",
 };
-```
