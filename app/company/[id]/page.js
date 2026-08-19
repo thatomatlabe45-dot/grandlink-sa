@@ -23,6 +23,8 @@ export default function CompanyProfilePage() {
     description: "",
   });
 
+  const [oldCompanyName, setOldCompanyName] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -54,8 +56,8 @@ export default function CompanyProfilePage() {
         .maybeSingle();
 
       console.log("Logged in user:", user.id);
-      console.log("Company loaded:", data);
-      console.log("Company load error:", error);
+      console.log("Company:", data);
+      console.log("Company error:", error);
 
       if (error) {
         setErrorMessage(
@@ -74,7 +76,7 @@ export default function CompanyProfilePage() {
         return;
       }
 
-      setCompany({
+      const loadedCompany = {
         company_name: data.company_name || "",
         industry: data.industry || "",
         website: data.website || "",
@@ -82,7 +84,12 @@ export default function CompanyProfilePage() {
         email: data.email || "",
         phone: data.phone || "",
         description: data.description || "",
-      });
+      };
+
+      setCompany(loadedCompany);
+
+      // Remember the original company name.
+      setOldCompanyName(data.company_name || "");
 
       setLoading(false);
     } catch (error) {
@@ -113,6 +120,10 @@ export default function CompanyProfilePage() {
     setErrorMessage("");
 
     try {
+      // ----------------------------------------
+      // GET LOGGED-IN USER
+      // ----------------------------------------
+
       const {
         data: { user },
         error: userError,
@@ -122,12 +133,29 @@ export default function CompanyProfilePage() {
         setErrorMessage(
           "Your session has expired. Please log in again."
         );
+
+        setSaving(false);
+        return;
+      }
+
+      // ----------------------------------------
+      // PREPARE UPDATED COMPANY
+      // ----------------------------------------
+
+      const newCompanyName =
+        company.company_name.trim();
+
+      if (!newCompanyName) {
+        setErrorMessage(
+          "Please enter your company name."
+        );
+
         setSaving(false);
         return;
       }
 
       const updatedCompany = {
-        company_name: company.company_name.trim(),
+        company_name: newCompanyName,
         industry: company.industry.trim(),
         website: company.website.trim(),
         location: company.location.trim(),
@@ -136,60 +164,149 @@ export default function CompanyProfilePage() {
         description: company.description.trim(),
       };
 
-      if (!updatedCompany.company_name) {
-        setErrorMessage(
-          "Please enter your company name."
-        );
-        setSaving(false);
-        return;
-      }
-
       console.log(
-        "Updating company for user:",
-        user.id
+        "Old company name:",
+        oldCompanyName
       );
 
-      const { error: updateError } = await supabase
-        .from("companies")
-        .update(updatedCompany)
-        .eq("user_id", user.id);
-
       console.log(
-        "Update error:",
-        updateError
+        "New company name:",
+        newCompanyName
       );
 
-      if (updateError) {
-        setErrorMessage(
-          "Company profile could not be updated: " +
-            updateError.message
-        );
+      // ----------------------------------------
+      // UPDATE COMPANY PROFILE
+      // ----------------------------------------
 
-        setSaving(false);
-        return;
-      }
-
-      // Verify that the updated company can be read
-      const { data: updatedData, error: verifyError } =
+      const { error: companyUpdateError } =
         await supabase
           .from("companies")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
+          .update(updatedCompany)
+          .eq("user_id", user.id);
 
       console.log(
-        "Updated company:",
-        updatedData
+        "Company update error:",
+        companyUpdateError
       );
 
-      console.log(
-        "Verification error:",
-        verifyError
-      );
+      if (companyUpdateError) {
+        setErrorMessage(
+          "Company profile could not be updated: " +
+            companyUpdateError.message
+        );
+
+        setSaving(false);
+        return;
+      }
+
+      // ----------------------------------------
+      // UPDATE EXISTING INTERNSHIPS
+      // IF COMPANY NAME CHANGED
+      // ----------------------------------------
+
+      if (
+        oldCompanyName &&
+        oldCompanyName !== newCompanyName
+      ) {
+        console.log(
+          "Company name changed. Updating internships..."
+        );
+
+        const {
+          data: internshipData,
+          error: internshipFindError,
+        } = await supabase
+          .from("internships")
+          .select("id")
+          .eq("company_name", oldCompanyName);
+
+        console.log(
+          "Existing company internships:",
+          internshipData
+        );
+
+        console.log(
+          "Internship lookup error:",
+          internshipFindError
+        );
+
+        if (internshipFindError) {
+          console.error(
+            "Could not find internships:",
+            internshipFindError
+          );
+
+          setErrorMessage(
+            "Company profile was updated, but existing internships could not be checked: " +
+              internshipFindError.message
+          );
+
+          setSaving(false);
+          return;
+        }
+
+        if (
+          internshipData &&
+          internshipData.length > 0
+        ) {
+          const {
+            error: internshipUpdateError,
+          } = await supabase
+            .from("internships")
+            .update({
+              company_name: newCompanyName,
+            })
+            .eq(
+              "company_name",
+              oldCompanyName
+            );
+
+          console.log(
+            "Internship update error:",
+            internshipUpdateError
+          );
+
+          if (internshipUpdateError) {
+            console.error(
+              "Could not update internships:",
+              internshipUpdateError
+            );
+
+            setErrorMessage(
+              "Your company profile was updated, but the existing internships could not be updated: " +
+                internshipUpdateError.message
+            );
+
+            setSaving(false);
+            return;
+          }
+
+          console.log(
+            "All existing internships updated successfully."
+          );
+        } else {
+          console.log(
+            "No existing internships found for this company."
+          );
+        }
+      }
+
+      // ----------------------------------------
+      // VERIFY COMPANY
+      // ----------------------------------------
+
+      const {
+        data: verifiedCompany,
+        error: verifyError,
+      } = await supabase
+        .from("companies")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
       if (verifyError) {
         setErrorMessage(
-          "The profile was updated, but we could not verify the changes: " +
+          "The profile was updated, but verification failed: " +
             verifyError.message
         );
 
@@ -197,37 +314,49 @@ export default function CompanyProfilePage() {
         return;
       }
 
-      if (!updatedData) {
+      if (!verifiedCompany) {
         setErrorMessage(
-          "Company profile could not be updated. No company was found for this account."
+          "Company profile could not be verified."
         );
 
         setSaving(false);
         return;
       }
 
+      // ----------------------------------------
+      // UPDATE LOCAL STATE
+      // ----------------------------------------
+
       setCompany({
         company_name:
-          updatedData.company_name || "",
+          verifiedCompany.company_name || "",
         industry:
-          updatedData.industry || "",
+          verifiedCompany.industry || "",
         website:
-          updatedData.website || "",
+          verifiedCompany.website || "",
         location:
-          updatedData.location || "",
+          verifiedCompany.location || "",
         email:
-          updatedData.email || "",
+          verifiedCompany.email || "",
         phone:
-          updatedData.phone || "",
+          verifiedCompany.phone || "",
         description:
-          updatedData.description || "",
+          verifiedCompany.description || "",
       });
+
+      setOldCompanyName(
+        verifiedCompany.company_name || ""
+      );
 
       setMessage(
         "Company profile updated successfully! ✅"
       );
 
       setSaving(false);
+
+      // ----------------------------------------
+      // RETURN TO DASHBOARD
+      // ----------------------------------------
 
       setTimeout(() => {
         router.push("/company-dashboard");
@@ -246,6 +375,10 @@ export default function CompanyProfilePage() {
       setSaving(false);
     }
   }
+
+  // ----------------------------------------
+  // LOADING
+  // ----------------------------------------
 
   if (loading) {
     return (
@@ -266,7 +399,14 @@ export default function CompanyProfilePage() {
     );
   }
 
-  if (errorMessage && !company.company_name) {
+  // ----------------------------------------
+  // ERROR
+  // ----------------------------------------
+
+  if (
+    errorMessage &&
+    !company.company_name
+  ) {
     return (
       <main
         style={{
@@ -294,13 +434,20 @@ export default function CompanyProfilePage() {
             Company Profile Error
           </h2>
 
-          <p style={{ color: "#666" }}>
+          <p
+            style={{
+              color: "#666",
+              lineHeight: "1.6",
+            }}
+          >
             {errorMessage}
           </p>
 
           <button
             onClick={() =>
-              router.push("/company-dashboard")
+              router.push(
+                "/company-dashboard"
+              )
             }
             style={primaryButton}
           >
@@ -310,6 +457,10 @@ export default function CompanyProfilePage() {
       </main>
     );
   }
+
+  // ----------------------------------------
+  // EDIT PROFILE
+  // ----------------------------------------
 
   return (
     <main
@@ -327,7 +478,9 @@ export default function CompanyProfilePage() {
       >
         <button
           onClick={() =>
-            router.push("/company-dashboard")
+            router.push(
+              "/company-dashboard"
+            )
           }
           style={{
             background: "transparent",
@@ -513,6 +666,10 @@ export default function CompanyProfilePage() {
   );
 }
 
+// ----------------------------------------
+// FORM FIELD
+// ----------------------------------------
+
 function FormField({
   label,
   name,
@@ -540,6 +697,10 @@ function FormField({
     </div>
   );
 }
+
+// ----------------------------------------
+// STYLES
+// ----------------------------------------
 
 const inputStyle = {
   width: "100%",
