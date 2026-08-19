@@ -1266,7 +1266,7 @@ export default function CompanyDashboard() {
   style={secondaryButton}
 >
   ⚙️ Edit Company Profile
-</button>
+</button> 
         </div>
       </div>
 
