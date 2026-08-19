@@ -19,8 +19,18 @@ export default function CompanyDashboard() {
   const [selectedApplication, setSelectedApplication] = useState(null);
 
   useEffect(() => {
+  loadDashboard();
+
+  const handleFocus = () => {
     loadDashboard();
-  }, []);
+  };
+
+  window.addEventListener("focus", handleFocus);
+
+  return () => {
+    window.removeEventListener("focus", handleFocus);
+  };
+}, []);
 
   // ----------------------------------------
   // QUALIFICATION LEVEL
