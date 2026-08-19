@@ -9,126 +9,324 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
+const emptyCompany = {
+  company_name: "",
+  industry: "",
+  website: "",
+  location: "",
+  email: "",
+  phone: "",
+  description: "",
+};
+
 export default function CompanyPage() {
   const router = useRouter();
 
-  const [company, setCompany] = useState({
-    company_name: "",
-    industry: "",
-    website: "",
-    location: "",
-    email: "",
-    phone: "",
-    description: "",
-  });
+  const [company, setCompany] = useState(emptyCompany);
+  const [companyId, setCompanyId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const [loading, setLoading] = useState(false);
+  // ----------------------------------------
+  // LOAD EXISTING COMPANY PROFILE
+  // ----------------------------------------
 
   useEffect(() => {
-    async function checkUser() {
+    async function loadCompany() {
+      setLoading(true);
+      setMessage("");
+      setErrorMessage("");
+
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
 
-      if (!user) {
+      if (userError || !user) {
         router.push("/login");
+        return;
       }
+
+      const {
+        data: companyData,
+        error: companyError,
+      } = await supabase
+        .from("companies")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (companyError) {
+        console.error("Company load error:", companyError);
+
+        setErrorMessage(
+          "Could not load your company profile. Please try again."
+        );
+
+        setLoading(false);
+        return;
+      }
+
+      // Existing company profile
+      if (companyData) {
+        setCompanyId(companyData.id);
+
+        setCompany({
+          company_name: companyData.company_name || "",
+          industry: companyData.industry || "",
+          website: companyData.website || "",
+          location: companyData.location || "",
+          email: companyData.email || "",
+          phone: companyData.phone || "",
+          description: companyData.description || "",
+        });
+      }
+
+      setLoading(false);
     }
 
-    checkUser();
+    loadCompany();
   }, [router]);
 
+  // ----------------------------------------
+  // HANDLE FORM CHANGES
+  // ----------------------------------------
+
   function handleChange(e) {
-    setCompany({
-      ...company,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+
+    setCompany((currentCompany) => ({
+      ...currentCompany,
+      [name]: value,
+    }));
+
+    setMessage("");
+    setErrorMessage("");
   }
+
+  // ----------------------------------------
+  // SAVE / UPDATE COMPANY PROFILE
+  // ----------------------------------------
 
   async function handleSubmit(e) {
     e.preventDefault();
 
-    setLoading(true);
+    setSaving(true);
+    setMessage("");
+    setErrorMessage("");
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-    if (!user) {
-      alert("Please log in first.");
-      setLoading(false);
-      router.push("/login");
-      return;
-    }
+      if (userError || !user) {
+        router.push("/login");
+        return;
+      }
 
-    const companyData = {
-      user_id: user.id,
-      company_name: company.company_name,
-      industry: company.industry,
-      website: company.website,
-      location: company.location,
-      email: company.email,
-      phone: company.phone,
-      description: company.description,
-    };
+      const companyData = {
+        user_id: user.id,
+        company_name: company.company_name.trim(),
+        industry: company.industry.trim(),
+        website: company.website.trim(),
+        location: company.location.trim(),
+        email: company.email.trim(),
+        phone: company.phone.trim(),
+        description: company.description.trim(),
+      };
 
-    // Check if the logged-in user already has a company profile
-    const { data: existingCompany, error: checkError } = await supabase
-      .from("companies")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle();
+      // ----------------------------------------
+      // UPDATE EXISTING COMPANY
+      // ----------------------------------------
 
-    if (checkError) {
-      setLoading(false);
-      alert(checkError.message);
-      return;
-    }
+      if (companyId) {
+        const { data: updatedCompany, error: updateError } =
+          await supabase
+            .from("companies")
+            .update(companyData)
+            .eq("id", companyId)
+            .eq("user_id", user.id)
+            .select()
+            .single();
 
-    let error = null;
+        if (updateError) {
+          console.error("Update company error:", updateError);
+          throw updateError;
+        }
 
-    if (existingCompany) {
-      // Update existing company profile
-      const { error: updateError } = await supabase
+        if (updatedCompany) {
+          setCompanyId(updatedCompany.id);
+
+          setCompany({
+            company_name: updatedCompany.company_name || "",
+            industry: updatedCompany.industry || "",
+            website: updatedCompany.website || "",
+            location: updatedCompany.location || "",
+            email: updatedCompany.email || "",
+            phone: updatedCompany.phone || "",
+            description: updatedCompany.description || "",
+          });
+        }
+
+        setMessage(
+          "✅ Company profile updated successfully!"
+        );
+
+        return;
+      }
+
+      // ----------------------------------------
+      // SAFETY CHECK
+      // Look for an existing profile again
+      // before inserting a new one.
+      // ----------------------------------------
+
+      const {
+        data: existingCompany,
+        error: existingError,
+      } = await supabase
         .from("companies")
-        .update(companyData)
-        .eq("user_id", user.id);
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-      error = updateError;
-    } else {
-      // Create a new company profile
-     const { data, error: insertError } = await supabase
-  .from("companies")
-  .insert([companyData])
-  .select();
+      if (existingError) {
+        console.error(
+          "Existing company check error:",
+          existingError
+        );
 
-console.log("Inserted:", data);
-console.log("Error:", insertError);
+        throw existingError;
+      }
 
-error = insertError;
+      // ----------------------------------------
+      // EXISTING PROFILE FOUND
+      // ----------------------------------------
+
+      if (existingCompany) {
+        const {
+          data: updatedCompany,
+          error: updateError,
+        } = await supabase
+          .from("companies")
+          .update(companyData)
+          .eq("id", existingCompany.id)
+          .eq("user_id", user.id)
+          .select()
+          .single();
+
+        if (updateError) {
+          console.error(
+            "Update existing company error:",
+            updateError
+          );
+
+          throw updateError;
+        }
+
+        setCompanyId(updatedCompany.id);
+
+        setCompany({
+          company_name:
+            updatedCompany.company_name || "",
+          industry: updatedCompany.industry || "",
+          website: updatedCompany.website || "",
+          location: updatedCompany.location || "",
+          email: updatedCompany.email || "",
+          phone: updatedCompany.phone || "",
+          description:
+            updatedCompany.description || "",
+        });
+
+        setMessage(
+          "✅ Company profile updated successfully!"
+        );
+
+        return;
+      }
+
+      // ----------------------------------------
+      // CREATE NEW COMPANY PROFILE
+      // ----------------------------------------
+
+      const {
+        data: newCompany,
+        error: insertError,
+      } = await supabase
+        .from("companies")
+        .insert([companyData])
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error(
+          "Insert company error:",
+          insertError
+        );
+
+        throw insertError;
+      }
+
+      if (newCompany) {
+        setCompanyId(newCompany.id);
+
+        setCompany({
+          company_name: newCompany.company_name || "",
+          industry: newCompany.industry || "",
+          website: newCompany.website || "",
+          location: newCompany.location || "",
+          email: newCompany.email || "",
+          phone: newCompany.phone || "",
+          description: newCompany.description || "",
+        });
+      }
+
+      setMessage(
+        "✅ Company profile created successfully!"
+      );
+    } catch (error) {
+      console.error("Company profile error:", error);
+
+      setErrorMessage(
+        error?.message ||
+          "Something went wrong while saving your company profile."
+      );
+    } finally {
+      setSaving(false);
     }
-
-    setLoading(false);
-
-    if (error) {
-  console.log(error);
-  alert("Error: " + JSON.stringify(error));
-  return;
-}
-
-console.log("Saved successfully");
-alert("✅ Company profile saved successfully!");
-
-    setCompany({
-      company_name: "",
-      industry: "",
-      website: "",
-      location: "",
-      email: "",
-      phone: "",
-      description: "",
-    });
   }
+
+  // ----------------------------------------
+  // LOADING SCREEN
+  // ----------------------------------------
+
+  if (loading) {
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          background: "#f4f8fc",
+          color: "#0057B8",
+          fontSize: "22px",
+          fontWeight: "bold",
+          padding: "20px",
+        }}
+      >
+        Loading company profile...
+      </main>
+    );
+  }
+
+  // ----------------------------------------
+  // PAGE
+  // ----------------------------------------
 
   return (
     <div
@@ -145,28 +343,86 @@ alert("✅ Company profile saved successfully!");
           background: "#fff",
           borderRadius: "16px",
           padding: "35px",
-          boxShadow: "0 8px 30px rgba(0,0,0,0.08)",
+          boxShadow:
+            "0 8px 30px rgba(0,0,0,0.08)",
         }}
       >
-        <h1
-          style={{
-            color: "#0057B8",
-            marginBottom: "10px",
-          }}
-        >
-          Company Profile
-        </h1>
+        {/* HEADER */}
 
-        <p
+        <div
           style={{
-            color: "#555",
             marginBottom: "30px",
           }}
         >
-          Create your company profile and start hiring South Africa's best graduates.
-        </p>
+          <h1
+            style={{
+              color: "#0057B8",
+              marginBottom: "10px",
+            }}
+          >
+            🏢 {companyId
+              ? "Edit Company Profile"
+              : "Company Profile"}
+          </h1>
+
+          <p
+            style={{
+              color: "#555",
+              marginBottom: 0,
+              lineHeight: "1.6",
+            }}
+          >
+            {companyId
+              ? "Update your company information and keep your GradLink SA profile up to date."
+              : "Create your company profile and start hiring South Africa's best graduates."}
+          </p>
+        </div>
+
+        {/* SUCCESS MESSAGE */}
+
+        {message && (
+          <div
+            style={{
+              background: "#e8f7ee",
+              color: "#16803c",
+              border:
+                "1px solid #b7e4c7",
+              padding: "14px 16px",
+              borderRadius: "10px",
+              marginBottom: "20px",
+              fontWeight: "bold",
+            }}
+          >
+            {message}
+          </div>
+        )}
+
+        {/* ERROR MESSAGE */}
+
+        {errorMessage && (
+          <div
+            style={{
+              background: "#fff0f0",
+              color: "#c62828",
+              border:
+                "1px solid #f0b8b8",
+              padding: "14px 16px",
+              borderRadius: "10px",
+              marginBottom: "20px",
+              fontWeight: "bold",
+            }}
+          >
+            {errorMessage}
+          </div>
+        )}
+
+        {/* FORM */}
 
         <form onSubmit={handleSubmit}>
+          <label style={labelStyle}>
+            Company Name
+          </label>
+
           <input
             name="company_name"
             placeholder="Company Name"
@@ -175,6 +431,10 @@ alert("✅ Company profile saved successfully!");
             style={inputStyle}
             required
           />
+
+          <label style={labelStyle}>
+            Industry
+          </label>
 
           <input
             name="industry"
@@ -185,32 +445,48 @@ alert("✅ Company profile saved successfully!");
             required
           />
 
+          <label style={labelStyle}>
+            Website
+          </label>
+
           <input
             name="website"
-            placeholder="Website"
+            placeholder="https://example.co.za"
             value={company.website}
             onChange={handleChange}
             style={inputStyle}
           />
 
+          <label style={labelStyle}>
+            Location
+          </label>
+
           <input
             name="location"
-            placeholder="Location"
+            placeholder="Johannesburg, Gauteng"
             value={company.location}
             onChange={handleChange}
             style={inputStyle}
             required
           />
 
+          <label style={labelStyle}>
+            Company Email
+          </label>
+
           <input
             type="email"
             name="email"
-            placeholder="Company Email"
+            placeholder="company@example.co.za"
             value={company.email}
             onChange={handleChange}
             style={inputStyle}
             required
           />
+
+          <label style={labelStyle}>
+            Phone Number
+          </label>
 
           <input
             name="phone"
@@ -220,37 +496,87 @@ alert("✅ Company profile saved successfully!");
             style={inputStyle}
           />
 
+          <label style={labelStyle}>
+            Company Description
+          </label>
+
           <textarea
             name="description"
             placeholder="Describe your company..."
             value={company.description}
             onChange={handleChange}
             rows={6}
-            style={inputStyle}
+            style={{
+              ...inputStyle,
+              resize: "vertical",
+            }}
           />
+
+          {/* SAVE BUTTON */}
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={saving}
             style={{
               width: "100%",
               padding: "15px",
-              background: "#0057B8",
+              background: saving
+                ? "#7aa9d8"
+                : "#0057B8",
               color: "white",
               border: "none",
               borderRadius: "10px",
               fontSize: "17px",
               fontWeight: "bold",
-              cursor: "pointer",
+              cursor: saving
+                ? "not-allowed"
+                : "pointer",
             }}
           >
-            {loading ? "Saving..." : "Save Company Profile"}
+            {saving
+              ? "Saving..."
+              : companyId
+              ? "💾 Update Company Profile"
+              : "💾 Save Company Profile"}
           </button>
+
+          {/* BACK TO DASHBOARD */}
+
+          {companyId && (
+            <button
+              type="button"
+              onClick={() =>
+                router.push("/company/dashboard")
+              }
+              style={{
+                width: "100%",
+                padding: "14px",
+                marginTop: "12px",
+                background: "#fff",
+                color: "#0057B8",
+                border:
+                  "2px solid #0057B8",
+                borderRadius: "10px",
+                fontSize: "16px",
+                fontWeight: "bold",
+                cursor: "pointer",
+              }}
+            >
+              ← Back to Company Dashboard
+            </button>
+          )}
         </form>
       </div>
     </div>
   );
 }
+
+const labelStyle = {
+  display: "block",
+  marginBottom: "7px",
+  color: "#333",
+  fontWeight: "600",
+};
 
 const inputStyle = {
   width: "100%",
