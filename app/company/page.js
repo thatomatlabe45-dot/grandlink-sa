@@ -141,14 +141,30 @@ export default function CompanyPage() {
 
       if (companyId) {
         const {
-          data: updatedCompany,
-          error: updateError,
-        } = await supabase
-          .from("companies")
-          .update(companyData)
-          .eq("user_id", user.id)
-          .select("*")
-          .single();
+  data: updatedCompanies,
+  error: updateError,
+} = await supabase
+  .from("companies")
+  .update(companyData)
+  .eq("user_id", user.id)
+  .select("*");
+
+if (updateError) {
+  console.error(
+    "Update company error:",
+    updateError
+  );
+
+  throw updateError;
+}
+
+if (!updatedCompanies || updatedCompanies.length === 0) {
+  throw new Error(
+    "Company profile could not be updated. No matching company was found."
+  );
+}
+
+const updatedCompany = updatedCompanies[0];
 
         if (updateError) {
           console.error(
