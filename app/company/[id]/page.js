@@ -9,63 +9,67 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-const emptyCompany = {
-  company_name: "",
-  industry: "",
-  website: "",
-  location: "",
-  email: "",
-  phone: "",
-  description: "",
-};
-
 export default function CompanyProfilePage() {
   const params = useParams();
   const router = useRouter();
 
-  const id = params?.id;
+  const [company, setCompany] = useState({
+    company_name: "",
+    industry: "",
+    website: "",
+    location: "",
+    email: "",
+    phone: "",
+    description: "",
+  });
 
-  const [company, setCompany] = useState(emptyCompany);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    if (id) {
-      loadCompany();
-    }
-  }, [id]);
+    loadCompany();
+  }, []);
 
   async function loadCompany() {
     setLoading(true);
-    setMessage("");
     setErrorMessage("");
 
     try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        router.push("/login");
+        return;
+      }
+
       const { data, error } = await supabase
         .from("companies")
         .select("*")
-        .eq("id", id)
+        .eq("user_id", user.id)
         .maybeSingle();
 
-      if (error) {
-        console.error("Load company error:", error);
+      console.log("Logged in user:", user.id);
+      console.log("Company loaded:", data);
+      console.log("Company load error:", error);
 
+      if (error) {
         setErrorMessage(
-          "Could not load your company profile. " +
+          "Could not load company profile: " +
             error.message
         );
-
         setLoading(false);
         return;
       }
 
       if (!data) {
         setErrorMessage(
-          "No company was found with this ID."
+          "No company profile was found for this account."
         );
-
         setLoading(false);
         return;
       }
@@ -92,25 +96,32 @@ export default function CompanyProfilePage() {
     }
   }
 
-  function handleChange(e) {
-    const { name, value } = e.target;
+  function handleChange(event) {
+    const { name, value } = event.target;
 
-    setCompany((previous) => ({
-      ...previous,
+    setCompany((current) => ({
+      ...current,
       [name]: value,
     }));
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function handleSubmit(event) {
+    event.preventDefault();
 
     setSaving(true);
     setMessage("");
     setErrorMessage("");
 
     try {
-      if (!id) {
-        setErrorMessage("Company ID is missing.");
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        setErrorMessage(
+          "Your session has expired. Please log in again."
+        );
         setSaving(false);
         return;
       }
@@ -129,50 +140,66 @@ export default function CompanyProfilePage() {
         setErrorMessage(
           "Please enter your company name."
         );
-
         setSaving(false);
         return;
       }
 
       console.log(
-        "Updating company ID:",
-        id
+        "Updating company for user:",
+        user.id
       );
 
-      const { data, error } = await supabase
+      const { error: updateError } = await supabase
         .from("companies")
         .update(updatedCompany)
-        .eq("id", id)
-        .select("*");
-
-      console.log(
-        "Update response:",
-        data
-      );
+        .eq("user_id", user.id);
 
       console.log(
         "Update error:",
-        error
+        updateError
       );
 
-      if (error) {
-        console.error(
-          "Supabase update error:",
-          error
-        );
-
+      if (updateError) {
         setErrorMessage(
-          "Company profile could not be updated. " +
-            error.message
+          "Company profile could not be updated: " +
+            updateError.message
         );
 
         setSaving(false);
         return;
       }
 
-      if (!data || data.length === 0) {
+      // Verify that the updated company can be read
+      const { data: updatedData, error: verifyError } =
+        await supabase
+          .from("companies")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+      console.log(
+        "Updated company:",
+        updatedData
+      );
+
+      console.log(
+        "Verification error:",
+        verifyError
+      );
+
+      if (verifyError) {
         setErrorMessage(
-          "Company profile could not be updated. No matching company was found."
+          "The profile was updated, but we could not verify the changes: " +
+            verifyError.message
+        );
+
+        setSaving(false);
+        return;
+      }
+
+      if (!updatedData) {
+        setErrorMessage(
+          "Company profile could not be updated. No company was found for this account."
         );
 
         setSaving(false);
@@ -181,19 +208,19 @@ export default function CompanyProfilePage() {
 
       setCompany({
         company_name:
-          data[0].company_name || "",
+          updatedData.company_name || "",
         industry:
-          data[0].industry || "",
+          updatedData.industry || "",
         website:
-          data[0].website || "",
+          updatedData.website || "",
         location:
-          data[0].location || "",
+          updatedData.location || "",
         email:
-          data[0].email || "",
+          updatedData.email || "",
         phone:
-          data[0].phone || "",
+          updatedData.phone || "",
         description:
-          data[0].description || "",
+          updatedData.description || "",
       });
 
       setMessage(
@@ -207,7 +234,10 @@ export default function CompanyProfilePage() {
         router.refresh();
       }, 1000);
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Unexpected update error:",
+        error
+      );
 
       setErrorMessage(
         "Something went wrong while updating your company profile."
@@ -219,7 +249,7 @@ export default function CompanyProfilePage() {
 
   if (loading) {
     return (
-      <div
+      <main
         style={{
           minHeight: "100vh",
           display: "flex",
@@ -232,75 +262,52 @@ export default function CompanyProfilePage() {
         }}
       >
         Loading company profile...
-      </div>
+      </main>
     );
   }
 
-  if (
-    errorMessage &&
-    !company.company_name
-  ) {
+  if (errorMessage && !company.company_name) {
     return (
-      <div
+      <main
         style={{
           minHeight: "100vh",
-          background: "#f5f9ff",
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
+          background: "#f5f9ff",
           padding: "20px",
         }}
       >
         <div
           style={{
             background: "#fff",
-            padding: "40px",
-            borderRadius: "20px",
+            padding: "35px",
+            borderRadius: "18px",
             maxWidth: "550px",
             width: "100%",
             textAlign: "center",
             boxShadow:
-              "0 10px 30px rgba(0,0,0,0.08)",
+              "0 10px 30px rgba(0,0,0,.08)",
           }}
         >
-          <h2
-            style={{
-              color: "#d32f2f",
-            }}
-          >
+          <h2 style={{ color: "#c62828" }}>
             Company Profile Error
           </h2>
 
-          <p
-            style={{
-              color: "#555",
-              lineHeight: "1.6",
-            }}
-          >
+          <p style={{ color: "#666" }}>
             {errorMessage}
           </p>
 
           <button
             onClick={() =>
-              router.push(
-                "/company-dashboard"
-              )
+              router.push("/company-dashboard")
             }
-            style={{
-              marginTop: "20px",
-              padding: "12px 22px",
-              background: "#0057B8",
-              color: "#fff",
-              border: "none",
-              borderRadius: "10px",
-              cursor: "pointer",
-              fontWeight: "bold",
-            }}
+            style={primaryButton}
           >
             Back to Dashboard
           </button>
         </div>
-      </div>
+      </main>
     );
   }
 
@@ -309,7 +316,7 @@ export default function CompanyProfilePage() {
       style={{
         minHeight: "100vh",
         background: "#f5f9ff",
-        padding: "40px 20px",
+        padding: "35px 20px 60px",
       }}
     >
       <div
@@ -318,57 +325,48 @@ export default function CompanyProfilePage() {
           margin: "0 auto",
         }}
       >
-        <div
+        <button
+          onClick={() =>
+            router.push("/company-dashboard")
+          }
           style={{
+            background: "transparent",
+            border: "none",
+            color: "#0057B8",
+            fontSize: "16px",
+            fontWeight: "bold",
+            cursor: "pointer",
+            padding: 0,
+            marginBottom: "20px",
+          }}
+        >
+          ← Back to Dashboard
+        </button>
+
+        <h1
+          style={{
+            color: "#0057B8",
+            marginBottom: "8px",
+          }}
+        >
+          Edit Company Profile
+        </h1>
+
+        <p
+          style={{
+            color: "#666",
             marginBottom: "25px",
           }}
         >
-          <button
-            onClick={() =>
-              router.push(
-                "/company-dashboard"
-              )
-            }
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "#0057B8",
-              fontSize: "16px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              padding: "0",
-            }}
-          >
-            ← Back to Dashboard
-          </button>
-
-          <h1
-            style={{
-              color: "#0057B8",
-              marginBottom: "8px",
-              fontSize: "32px",
-            }}
-          >
-            Edit Company Profile
-          </h1>
-
-          <p
-            style={{
-              color: "#666",
-              marginTop: 0,
-            }}
-          >
-            Update your company information
-            below.
-          </p>
-        </div>
+          Update your company information below.
+        </p>
 
         {message && (
           <div
             style={{
               background: "#e8f5e9",
               color: "#2e7d32",
-              padding: "15px 18px",
+              padding: "15px",
               borderRadius: "10px",
               marginBottom: "20px",
               fontWeight: "bold",
@@ -383,7 +381,7 @@ export default function CompanyProfilePage() {
             style={{
               background: "#ffebee",
               color: "#c62828",
-              padding: "15px 18px",
+              padding: "15px",
               borderRadius: "10px",
               marginBottom: "20px",
               fontWeight: "bold",
@@ -400,99 +398,58 @@ export default function CompanyProfilePage() {
             padding: "30px",
             borderRadius: "20px",
             boxShadow:
-              "0 10px 30px rgba(0,0,0,0.08)",
+              "0 10px 30px rgba(0,0,0,.08)",
           }}
         >
-          <div style={{ marginBottom: "20px" }}>
-            <label style={labelStyle}>
-              Company Name *
-            </label>
+          <FormField
+            label="Company Name *"
+            name="company_name"
+            value={company.company_name}
+            onChange={handleChange}
+            required
+          />
 
-            <input
-              type="text"
-              name="company_name"
-              value={company.company_name}
-              onChange={handleChange}
-              required
-              placeholder="Enter company name"
-              style={inputStyle}
-            />
-          </div>
+          <FormField
+            label="Industry"
+            name="industry"
+            value={company.industry}
+            onChange={handleChange}
+            placeholder="e.g. Information Technology"
+          />
 
-          <div style={{ marginBottom: "20px" }}>
-            <label style={labelStyle}>
-              Industry
-            </label>
+          <FormField
+            label="Website"
+            name="website"
+            value={company.website}
+            onChange={handleChange}
+            placeholder="https://example.com"
+          />
 
-            <input
-              type="text"
-              name="industry"
-              value={company.industry}
-              onChange={handleChange}
-              placeholder="e.g. Information Technology"
-              style={inputStyle}
-            />
-          </div>
+          <FormField
+            label="Location"
+            name="location"
+            value={company.location}
+            onChange={handleChange}
+            placeholder="e.g. Johannesburg, Gauteng"
+          />
 
-          <div style={{ marginBottom: "20px" }}>
-            <label style={labelStyle}>
-              Website
-            </label>
+          <FormField
+            label="Email"
+            name="email"
+            type="email"
+            value={company.email}
+            onChange={handleChange}
+            placeholder="company@example.com"
+          />
 
-            <input
-              type="text"
-              name="website"
-              value={company.website}
-              onChange={handleChange}
-              placeholder="https://example.com"
-              style={inputStyle}
-            />
-          </div>
-
-          <div style={{ marginBottom: "20px" }}>
-            <label style={labelStyle}>
-              Location
-            </label>
-
-            <input
-              type="text"
-              name="location"
-              value={company.location}
-              onChange={handleChange}
-              placeholder="e.g. Johannesburg, Gauteng"
-              style={inputStyle}
-            />
-          </div>
-
-          <div style={{ marginBottom: "20px" }}>
-            <label style={labelStyle}>
-              Email
-            </label>
-
-            <input
-              type="email"
-              name="email"
-              value={company.email}
-              onChange={handleChange}
-              placeholder="company@example.com"
-              style={inputStyle}
-            />
-          </div>
-
-          <div style={{ marginBottom: "20px" }}>
-            <label style={labelStyle}>
-              Phone
-            </label>
-
-            <input
-              type="tel"
-              name="phone"
-              value={company.phone}
-              onChange={handleChange}
-              placeholder="Enter phone number"
-              style={inputStyle}
-            />
-          </div>
+          <FormField
+            label="Phone"
+            name="phone"
+            type="tel"
+            value={company.phone}
+            onChange={handleChange}
+            placeholder="Enter phone number"
+          />
 
           <div style={{ marginBottom: "25px" }}>
             <label style={labelStyle}>
@@ -508,7 +465,6 @@ export default function CompanyProfilePage() {
               style={{
                 ...inputStyle,
                 resize: "vertical",
-                minHeight: "140px",
               }}
             />
           </div>
@@ -524,20 +480,10 @@ export default function CompanyProfilePage() {
               type="submit"
               disabled={saving}
               style={{
+                ...primaryButton,
                 flex: 1,
                 minWidth: "180px",
-                padding: "14px 20px",
-                background: saving
-                  ? "#7aa9d8"
-                  : "#0057B8",
-                color: "#fff",
-                border: "none",
-                borderRadius: "10px",
-                cursor: saving
-                  ? "not-allowed"
-                  : "pointer",
-                fontSize: "16px",
-                fontWeight: "bold",
+                opacity: saving ? 0.7 : 1,
               }}
             >
               {saving
@@ -553,17 +499,9 @@ export default function CompanyProfilePage() {
                 )
               }
               style={{
+                ...secondaryButton,
                 flex: 1,
                 minWidth: "180px",
-                padding: "14px 20px",
-                background: "#fff",
-                color: "#0057B8",
-                border:
-                  "2px solid #0057B8",
-                borderRadius: "10px",
-                cursor: "pointer",
-                fontSize: "16px",
-                fontWeight: "bold",
               }}
             >
               Cancel
@@ -575,6 +513,34 @@ export default function CompanyProfilePage() {
   );
 }
 
+function FormField({
+  label,
+  name,
+  type = "text",
+  value,
+  onChange,
+  placeholder,
+  required = false,
+}) {
+  return (
+    <div style={{ marginBottom: "20px" }}>
+      <label style={labelStyle}>
+        {label}
+      </label>
+
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        required={required}
+        style={inputStyle}
+      />
+    </div>
+  );
+}
+
 const inputStyle = {
   width: "100%",
   padding: "13px 14px",
@@ -582,7 +548,6 @@ const inputStyle = {
   borderRadius: "10px",
   fontSize: "16px",
   boxSizing: "border-box",
-  outline: "none",
   background: "#fff",
 };
 
@@ -591,4 +556,25 @@ const labelStyle = {
   marginBottom: "8px",
   fontWeight: "bold",
   color: "#333",
+};
+
+const primaryButton = {
+  marginTop: "15px",
+  padding: "13px 22px",
+  background: "#0057B8",
+  color: "#fff",
+  border: "none",
+  borderRadius: "10px",
+  fontWeight: "bold",
+  cursor: "pointer",
+};
+
+const secondaryButton = {
+  padding: "13px 22px",
+  background: "#fff",
+  color: "#0057B8",
+  border: "2px solid #0057B8",
+  borderRadius: "10px",
+  fontWeight: "bold",
+  cursor: "pointer",
 };
