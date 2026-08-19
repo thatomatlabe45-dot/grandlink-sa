@@ -1260,13 +1260,13 @@ export default function CompanyDashboard() {
           </button>
 
           <button
-            onClick={() =>
-              router.push("/company")
-            }
-            style={secondaryButton}
-          >
-            ⚙️ Edit Company Profile
-          </button>
+  onClick={() =>
+    router.push(`/company/${company.id}`)
+  }
+  style={secondaryButton}
+>
+  ⚙️ Edit Company Profile
+</button>
         </div>
       </div>
 
