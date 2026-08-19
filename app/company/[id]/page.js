@@ -51,15 +51,21 @@ export default function CompanyProfilePage() {
 
       if (error) {
         console.error("Load company error:", error);
+
         setErrorMessage(
-          "Could not load your company profile. " + error.message
+          "Could not load your company profile. " +
+            error.message
         );
+
         setLoading(false);
         return;
       }
 
       if (!data) {
-        setErrorMessage("No company was found with this ID.");
+        setErrorMessage(
+          "No company was found with this ID."
+        );
+
         setLoading(false);
         return;
       }
@@ -76,7 +82,7 @@ export default function CompanyProfilePage() {
 
       setLoading(false);
     } catch (error) {
-      console.error("Unexpected error:", error);
+      console.error(error);
 
       setErrorMessage(
         "Something went wrong while loading your company profile."
@@ -120,13 +126,18 @@ export default function CompanyProfilePage() {
       };
 
       if (!updatedCompany.company_name) {
-        setErrorMessage("Please enter your company name.");
+        setErrorMessage(
+          "Please enter your company name."
+        );
+
         setSaving(false);
         return;
       }
 
-      console.log("Updating company with ID:", id);
-      console.log("New company data:", updatedCompany);
+      console.log(
+        "Updating company ID:",
+        id
+      );
 
       const { data, error } = await supabase
         .from("companies")
@@ -134,14 +145,25 @@ export default function CompanyProfilePage() {
         .eq("id", id)
         .select("*");
 
-      console.log("Update response:", data);
-      console.log("Update error:", error);
+      console.log(
+        "Update response:",
+        data
+      );
+
+      console.log(
+        "Update error:",
+        error
+      );
 
       if (error) {
-        console.error("Supabase update error:", error);
+        console.error(
+          "Supabase update error:",
+          error
+        );
 
         setErrorMessage(
-          "Company profile could not be updated. " + error.message
+          "Company profile could not be updated. " +
+            error.message
         );
 
         setSaving(false);
@@ -158,25 +180,34 @@ export default function CompanyProfilePage() {
       }
 
       setCompany({
-        company_name: data[0].company_name || "",
-        industry: data[0].industry || "",
-        website: data[0].website || "",
-        location: data[0].location || "",
-        email: data[0].email || "",
-        phone: data[0].phone || "",
-        description: data[0].description || "",
+        company_name:
+          data[0].company_name || "",
+        industry:
+          data[0].industry || "",
+        website:
+          data[0].website || "",
+        location:
+          data[0].location || "",
+        email:
+          data[0].email || "",
+        phone:
+          data[0].phone || "",
+        description:
+          data[0].description || "",
       });
 
-      setMessage("Company profile updated successfully! ✅");
+      setMessage(
+        "Company profile updated successfully! ✅"
+      );
 
       setSaving(false);
 
       setTimeout(() => {
-        router.push("/company");
+        router.push("/company-dashboard");
         router.refresh();
       }, 1000);
     } catch (error) {
-      console.error("Unexpected update error:", error);
+      console.error(error);
 
       setErrorMessage(
         "Something went wrong while updating your company profile."
@@ -205,7 +236,10 @@ export default function CompanyProfilePage() {
     );
   }
 
-  if (errorMessage && !company.company_name) {
+  if (
+    errorMessage &&
+    !company.company_name
+  ) {
     return (
       <div
         style={{
@@ -225,10 +259,17 @@ export default function CompanyProfilePage() {
             maxWidth: "550px",
             width: "100%",
             textAlign: "center",
-            boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+            boxShadow:
+              "0 10px 30px rgba(0,0,0,0.08)",
           }}
         >
-          <h2 style={{ color: "#d32f2f" }}>Company Profile Error</h2>
+          <h2
+            style={{
+              color: "#d32f2f",
+            }}
+          >
+            Company Profile Error
+          </h2>
 
           <p
             style={{
@@ -240,7 +281,11 @@ export default function CompanyProfilePage() {
           </p>
 
           <button
-            onClick={() => router.push("/company")}
+            onClick={() =>
+              router.push(
+                "/company-dashboard"
+              )
+            }
             style={{
               marginTop: "20px",
               padding: "12px 22px",
@@ -273,14 +318,17 @@ export default function CompanyProfilePage() {
           margin: "0 auto",
         }}
       >
-        {/* Header */}
         <div
           style={{
             marginBottom: "25px",
           }}
         >
           <button
-            onClick={() => router.push("/company")}
+            onClick={() =>
+              router.push(
+                "/company-dashboard"
+              )
+            }
             style={{
               background: "transparent",
               border: "none",
@@ -310,11 +358,11 @@ export default function CompanyProfilePage() {
               marginTop: 0,
             }}
           >
-            Update your company information below.
+            Update your company information
+            below.
           </p>
         </div>
 
-        {/* Success Message */}
         {message && (
           <div
             style={{
@@ -330,7 +378,6 @@ export default function CompanyProfilePage() {
           </div>
         )}
 
-        {/* Error Message */}
         {errorMessage && (
           <div
             style={{
@@ -346,26 +393,18 @@ export default function CompanyProfilePage() {
           </div>
         )}
 
-        {/* Form */}
         <form
           onSubmit={handleSubmit}
           style={{
             background: "#fff",
             padding: "30px",
             borderRadius: "20px",
-            boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+            boxShadow:
+              "0 10px 30px rgba(0,0,0,0.08)",
           }}
         >
-          {/* Company Name */}
           <div style={{ marginBottom: "20px" }}>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "8px",
-                fontWeight: "bold",
-                color: "#333",
-              }}
-            >
+            <label style={labelStyle}>
               Company Name *
             </label>
 
@@ -380,9 +419,10 @@ export default function CompanyProfilePage() {
             />
           </div>
 
-          {/* Industry */}
           <div style={{ marginBottom: "20px" }}>
-            <label style={labelStyle}>Industry</label>
+            <label style={labelStyle}>
+              Industry
+            </label>
 
             <input
               type="text"
@@ -394,9 +434,10 @@ export default function CompanyProfilePage() {
             />
           </div>
 
-          {/* Website */}
           <div style={{ marginBottom: "20px" }}>
-            <label style={labelStyle}>Website</label>
+            <label style={labelStyle}>
+              Website
+            </label>
 
             <input
               type="text"
@@ -408,9 +449,10 @@ export default function CompanyProfilePage() {
             />
           </div>
 
-          {/* Location */}
           <div style={{ marginBottom: "20px" }}>
-            <label style={labelStyle}>Location</label>
+            <label style={labelStyle}>
+              Location
+            </label>
 
             <input
               type="text"
@@ -422,9 +464,10 @@ export default function CompanyProfilePage() {
             />
           </div>
 
-          {/* Email */}
           <div style={{ marginBottom: "20px" }}>
-            <label style={labelStyle}>Email</label>
+            <label style={labelStyle}>
+              Email
+            </label>
 
             <input
               type="email"
@@ -436,9 +479,10 @@ export default function CompanyProfilePage() {
             />
           </div>
 
-          {/* Phone */}
           <div style={{ marginBottom: "20px" }}>
-            <label style={labelStyle}>Phone</label>
+            <label style={labelStyle}>
+              Phone
+            </label>
 
             <input
               type="tel"
@@ -450,9 +494,10 @@ export default function CompanyProfilePage() {
             />
           </div>
 
-          {/* Description */}
           <div style={{ marginBottom: "25px" }}>
-            <label style={labelStyle}>Company Description</label>
+            <label style={labelStyle}>
+              Company Description
+            </label>
 
             <textarea
               name="description"
@@ -468,7 +513,6 @@ export default function CompanyProfilePage() {
             />
           </div>
 
-          {/* Buttons */}
           <div
             style={{
               display: "flex",
@@ -483,28 +527,39 @@ export default function CompanyProfilePage() {
                 flex: 1,
                 minWidth: "180px",
                 padding: "14px 20px",
-                background: saving ? "#7aa9d8" : "#0057B8",
+                background: saving
+                  ? "#7aa9d8"
+                  : "#0057B8",
                 color: "#fff",
                 border: "none",
                 borderRadius: "10px",
-                cursor: saving ? "not-allowed" : "pointer",
+                cursor: saving
+                  ? "not-allowed"
+                  : "pointer",
                 fontSize: "16px",
                 fontWeight: "bold",
               }}
             >
-              {saving ? "Saving..." : "Save Changes"}
+              {saving
+                ? "Saving..."
+                : "Save Changes"}
             </button>
 
             <button
               type="button"
-              onClick={() => router.push("/company")}
+              onClick={() =>
+                router.push(
+                  "/company-dashboard"
+                )
+              }
               style={{
                 flex: 1,
                 minWidth: "180px",
                 padding: "14px 20px",
                 background: "#fff",
                 color: "#0057B8",
-                border: "2px solid #0057B8",
+                border:
+                  "2px solid #0057B8",
                 borderRadius: "10px",
                 cursor: "pointer",
                 fontSize: "16px",
