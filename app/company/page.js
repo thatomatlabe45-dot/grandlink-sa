@@ -30,7 +30,7 @@ export default function CompanyPage() {
   const [errorMessage, setErrorMessage] = useState("");
 
   // ----------------------------------------
-  // LOAD COMPANY PROFILE
+  // LOAD EXISTING COMPANY PROFILE
   // ----------------------------------------
 
   useEffect(() => {
@@ -49,14 +49,20 @@ export default function CompanyPage() {
         return;
       }
 
-      const { data, error } = await supabase
+      const {
+        data: companyData,
+        error: companyError,
+      } = await supabase
         .from("companies")
         .select("*")
         .eq("user_id", user.id)
-        .maybeSingle();
+        .limit(1);
 
-      if (error) {
-        console.error("Company load error:", error);
+      if (companyError) {
+        console.error(
+          "Company load error:",
+          companyError
+        );
 
         setErrorMessage(
           "Could not load your company profile. Please try again."
@@ -66,17 +72,32 @@ export default function CompanyPage() {
         return;
       }
 
-      if (data) {
-        setCompanyId(data.id);
+      if (
+        companyData &&
+        companyData.length > 0
+      ) {
+        const existingCompany =
+          companyData[0];
+
+        // IMPORTANT:
+        // Save the actual company ID
+        setCompanyId(existingCompany.id);
 
         setCompany({
-          company_name: data.company_name || "",
-          industry: data.industry || "",
-          website: data.website || "",
-          location: data.location || "",
-          email: data.email || "",
-          phone: data.phone || "",
-          description: data.description || "",
+          company_name:
+            existingCompany.company_name || "",
+          industry:
+            existingCompany.industry || "",
+          website:
+            existingCompany.website || "",
+          location:
+            existingCompany.location || "",
+          email:
+            existingCompany.email || "",
+          phone:
+            existingCompany.phone || "",
+          description:
+            existingCompany.description || "",
         });
       }
 
@@ -93,8 +114,8 @@ export default function CompanyPage() {
   function handleChange(e) {
     const { name, value } = e.target;
 
-    setCompany((current) => ({
-      ...current,
+    setCompany((currentCompany) => ({
+      ...currentCompany,
       [name]: value,
     }));
 
@@ -114,6 +135,10 @@ export default function CompanyPage() {
     setErrorMessage("");
 
     try {
+      // ----------------------------------------
+      // GET LOGGED-IN USER
+      // ----------------------------------------
+
       const {
         data: { user },
         error: userError,
@@ -124,71 +149,123 @@ export default function CompanyPage() {
         return;
       }
 
+      // ----------------------------------------
+      // PREPARE COMPANY DATA
+      // ----------------------------------------
+
       const companyData = {
-        user_id: user.id,
-        company_name: company.company_name.trim(),
-        industry: company.industry.trim(),
-        website: company.website.trim(),
-        location: company.location.trim(),
-        email: company.email.trim(),
-        phone: company.phone.trim(),
-        description: company.description.trim(),
+        company_name:
+          company.company_name.trim(),
+
+        industry:
+          company.industry.trim(),
+
+        website:
+          company.website.trim(),
+
+        location:
+          company.location.trim(),
+
+        email:
+          company.email.trim(),
+
+        phone:
+          company.phone.trim(),
+
+        description:
+          company.description.trim(),
       };
 
       // ----------------------------------------
       // UPDATE EXISTING COMPANY
       // ----------------------------------------
 
-      // ----------------------------------------
-// UPDATE EXISTING COMPANY
-// ----------------------------------------
+      if (companyId) {
+        const {
+          error: updateError,
+        } = await supabase
+          .from("companies")
+          .update(companyData)
+          .eq("id", companyId);
 
-if (companyId) {
-  const { error: updateError } = await supabase
-    .from("companies")
-    .update(companyData)
-    .eq("id", companyId)
-    .eq("user_id", user.id);
+        if (updateError) {
+          console.error(
+            "Update company error:",
+            updateError
+          );
 
-  if (updateError) {
-    console.error(
-      "Update company error:",
-      updateError
-    );
+          throw updateError;
+        }
 
-    throw updateError;
-  }
-
-  // Update the form with the values we just saved
-  setCompany(companyData);
-
-  setMessage(
-    "✅ Company profile updated successfully!"
-  );
-
-  return;
-}
-
-        setCompany({
-          company_name:
-            updatedCompany.company_name || "",
-          industry:
-            updatedCompany.industry || "",
-          website:
-            updatedCompany.website || "",
-          location:
-            updatedCompany.location || "",
-          email:
-            updatedCompany.email || "",
-          phone:
-            updatedCompany.phone || "",
-          description:
-            updatedCompany.description || "",
-        });
+        // Keep the updated information on the page
+        setCompany(companyData);
 
         setMessage(
           "✅ Company profile updated successfully!"
         );
+
+        setSaving(false);
+
+        return;
+      }
+
+      // ----------------------------------------
+      // CHECK FOR EXISTING COMPANY
+      // ----------------------------------------
+
+      const {
+        data: existingCompanies,
+        error: existingError,
+      } = await supabase
+        .from("companies")
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1);
+
+      if (existingError) {
+        console.error(
+          "Existing company check error:",
+          existingError
+        );
+
+        throw existingError;
+      }
+
+      // ----------------------------------------
+      // COMPANY ALREADY EXISTS
+      // ----------------------------------------
+
+      if (
+        existingCompanies &&
+        existingCompanies.length > 0
+      ) {
+        const existingCompany =
+          existingCompanies[0];
+
+        const {
+          error: updateExistingError,
+        } = await supabase
+          .from("companies")
+          .update(companyData)
+          .eq("id", existingCompany.id);
+
+        if (updateExistingError) {
+          console.error(
+            "Update existing company error:",
+            updateExistingError
+          );
+
+          throw updateExistingError;
+        }
+
+        setCompanyId(existingCompany.id);
+        setCompany(companyData);
+
+        setMessage(
+          "✅ Company profile updated successfully!"
+        );
+
+        setSaving(false);
 
         return;
       }
@@ -202,8 +279,13 @@ if (companyId) {
         error: insertError,
       } = await supabase
         .from("companies")
-        .insert([companyData])
-        .select("*")
+        .insert([
+          {
+            user_id: user.id,
+            ...companyData,
+          },
+        ])
+        .select("id")
         .single();
 
       if (insertError) {
@@ -215,24 +297,11 @@ if (companyId) {
         throw insertError;
       }
 
-      setCompanyId(createdCompany.id);
+      if (createdCompany?.id) {
+        setCompanyId(createdCompany.id);
+      }
 
-      setCompany({
-        company_name:
-          createdCompany.company_name || "",
-        industry:
-          createdCompany.industry || "",
-        website:
-          createdCompany.website || "",
-        location:
-          createdCompany.location || "",
-        email:
-          createdCompany.email || "",
-        phone:
-          createdCompany.phone || "",
-        description:
-          createdCompany.description || "",
-      });
+      setCompany(companyData);
 
       setMessage(
         "✅ Company profile created successfully!"
@@ -253,7 +322,7 @@ if (companyId) {
   }
 
   // ----------------------------------------
-  // BACK TO DASHBOARD
+  // GO BACK TO COMPANY DASHBOARD
   // ----------------------------------------
 
   function goToDashboard() {
@@ -261,7 +330,7 @@ if (companyId) {
   }
 
   // ----------------------------------------
-  // LOADING
+  // LOADING SCREEN
   // ----------------------------------------
 
   if (loading) {
@@ -307,6 +376,8 @@ if (companyId) {
             "0 8px 30px rgba(0,0,0,0.08)",
         }}
       >
+        {/* HEADER */}
+
         <h1
           style={{
             color: "#0057B8",
@@ -331,6 +402,8 @@ if (companyId) {
             : "Create your company profile and start hiring South Africa's best graduates."}
         </p>
 
+        {/* SUCCESS MESSAGE */}
+
         {message && (
           <div
             style={{
@@ -346,6 +419,8 @@ if (companyId) {
             {message}
           </div>
         )}
+
+        {/* ERROR MESSAGE */}
 
         {errorMessage && (
           <div
@@ -363,7 +438,11 @@ if (companyId) {
           </div>
         )}
 
+        {/* FORM */}
+
         <form onSubmit={handleSubmit}>
+          {/* COMPANY NAME */}
+
           <label style={labelStyle}>
             Company Name
           </label>
@@ -376,6 +455,8 @@ if (companyId) {
             style={inputStyle}
             required
           />
+
+          {/* INDUSTRY */}
 
           <label style={labelStyle}>
             Industry
@@ -390,6 +471,8 @@ if (companyId) {
             required
           />
 
+          {/* WEBSITE */}
+
           <label style={labelStyle}>
             Website
           </label>
@@ -401,6 +484,8 @@ if (companyId) {
             onChange={handleChange}
             style={inputStyle}
           />
+
+          {/* LOCATION */}
 
           <label style={labelStyle}>
             Location
@@ -414,6 +499,8 @@ if (companyId) {
             style={inputStyle}
             required
           />
+
+          {/* EMAIL */}
 
           <label style={labelStyle}>
             Company Email
@@ -429,6 +516,8 @@ if (companyId) {
             required
           />
 
+          {/* PHONE */}
+
           <label style={labelStyle}>
             Phone Number
           </label>
@@ -440,6 +529,8 @@ if (companyId) {
             onChange={handleChange}
             style={inputStyle}
           />
+
+          {/* DESCRIPTION */}
 
           <label style={labelStyle}>
             Company Description
@@ -456,6 +547,8 @@ if (companyId) {
               resize: "vertical",
             }}
           />
+
+          {/* SAVE BUTTON */}
 
           <button
             type="submit"
@@ -483,6 +576,8 @@ if (companyId) {
               : "💾 Save Company Profile"}
           </button>
 
+          {/* BACK TO DASHBOARD */}
+
           <button
             type="button"
             onClick={goToDashboard}
@@ -506,6 +601,10 @@ if (companyId) {
     </div>
   );
 }
+
+// ----------------------------------------
+// STYLES
+// ----------------------------------------
 
 const labelStyle = {
   display: "block",
