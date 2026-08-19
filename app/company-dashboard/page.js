@@ -1259,7 +1259,7 @@ export default function CompanyDashboard() {
             🚀 Post Internship
           </button>
 
-          <button
+          <button 
   onClick={() =>
     router.push(`/company/${company.id}`)
   }
