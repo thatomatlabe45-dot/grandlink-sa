@@ -1,3 +1,4 @@
+```javascript
 "use client";
 
 import { useState, useEffect } from "react";
@@ -49,17 +50,18 @@ export default function CompanyPage() {
         return;
       }
 
-      const {
-        data: companyData,
-        error: companyError,
-      } = await supabase
-        .from("companies")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      const { data: companyData, error: companyError } =
+        await supabase
+          .from("companies")
+          .select("*")
+          .eq("user_id", user.id)
+          .limit(1);
 
       if (companyError) {
-        console.error("Company load error:", companyError);
+        console.error(
+          "Company load error:",
+          companyError
+        );
 
         setErrorMessage(
           "Could not load your company profile. Please try again."
@@ -69,18 +71,26 @@ export default function CompanyPage() {
         return;
       }
 
-      // Existing company profile
-      if (companyData) {
-        setCompanyId(companyData.id);
+      if (companyData && companyData.length > 0) {
+        const existingCompany = companyData[0];
+
+        setCompanyId(existingCompany.id);
 
         setCompany({
-          company_name: companyData.company_name || "",
-          industry: companyData.industry || "",
-          website: companyData.website || "",
-          location: companyData.location || "",
-          email: companyData.email || "",
-          phone: companyData.phone || "",
-          description: companyData.description || "",
+          company_name:
+            existingCompany.company_name || "",
+          industry:
+            existingCompany.industry || "",
+          website:
+            existingCompany.website || "",
+          location:
+            existingCompany.location || "",
+          email:
+            existingCompany.email || "",
+          phone:
+            existingCompany.phone || "",
+          description:
+            existingCompany.description || "",
         });
       }
 
@@ -130,13 +140,20 @@ export default function CompanyPage() {
 
       const companyData = {
         user_id: user.id,
-        company_name: company.company_name.trim(),
-        industry: company.industry.trim(),
-        website: company.website.trim(),
-        location: company.location.trim(),
-        email: company.email.trim(),
-        phone: company.phone.trim(),
-        description: company.description.trim(),
+        company_name:
+          company.company_name.trim(),
+        industry:
+          company.industry.trim(),
+        website:
+          company.website.trim(),
+        location:
+          company.location.trim(),
+        email:
+          company.email.trim(),
+        phone:
+          company.phone.trim(),
+        description:
+          company.description.trim(),
       };
 
       // ----------------------------------------
@@ -144,33 +161,23 @@ export default function CompanyPage() {
       // ----------------------------------------
 
       if (companyId) {
-        const { data: updatedCompany, error: updateError } =
+        const { error: updateError } =
           await supabase
             .from("companies")
             .update(companyData)
             .eq("id", companyId)
-            .eq("user_id", user.id)
-            .select()
-            .single();
+            .eq("user_id", user.id);
 
         if (updateError) {
-          console.error("Update company error:", updateError);
+          console.error(
+            "Update company error:",
+            updateError
+          );
+
           throw updateError;
         }
 
-        if (updatedCompany) {
-          setCompanyId(updatedCompany.id);
-
-          setCompany({
-            company_name: updatedCompany.company_name || "",
-            industry: updatedCompany.industry || "",
-            website: updatedCompany.website || "",
-            location: updatedCompany.location || "",
-            email: updatedCompany.email || "",
-            phone: updatedCompany.phone || "",
-            description: updatedCompany.description || "",
-          });
-        }
+        setCompany(companyData);
 
         setMessage(
           "✅ Company profile updated successfully!"
@@ -180,19 +187,17 @@ export default function CompanyPage() {
       }
 
       // ----------------------------------------
-      // SAFETY CHECK
-      // Look for an existing profile again
-      // before inserting a new one.
+      // CHECK IF PROFILE ALREADY EXISTS
       // ----------------------------------------
 
       const {
-        data: existingCompany,
+        data: existingCompanies,
         error: existingError,
       } = await supabase
         .from("companies")
         .select("id")
         .eq("user_id", user.id)
-        .maybeSingle();
+        .limit(1);
 
       if (existingError) {
         console.error(
@@ -207,17 +212,19 @@ export default function CompanyPage() {
       // EXISTING PROFILE FOUND
       // ----------------------------------------
 
-      if (existingCompany) {
-        const {
-          data: updatedCompany,
-          error: updateError,
-        } = await supabase
-          .from("companies")
-          .update(companyData)
-          .eq("id", existingCompany.id)
-          .eq("user_id", user.id)
-          .select()
-          .single();
+      if (
+        existingCompanies &&
+        existingCompanies.length > 0
+      ) {
+        const existingCompany =
+          existingCompanies[0];
+
+        const { error: updateError } =
+          await supabase
+            .from("companies")
+            .update(companyData)
+            .eq("id", existingCompany.id)
+            .eq("user_id", user.id);
 
         if (updateError) {
           console.error(
@@ -228,19 +235,9 @@ export default function CompanyPage() {
           throw updateError;
         }
 
-        setCompanyId(updatedCompany.id);
+        setCompanyId(existingCompany.id);
 
-        setCompany({
-          company_name:
-            updatedCompany.company_name || "",
-          industry: updatedCompany.industry || "",
-          website: updatedCompany.website || "",
-          location: updatedCompany.location || "",
-          email: updatedCompany.email || "",
-          phone: updatedCompany.phone || "",
-          description:
-            updatedCompany.description || "",
-        });
+        setCompany(companyData);
 
         setMessage(
           "✅ Company profile updated successfully!"
@@ -253,14 +250,10 @@ export default function CompanyPage() {
       // CREATE NEW COMPANY PROFILE
       // ----------------------------------------
 
-      const {
-        data: newCompany,
-        error: insertError,
-      } = await supabase
-        .from("companies")
-        .insert([companyData])
-        .select()
-        .single();
+      const { error: insertError } =
+        await supabase
+          .from("companies")
+          .insert([companyData]);
 
       if (insertError) {
         console.error(
@@ -271,25 +264,38 @@ export default function CompanyPage() {
         throw insertError;
       }
 
-      if (newCompany) {
-        setCompanyId(newCompany.id);
+      // ----------------------------------------
+      // GET NEW PROFILE ID
+      // ----------------------------------------
 
-        setCompany({
-          company_name: newCompany.company_name || "",
-          industry: newCompany.industry || "",
-          website: newCompany.website || "",
-          location: newCompany.location || "",
-          email: newCompany.email || "",
-          phone: newCompany.phone || "",
-          description: newCompany.description || "",
-        });
+      const {
+        data: createdCompanies,
+        error: createdError,
+      } = await supabase
+        .from("companies")
+        .select("id")
+        .eq("user_id", user.id)
+        .order("created_at", {
+          ascending: false,
+        })
+        .limit(1);
+
+      if (!createdError && createdCompanies?.length) {
+        setCompanyId(
+          createdCompanies[0].id
+        );
       }
+
+      setCompany(companyData);
 
       setMessage(
         "✅ Company profile created successfully!"
       );
     } catch (error) {
-      console.error("Company profile error:", error);
+      console.error(
+        "Company profile error:",
+        error
+      );
 
       setErrorMessage(
         error?.message ||
@@ -349,34 +355,29 @@ export default function CompanyPage() {
       >
         {/* HEADER */}
 
-        <div
+        <h1
           style={{
-            marginBottom: "30px",
+            color: "#0057B8",
+            marginBottom: "10px",
           }}
         >
-          <h1
-            style={{
-              color: "#0057B8",
-              marginBottom: "10px",
-            }}
-          >
-            🏢 {companyId
-              ? "Edit Company Profile"
-              : "Company Profile"}
-          </h1>
+          🏢{" "}
+          {companyId
+            ? "Edit Company Profile"
+            : "Company Profile"}
+        </h1>
 
-          <p
-            style={{
-              color: "#555",
-              marginBottom: 0,
-              lineHeight: "1.6",
-            }}
-          >
-            {companyId
-              ? "Update your company information and keep your GradLink SA profile up to date."
-              : "Create your company profile and start hiring South Africa's best graduates."}
-          </p>
-        </div>
+        <p
+          style={{
+            color: "#555",
+            marginBottom: "30px",
+            lineHeight: "1.6",
+          }}
+        >
+          {companyId
+            ? "Update your company information and keep your GradLink SA profile up to date."
+            : "Create your company profile and start hiring South Africa's best graduates."}
+        </p>
 
         {/* SUCCESS MESSAGE */}
 
@@ -546,7 +547,7 @@ export default function CompanyPage() {
             <button
               type="button"
               onClick={() =>
-                router.push("/company/dashboard")
+                router.push("/company")
               }
               style={{
                 width: "100%",
@@ -562,7 +563,7 @@ export default function CompanyPage() {
                 cursor: "pointer",
               }}
             >
-              ← Back to Company Dashboard
+              ← Back
             </button>
           )}
         </form>
@@ -587,3 +588,4 @@ const inputStyle = {
   fontSize: "16px",
   boxSizing: "border-box",
 };
+```
