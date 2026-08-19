@@ -355,7 +355,6 @@ export default function CompanyDashboard() {
       return;
     }
 
-    // If the database already contains a full URL
     if (
       cvPath.startsWith("http://") ||
       cvPath.startsWith("https://")
@@ -364,7 +363,6 @@ export default function CompanyDashboard() {
       return;
     }
 
-    // If the database contains a Supabase Storage path
     const { data, error } = await supabase.storage
       .from("documents")
       .createSignedUrl(cvPath, 60 * 10);
@@ -381,16 +379,8 @@ export default function CompanyDashboard() {
   // VIEW APPLICATION
   // ----------------------------------------
 
-  async function viewApplication(application) {
+  function viewApplication(application) {
     setSelectedApplication(application);
-
-    // Automatically move Pending applications to Review
-    if (application.status === "Pending") {
-      await updateApplicationStatus(
-        application.id,
-        "Review"
-      );
-    }
   }
 
   // ----------------------------------------
@@ -535,8 +525,6 @@ export default function CompanyDashboard() {
 
         match_reasons: match.reasons,
 
-        // Keep the existing application CV fields.
-        // Use graduates.cv_url as a fallback.
         cv_url:
           application.cv_url ||
           graduate?.cv_url ||
@@ -549,7 +537,6 @@ export default function CompanyDashboard() {
     );
 
     setApplications(applicationsWithJobs);
-
     setLoading(false);
   }
 
@@ -834,8 +821,6 @@ export default function CompanyDashboard() {
                         </p>
                       </div>
 
-                      {/* STATUS */}
-
                       <div
                         style={{
                           background:
@@ -1102,28 +1087,21 @@ export default function CompanyDashboard() {
                               "Shortlisted"
                                 ? "#16803c"
                                 : "#e8f7ee",
-
                             color:
                               currentStatus ===
                               "Shortlisted"
                                 ? "#fff"
                                 : "#16803c",
-
                             border:
                               "1px solid #16803c",
-
                             padding: "11px 16px",
-
                             borderRadius: "9px",
-
                             fontWeight: "bold",
-
                             cursor:
                               currentStatus ===
                               "Shortlisted"
                                 ? "default"
                                 : "pointer",
-
                             opacity:
                               updatingId ===
                               application.id
@@ -1161,28 +1139,21 @@ export default function CompanyDashboard() {
                               "Rejected"
                                 ? "#c62828"
                                 : "#fff0f0",
-
                             color:
                               currentStatus ===
                               "Rejected"
                                 ? "#fff"
                                 : "#c62828",
-
                             border:
                               "1px solid #c62828",
-
                             padding: "11px 16px",
-
                             borderRadius: "9px",
-
                             fontWeight: "bold",
-
                             cursor:
                               currentStatus ===
                               "Rejected"
                                 ? "default"
                                 : "pointer",
-
                             opacity:
                               updatingId ===
                               application.id
@@ -1595,8 +1566,8 @@ export default function CompanyDashboard() {
                 }
               </p>
 
-              {selectedApplication.match_reasons
-                ?.map((reason, index) => (
+              {selectedApplication.match_reasons?.map(
+                (reason, index) => (
                   <p
                     key={index}
                     style={{
@@ -1606,7 +1577,8 @@ export default function CompanyDashboard() {
                   >
                     {reason}
                   </p>
-                ))}
+                )
+              )}
             </div>
 
             {/* CV */}
@@ -1751,6 +1723,50 @@ export default function CompanyDashboard() {
                 >
                   🔴 Reject
                 </button>
+
+                {/* RESET */}
+
+                {selectedApplication.status !==
+                  "Pending" && (
+                  <button
+                    onClick={async () => {
+                      const success =
+                        await updateApplicationStatus(
+                          selectedApplication.id,
+                          "Pending"
+                        );
+
+                      if (success) {
+                        setSelectedApplication(
+                          (current) => ({
+                            ...current,
+                            status: "Pending",
+                          })
+                        );
+                      }
+                    }}
+                    disabled={
+                      updatingId ===
+                      selectedApplication.id
+                    }
+                    style={{
+                      background: "#fff",
+                      color: "#555",
+                      border: "1px solid #aaa",
+                      padding: "13px 18px",
+                      borderRadius: "9px",
+                      fontWeight: "bold",
+                      cursor: "pointer",
+                      opacity:
+                        updatingId ===
+                        selectedApplication.id
+                          ? 0.6
+                          : 1,
+                    }}
+                  >
+                    🔄 Reset to Pending
+                  </button>
+                )}
 
                 {/* CLOSE */}
 
