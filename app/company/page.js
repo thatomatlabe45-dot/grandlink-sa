@@ -139,44 +139,35 @@ export default function CompanyPage() {
       // UPDATE EXISTING COMPANY
       // ----------------------------------------
 
-      if (companyId) {
-        const {
-  data: updatedCompanies,
-  error: updateError,
-} = await supabase
-  .from("companies")
-  .update(companyData)
-  .eq("user_id", user.id)
-  .select("*");
+      // ----------------------------------------
+// UPDATE EXISTING COMPANY
+// ----------------------------------------
 
-if (updateError) {
-  console.error(
-    "Update company error:",
-    updateError
+if (companyId) {
+  const { error: updateError } = await supabase
+    .from("companies")
+    .update(companyData)
+    .eq("id", companyId)
+    .eq("user_id", user.id);
+
+  if (updateError) {
+    console.error(
+      "Update company error:",
+      updateError
+    );
+
+    throw updateError;
+  }
+
+  // Update the form with the values we just saved
+  setCompany(companyData);
+
+  setMessage(
+    "✅ Company profile updated successfully!"
   );
 
-  throw updateError;
+  return;
 }
-
-if (!updatedCompanies || updatedCompanies.length === 0) {
-  throw new Error(
-    "Company profile could not be updated. No matching company was found."
-  );
-}
-
-const updatedCompany = updatedCompanies[0];
-
-        if (updateError) {
-          console.error(
-            "Update company error:",
-            updateError
-          );
-
-          throw updateError;
-        }
-
-        // Use the actual row returned by Supabase
-        setCompanyId(updatedCompany.id);
 
         setCompany({
           company_name:
