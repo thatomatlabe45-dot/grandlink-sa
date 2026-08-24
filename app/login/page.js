@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
+
 export default function LoginPage() {
   const router = useRouter();
 
@@ -20,29 +21,101 @@ export default function LoginPage() {
     setError("");
     setMessage("");
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-        if (error) {
+    // ----------------------------------------
+    // LOGIN
+    // ----------------------------------------
+
+    const { data, error } =
+      await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+    if (error) {
       setError(error.message);
+      setLoading(false);
+      return;
+    }
+
+    const user = data?.user;
+
+    if (!user) {
+      setError("Could not find your account.");
       setLoading(false);
       return;
     }
 
     setMessage("Login successful! Redirecting...");
 
-    setLoading(false);
+    // ----------------------------------------
+    // CHECK SAVED PROFILE TYPE
+    // ----------------------------------------
 
-    const savedProfile = localStorage.getItem("gradlink_profile");
+    const savedProfile =
+      localStorage.getItem("gradlink_profile");
 
-if (savedProfile === "graduate") {
-  router.push("/graduate");
-} else if (savedProfile === "company") {
-  router.push("/company");
-} else {
-  router.push("/choose-profile");
-}
+    // ----------------------------------------
+    // GRADUATE
+    // ----------------------------------------
+
+    if (savedProfile === "graduate") {
+      router.push("/graduate");
+      return;
+    }
+
+    // ----------------------------------------
+    // COMPANY
+    // ----------------------------------------
+
+    if (savedProfile === "company") {
+      // Check whether this user already has
+      // a company profile.
+
+      const {
+        data: company,
+        error: companyError,
+      } = await supabase
+        .from("companies")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (companyError) {
+        console.error(
+          "Company check error:",
+          companyError
+        );
+
+        setError(
+          "Could not check your company profile. Please try again."
+        );
+
+        setLoading(false);
+        return;
+      }
+
+      // ----------------------------------------
+      // EXISTING COMPANY
+      // ----------------------------------------
+
+      if (company) {
+        router.push("/company-dashboard");
+        return;
+      }
+
+      // ----------------------------------------
+      // NEW COMPANY
+      // ----------------------------------------
+
+      router.push("/company");
+      return;
+    }
+
+    // ----------------------------------------
+    // NO PROFILE TYPE SAVED
+    // ----------------------------------------
+
+    router.push("/choose-profile");
   }
 
   return (
@@ -101,7 +174,9 @@ if (savedProfile === "graduate") {
           <input
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) =>
+              setEmail(e.target.value)
+            }
             placeholder="Enter your email"
             required
             style={{
@@ -128,7 +203,9 @@ if (savedProfile === "graduate") {
           <input
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) =>
+              setPassword(e.target.value)
+            }
             placeholder="Enter your password"
             required
             style={{
@@ -141,7 +218,8 @@ if (savedProfile === "graduate") {
               boxSizing: "border-box",
             }}
           />
-                    <div
+
+          <div
             style={{
               textAlign: "right",
               marginBottom: "20px",
@@ -192,17 +270,23 @@ if (savedProfile === "graduate") {
             disabled={loading}
             style={{
               width: "100%",
-              background: loading ? "#93c5fd" : "#0057b8",
+              background: loading
+                ? "#93c5fd"
+                : "#0057b8",
               color: "#ffffff",
               border: "none",
               padding: "14px",
               borderRadius: "10px",
               fontSize: "16px",
               fontWeight: "700",
-              cursor: loading ? "not-allowed" : "pointer",
+              cursor: loading
+                ? "not-allowed"
+                : "pointer",
             }}
           >
-            {loading ? "Logging in..." : "Login"}
+            {loading
+              ? "Logging in..."
+              : "Login"}
           </button>
         </form>
 
