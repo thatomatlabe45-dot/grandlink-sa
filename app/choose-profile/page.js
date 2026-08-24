@@ -2,12 +2,90 @@
 
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
+
 export default function ChooseProfilePage() {
   const router = useRouter();
 
   async function handleLogout() {
     await supabase.auth.signOut();
+    localStorage.removeItem("gradlink_profile");
     router.push("/login");
+  }
+
+  // ----------------------------------------
+  // GRADUATE
+  // ----------------------------------------
+
+  async function handleGraduate() {
+    localStorage.setItem("gradlink_profile", "graduate");
+    router.push("/graduate");
+  }
+
+  // ----------------------------------------
+  // COMPANY
+  // ----------------------------------------
+
+  async function handleCompany() {
+    try {
+      // Get logged-in user
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        router.push("/login");
+        return;
+      }
+
+      // Remember that this account is a company
+      localStorage.setItem("gradlink_profile", "company");
+
+      // Check whether the company already exists
+      const {
+        data: company,
+        error: companyError,
+      } = await supabase
+        .from("companies")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (companyError) {
+        console.error(
+          "Company check error:",
+          companyError
+        );
+
+        alert(
+          "Could not check your company profile. Please try again."
+        );
+
+        return;
+      }
+
+      // ----------------------------------------
+      // EXISTING COMPANY
+      // ----------------------------------------
+
+      if (company) {
+        router.push("/company-dashboard");
+        return;
+      }
+
+      // ----------------------------------------
+      // NEW COMPANY
+      // ----------------------------------------
+
+      router.push("/company");
+
+    } catch (error) {
+      console.error("Company selection error:", error);
+
+      alert(
+        "Something went wrong. Please try again."
+      );
+    }
   }
 
   return (
@@ -20,6 +98,7 @@ export default function ChooseProfilePage() {
       }}
     >
       {/* Top Bar */}
+
       <div
         style={{
           maxWidth: "900px",
@@ -61,6 +140,7 @@ export default function ChooseProfilePage() {
       </div>
 
       {/* Main Content */}
+
       <div
         style={{
           width: "100%",
@@ -97,9 +177,10 @@ export default function ChooseProfilePage() {
             justifyContent: "center",
           }}
         >
-          {/* Graduate */}
+          {/* GRADUATE */}
+
           <div
-            onClick={() => router.push("/graduate")}
+            onClick={handleGraduate}
             style={{
               width: "320px",
               background: "#fff",
@@ -109,7 +190,9 @@ export default function ChooseProfilePage() {
               boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
             }}
           >
-            <div style={{ fontSize: "60px" }}>🎓</div>
+            <div style={{ fontSize: "60px" }}>
+              🎓
+            </div>
 
             <h2
               style={{
@@ -126,14 +209,15 @@ export default function ChooseProfilePage() {
                 lineHeight: "1.6",
               }}
             >
-              Create your graduate profile, upload your CV, and apply for
-              internships.
+              Create your graduate profile, upload your CV,
+              and apply for internships.
             </p>
           </div>
 
-          {/* Company */}
+          {/* COMPANY */}
+
           <div
-            onClick={() => router.push("/company")}
+            onClick={handleCompany}
             style={{
               width: "320px",
               background: "#fff",
@@ -143,7 +227,9 @@ export default function ChooseProfilePage() {
               boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
             }}
           >
-            <div style={{ fontSize: "60px" }}>🏢</div>
+            <div style={{ fontSize: "60px" }}>
+              🏢
+            </div>
 
             <h2
               style={{
@@ -160,8 +246,8 @@ export default function ChooseProfilePage() {
                 lineHeight: "1.6",
               }}
             >
-              Create a company profile, post internships, and discover
-              talented graduates.
+              Create a company profile, post internships,
+              and discover talented graduates.
             </p>
           </div>
         </div>
