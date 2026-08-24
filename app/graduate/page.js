@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import Navbar from "../components/Navbar";
@@ -10,80 +10,93 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
+const emptyForm = {
+  full_name: "",
+  email: "",
+  phone: "",
+  qualification: "",
+  field_of_study: "",
+  institution: "",
+  province: "",
+  career_goals: "",
+  skills: "",
+};
+
 export default function GraduatePage() {
   const router = useRouter();
 
-  const [form, setForm] = useState({
-    full_name: "",
-    email: "",
-    phone: "",
-    qualification: "",
-    field_of_study: "",
-    institution: "",
-    province: "",
-    career_goals: "",
-    skills: "",
-  });
+  const [form, setForm] = useState(emptyForm);
 
-  const [cv, setCv] = useState(null);
+  const [cvFile, setCvFile] = useState(null);
   const [qualificationFile, setQualificationFile] = useState(null);
 
-  const [existingGraduate, setExistingGraduate] = useState(null);
+  const [existingCvUrl, setExistingCvUrl] = useState("");
+  const [existingQualificationUrl, setExistingQualificationUrl] =
+    useState("");
 
-  const [message, setMessage] = useState("");
+  const [graduateId, setGraduateId] = useState(null);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
-  // ----------------------------------------
-  // LOAD EXISTING GRADUATE
-  // ----------------------------------------
-
+  // =========================================================
+  // LOAD LOGGED-IN USER + EXISTING GRADUATE
+  // =========================================================
   useEffect(() => {
-    async function loadGraduate() {
+    loadGraduateProfile();
+  }, []);
+
+  async function loadGraduateProfile() {
+    try {
       setLoading(true);
+      setError("");
 
       const {
         data: { user },
-        error: userError,
+        error: authError,
       } = await supabase.auth.getUser();
 
-      if (userError || !user) {
+      if (authError) {
+        console.error(authError);
         router.push("/login");
         return;
       }
 
-      // Make sure email is available
-      setForm((current) => ({
-        ...current,
-        email: user.email || "",
-      }));
-
-      // Look for existing graduate profile
-      const {
-        data: graduate,
-        error: graduateError,
-      } = await supabase
-        .from("graduates")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (graduateError) {
-        console.error(
-          "Graduate profile load error:",
-          graduateError
-        );
-
-        setMessage(
-          "Could not load your graduate profile."
-        );
-
-        setLoading(false);
+      if (!user) {
+        router.push("/login");
         return;
       }
 
-      if (graduate) {
-        setExistingGraduate(graduate);
+      // -------------------------------------------------------
+      // IMPORTANT:
+      // DO NOT USE .single() HERE.
+      // This prevents:
+      // "Cannot coerce the result to a single JSON object"
+      // -------------------------------------------------------
+      const { data: graduates, error: graduateError } = await supabase
+        .from("graduates")
+        .select(
+          "id, user_id, full_name, email, phone, qualification, field_of_study, institution, province, career_goals, skills, cv_url, qualification_url"
+        )
+        .eq("user_id", user.id)
+        .order("id", { ascending: true })
+        .limit(1);
+
+      if (graduateError) {
+        console.error("Graduate lookup error:", graduateError);
+        setError(graduateError.message);
+        return;
+      }
+
+      // =======================================================
+      // EXISTING GRADUATE
+      // =======================================================
+      if (graduates && graduates.length > 0) {
+        const graduate = graduates[0];
+
+        setGraduateId(graduate.id);
 
         setForm({
           full_name: graduate.full_name || "",
@@ -96,297 +109,270 @@ export default function GraduatePage() {
           career_goals: graduate.career_goals || "",
           skills: graduate.skills || "",
         });
-      }
 
+        setExistingCvUrl(graduate.cv_url || "");
+        setExistingQualificationUrl(graduate.qualification_url || "");
+
+        console.log("Existing graduate loaded:", graduate.id);
+      } else {
+        // =====================================================
+        // NO GRADUATE YET
+        // =====================================================
+        setForm({
+          ...emptyForm,
+          email: user.email || "",
+        });
+
+        setGraduateId(null);
+
+        console.log("No graduate profile found.");
+      }
+    } catch (err) {
+      console.error("Load profile error:", err);
+      setError(err.message || "Could not load graduate profile.");
+    } finally {
       setLoading(false);
     }
-
-    loadGraduate();
-  }, [router]);
-
-  // ----------------------------------------
-  // HANDLE FORM CHANGES
-  // ----------------------------------------
-
-  function handleChange(e) {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
   }
 
-  // ----------------------------------------
-  // UPLOAD FILE
-  // ----------------------------------------
+  // =========================================================
+  // HANDLE FORM CHANGES
+  // =========================================================
+  function handleChange(e) {
+    const { name, value } = e.target;
 
+    setForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  }
+
+  // =========================================================
+  // UPLOAD FILE
+  // =========================================================
   async function uploadFile(file, folder) {
     if (!file) return null;
 
-    const safeFileName = file.name.replace(
-      /[^a-zA-Z0-9._-]/g,
-      "_"
-    );
+    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
 
-    const fileName = `${folder}/${Date.now()}-${safeFileName}`;
+    const filePath = `${folder}/${Date.now()}-${safeFileName}`;
 
-    const {
-      data,
-      error,
-    } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from("documents")
-      .upload(fileName, file);
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
 
-    if (error) {
-      console.error(
-        "Storage upload error:",
-        error
-      );
-
-      throw error;
+    if (uploadError) {
+      throw uploadError;
     }
 
-    return data?.path || fileName;
+    return filePath;
   }
 
-  // ----------------------------------------
+  // =========================================================
   // SUBMIT / UPDATE PROFILE
-  // ----------------------------------------
-
+  // =========================================================
   async function handleSubmit(e) {
     e.preventDefault();
 
+    setMessage("");
+    setError("");
     setSaving(true);
-    setMessage("Saving your graduate profile...");
 
     try {
-      // ----------------------------------------
-      // GET USER
-      // ----------------------------------------
-
       const {
         data: { user },
-        error: userError,
+        error: authError,
       } = await supabase.auth.getUser();
 
-      if (userError || !user) {
-        router.push("/login");
-        return;
+      if (authError || !user) {
+        throw new Error("Your session has expired. Please log in again.");
       }
 
-      // ----------------------------------------
-      // FIND EXISTING GRADUATE
-      // ----------------------------------------
+      // -------------------------------------------------------
+      // BASIC VALIDATION
+      // -------------------------------------------------------
+      if (!form.full_name.trim()) {
+        throw new Error("Please enter your full name.");
+      }
 
+      if (!form.email.trim()) {
+        throw new Error("Please enter your email.");
+      }
+
+      if (!form.phone.trim()) {
+        throw new Error("Please enter your phone number.");
+      }
+
+      if (!form.qualification.trim()) {
+        throw new Error("Please enter your qualification.");
+      }
+
+      if (!form.field_of_study.trim()) {
+        throw new Error("Please enter your field of study.");
+      }
+
+      // -------------------------------------------------------
+      // FIND EXISTING GRADUATE
+      //
+      // IMPORTANT:
+      // We use an array + limit(1), NOT .single()
+      // -------------------------------------------------------
       const {
-        data: currentGraduate,
+        data: existingGraduates,
         error: findError,
       } = await supabase
         .from("graduates")
-        .select("*")
+        .select("id, cv_url, qualification_url")
         .eq("user_id", user.id)
-        .maybeSingle();
+        .order("id", { ascending: true })
+        .limit(1);
 
       if (findError) {
-        console.error(
-          "Find graduate error:",
-          findError
-        );
-
+        console.error("Find graduate error:", findError);
         throw findError;
       }
 
-      // ----------------------------------------
-      // UPLOAD NEW CV ONLY IF SELECTED
-      // ----------------------------------------
+      let existingGraduate = null;
 
-      let cvPath = currentGraduate?.cv_url || null;
-
-      if (cv) {
-        cvPath = await uploadFile(cv, "cv");
+      if (existingGraduates && existingGraduates.length > 0) {
+        existingGraduate = existingGraduates[0];
       }
 
-      // ----------------------------------------
-      // UPLOAD NEW QUALIFICATION ONLY IF SELECTED
-      // ----------------------------------------
+      // -------------------------------------------------------
+      // UPLOAD NEW CV IF SELECTED
+      // -------------------------------------------------------
+      let cvUrl = existingGraduate?.cv_url || existingCvUrl || null;
 
-      let qualificationPath =
-        currentGraduate?.qualification_url || null;
+      if (cvFile) {
+        cvUrl = await uploadFile(cvFile, "cv");
+      }
+
+      // -------------------------------------------------------
+      // UPLOAD NEW QUALIFICATION DOCUMENT IF SELECTED
+      // -------------------------------------------------------
+      let qualificationUrl =
+        existingGraduate?.qualification_url ||
+        existingQualificationUrl ||
+        null;
 
       if (qualificationFile) {
-        qualificationPath = await uploadFile(
+        qualificationUrl = await uploadFile(
           qualificationFile,
           "qualifications"
         );
       }
 
-      // ----------------------------------------
+      // -------------------------------------------------------
       // DATA TO SAVE
-      // ----------------------------------------
-
+      // -------------------------------------------------------
       const graduateData = {
         user_id: user.id,
-
         full_name: form.full_name.trim(),
-
-        email:
-          form.email.trim() ||
-          user.email ||
-          "",
-
+        email: form.email.trim(),
         phone: form.phone.trim(),
-
-        qualification:
-          form.qualification.trim(),
-
-        field_of_study:
-          form.field_of_study.trim(),
-
-        institution:
-          form.institution.trim(),
-
-        province:
-          form.province.trim(),
-
-        career_goals:
-          form.career_goals.trim(),
-
-        skills:
-          form.skills.trim(),
-
-        cv_url: cvPath,
-
-        qualification_url:
-          qualificationPath,
+        qualification: form.qualification.trim(),
+        field_of_study: form.field_of_study.trim(),
+        institution: form.institution.trim(),
+        province: form.province.trim(),
+        career_goals: form.career_goals.trim(),
+        skills: form.skills.trim(),
+        cv_url: cvUrl,
+        qualification_url: qualificationUrl,
       };
 
-      // ----------------------------------------
+      // =======================================================
       // UPDATE EXISTING GRADUATE
-      // ----------------------------------------
+      // =======================================================
+      if (existingGraduate) {
+        console.log(
+          "Updating existing graduate:",
+          existingGraduate.id
+        );
 
-      if (currentGraduate) {
-        const {
-          data: updatedGraduate,
-          error: updateError,
-        } = await supabase
-          .from("graduates")
-          .update(graduateData)
-          .eq("user_id", user.id)
-          .select("*")
-          .single();
+        const { data: updatedGraduate, error: updateError } =
+          await supabase
+            .from("graduates")
+            .update(graduateData)
+            .eq("id", existingGraduate.id)
+            .select("id");
 
         if (updateError) {
-          console.error(
-            "Graduate update error:",
-            updateError
-          );
-
+          console.error("Update graduate error:", updateError);
           throw updateError;
         }
 
-        if (!updatedGraduate) {
-          throw new Error(
-            "Graduate profile could not be updated."
-          );
-        }
+        setGraduateId(existingGraduate.id);
 
-        setExistingGraduate(
-          updatedGraduate
-        );
-
-        setForm({
-          full_name:
-            updatedGraduate.full_name || "",
-
-          email:
-            updatedGraduate.email ||
-            user.email ||
-            "",
-
-          phone:
-            updatedGraduate.phone || "",
-
-          qualification:
-            updatedGraduate.qualification || "",
-
-          field_of_study:
-            updatedGraduate.field_of_study || "",
-
-          institution:
-            updatedGraduate.institution || "",
-
-          province:
-            updatedGraduate.province || "",
-
-          career_goals:
-            updatedGraduate.career_goals || "",
-
-          skills:
-            updatedGraduate.skills || "",
-        });
-
-        setCv(null);
-        setQualificationFile(null);
+        console.log("Graduate updated:", updatedGraduate);
 
         setMessage(
           "✅ Your graduate profile and documents have been updated successfully!"
         );
-
-        setSaving(false);
-        return;
       }
 
-      // ----------------------------------------
-      // CREATE NEW GRADUATE
-      // ----------------------------------------
+      // =======================================================
+      // INSERT NEW GRADUATE
+      // =======================================================
+      else {
+        console.log("Creating new graduate profile.");
 
-      const {
-        data: createdGraduate,
-        error: insertError,
-      } = await supabase
-        .from("graduates")
-        .insert([graduateData])
-        .select("*")
-        .single();
+        const { data: newGraduate, error: insertError } =
+          await supabase
+            .from("graduates")
+            .insert(graduateData)
+            .select("id");
 
-      if (insertError) {
-        console.error(
-          "Graduate insert error:",
-          insertError
+        if (insertError) {
+          console.error("Insert graduate error:", insertError);
+          throw insertError;
+        }
+
+        if (newGraduate && newGraduate.length > 0) {
+          setGraduateId(newGraduate[0].id);
+        }
+
+        setMessage(
+          "✅ Your graduate profile and documents have been created successfully!"
         );
-
-        throw insertError;
       }
 
-      setExistingGraduate(
-        createdGraduate
-      );
+      // -------------------------------------------------------
+      // UPDATE LOCAL STATE
+      // -------------------------------------------------------
+      setExistingCvUrl(cvUrl || "");
+      setExistingQualificationUrl(qualificationUrl || "");
 
-      setCv(null);
+      setCvFile(null);
       setQualificationFile(null);
 
-      setMessage(
-        "✅ Your graduate profile has been submitted successfully!"
-      );
+      // Reset file inputs
+      const cvInput = document.getElementById("cv");
+      const qualificationInput =
+        document.getElementById("qualification_document");
 
-    } catch (error) {
-      console.error(
-        "Graduate profile error:",
-        error
-      );
+      if (cvInput) cvInput.value = "";
+      if (qualificationInput) qualificationInput.value = "";
 
-      setMessage(
-        error?.message ||
-          "Something went wrong while saving your profile."
+      // Reload profile so everything is confirmed from Supabase
+      await loadGraduateProfile();
+    } catch (err) {
+      console.error("Save graduate profile error:", err);
+
+      setError(
+        err.message ||
+          "Something went wrong while updating your graduate profile."
       );
     } finally {
       setSaving(false);
     }
   }
 
-  // ----------------------------------------
+  // =========================================================
   // LOADING
-  // ----------------------------------------
-
+  // =========================================================
   if (loading) {
     return (
       <>
@@ -394,484 +380,468 @@ export default function GraduatePage() {
 
         <main
           style={{
-            minHeight: "70vh",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            color: "#0057b8",
-            fontSize: "22px",
-            fontWeight: "bold",
+            maxWidth: "900px",
+            margin: "0 auto",
+            padding: "40px 20px",
+            textAlign: "center",
           }}
         >
-          Loading your graduate profile...
+          <h1>Loading Graduate Profile...</h1>
+          <p>Please wait.</p>
         </main>
       </>
     );
   }
 
-  // ----------------------------------------
+  // =========================================================
   // PAGE
-  // ----------------------------------------
-
+  // =========================================================
   return (
     <>
       <Navbar />
 
-      <section
+      <main
         style={{
-          background:
-            "linear-gradient(135deg,#0057b8,#0a84ff)",
-          color: "white",
-          padding: "50px 20px",
-          textAlign: "center",
+          maxWidth: "900px",
+          margin: "0 auto",
+          padding: "30px 20px 60px",
         }}
       >
-        <h1
-          style={{
-            fontSize:
-              "clamp(2rem,5vw,3rem)",
-            marginBottom: "15px",
-          }}
-        >
-          🎓 Graduate Dashboard
-        </h1>
-
-        <p
-          style={{
-            maxWidth: "700px",
-            margin: "0 auto",
-            lineHeight: "1.8",
-            opacity: 0.95,
-          }}
-        >
-          Complete your graduate profile to
-          unlock AI internship matching and
-          apply to opportunities across South
-          Africa.
-        </p>
-      </section>
-
-      <main className="page">
-        <section className="hero">
-          <h1>
-            {existingGraduate
-              ? "👤 Update Your Graduate Profile"
-              : "🎓 Join GradLink SA"}
-          </h1>
-
-          <p>
-            {existingGraduate
-              ? "Update your information and documents whenever you need to."
-              : "Create your professional graduate profile and connect with employers across South Africa."}
-          </p>
-        </section>
-
-        {/* STATS */}
-
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit,minmax(180px,1fr))",
-            gap: "20px",
-            maxWidth: "1200px",
-            margin: "40px auto",
-            padding: "0 20px",
+            background: "#ffffff",
+            borderRadius: "16px",
+            padding: "30px",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
           }}
         >
-          {[
-            ["📝", "Applications", "0"],
-            ["❤️", "Saved Jobs", "0"],
-            ["🎯", "AI Match", "0%"],
-            [
-              "📄",
-              "Profile",
-              existingGraduate
-                ? "100%"
-                : "0%",
-            ],
-          ].map(
-            ([icon, title, value]) => (
-              <div
-                key={title}
-                style={{
-                  background: "#fff",
-                  borderRadius: "16px",
-                  padding: "25px",
-                  textAlign: "center",
-                  boxShadow:
-                    "0 10px 25px rgba(0,0,0,.08)",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "36px",
-                  }}
-                >
-                  {icon}
-                </div>
-
-                <h3>{value}</h3>
-
-                <p
-                  style={{
-                    color: "#666",
-                  }}
-                >
-                  {title}
-                </p>
-              </div>
-            )
-          )}
-        </div>
-
-        {/* PROFILE COMPLETION */}
-
-        <div
-          style={{
-            maxWidth: "1200px",
-            margin: "0 auto 30px",
-            padding: "0 20px",
-          }}
-        >
-          <div
+          <h1
             style={{
-              background: "#fff",
-              borderRadius: "16px",
-              padding: "25px",
-              boxShadow:
-                "0 10px 25px rgba(0,0,0,.08)",
+              marginBottom: "10px",
+              fontSize: "32px",
+              fontWeight: "700",
             }}
           >
+            🎓 Graduate Profile
+          </h1>
+
+          <p
+            style={{
+              color: "#666",
+              marginBottom: "30px",
+            }}
+          >
+            Keep your graduate profile and documents up to date.
+          </p>
+
+          {/* SUCCESS MESSAGE */}
+          {message && (
             <div
               style={{
-                display: "flex",
-                justifyContent:
-                  "space-between",
-                alignItems: "center",
-                marginBottom: "15px",
-                flexWrap: "wrap",
-                gap: "10px",
+                background: "#dcfce7",
+                color: "#166534",
+                padding: "15px",
+                borderRadius: "10px",
+                marginBottom: "20px",
+                fontWeight: "600",
               }}
             >
-              <h2
+              {message}
+            </div>
+          )}
+
+          {/* ERROR MESSAGE */}
+          {error && (
+            <div
+              style={{
+                background: "#fee2e2",
+                color: "#991b1b",
+                padding: "15px",
+                borderRadius: "10px",
+                marginBottom: "20px",
+                fontWeight: "600",
+              }}
+            >
+              ❌ {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit}>
+            {/* FULL NAME */}
+            <div style={{ marginBottom: "18px" }}>
+              <label
+                htmlFor="full_name"
                 style={{
-                  margin: 0,
-                  color: "#0057b8",
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
                 }}
               >
-                📈 Profile Completion
-              </h2>
+                Full Name
+              </label>
 
-              <strong>
-                {existingGraduate
-                  ? "100%"
-                  : "0%"}
-              </strong>
+              <input
+                id="full_name"
+                name="full_name"
+                type="text"
+                value={form.full_name}
+                onChange={handleChange}
+                placeholder="Enter your full name"
+                style={inputStyle}
+              />
             </div>
 
-            <div
-              style={{
-                width: "100%",
-                height: "12px",
-                background: "#e5e7eb",
-                borderRadius: "999px",
-                overflow: "hidden",
-              }}
-            >
-              <div
+            {/* EMAIL */}
+            <div style={{ marginBottom: "18px" }}>
+              <label
+                htmlFor="email"
                 style={{
-                  width:
-                    existingGraduate
-                      ? "100%"
-                      : "0%",
-                  height: "100%",
-                  background: "#0057b8",
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
+                }}
+              >
+                Email
+              </label>
+
+              <input
+                id="email"
+                name="email"
+                type="email"
+                value={form.email}
+                onChange={handleChange}
+                placeholder="Enter your email"
+                style={inputStyle}
+              />
+            </div>
+
+            {/* PHONE */}
+            <div style={{ marginBottom: "18px" }}>
+              <label
+                htmlFor="phone"
+                style={{
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
+                }}
+              >
+                Phone Number
+              </label>
+
+              <input
+                id="phone"
+                name="phone"
+                type="tel"
+                value={form.phone}
+                onChange={handleChange}
+                placeholder="Enter your phone number"
+                style={inputStyle}
+              />
+            </div>
+
+            {/* QUALIFICATION */}
+            <div style={{ marginBottom: "18px" }}>
+              <label
+                htmlFor="qualification"
+                style={{
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
+                }}
+              >
+                Qualification
+              </label>
+
+              <input
+                id="qualification"
+                name="qualification"
+                type="text"
+                value={form.qualification}
+                onChange={handleChange}
+                placeholder="e.g. Diploma in Information Technology"
+                style={inputStyle}
+              />
+            </div>
+
+            {/* FIELD OF STUDY */}
+            <div style={{ marginBottom: "18px" }}>
+              <label
+                htmlFor="field_of_study"
+                style={{
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
+                }}
+              >
+                Field of Study
+              </label>
+
+              <input
+                id="field_of_study"
+                name="field_of_study"
+                type="text"
+                value={form.field_of_study}
+                onChange={handleChange}
+                placeholder="e.g. Computer Science"
+                style={inputStyle}
+              />
+            </div>
+
+            {/* INSTITUTION */}
+            <div style={{ marginBottom: "18px" }}>
+              <label
+                htmlFor="institution"
+                style={{
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
+                }}
+              >
+                Institution
+              </label>
+
+              <input
+                id="institution"
+                name="institution"
+                type="text"
+                value={form.institution}
+                onChange={handleChange}
+                placeholder="e.g. University of Johannesburg"
+                style={inputStyle}
+              />
+            </div>
+
+            {/* PROVINCE */}
+            <div style={{ marginBottom: "18px" }}>
+              <label
+                htmlFor="province"
+                style={{
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
+                }}
+              >
+                Province
+              </label>
+
+              <select
+                id="province"
+                name="province"
+                value={form.province}
+                onChange={handleChange}
+                style={inputStyle}
+              >
+                <option value="">Select Province</option>
+                <option value="Gauteng">Gauteng</option>
+                <option value="KwaZulu-Natal">KwaZulu-Natal</option>
+                <option value="Western Cape">Western Cape</option>
+                <option value="Eastern Cape">Eastern Cape</option>
+                <option value="Free State">Free State</option>
+                <option value="Limpopo">Limpopo</option>
+                <option value="Mpumalanga">Mpumalanga</option>
+                <option value="North West">North West</option>
+                <option value="Northern Cape">Northern Cape</option>
+              </select>
+            </div>
+
+            {/* SKILLS */}
+            <div style={{ marginBottom: "18px" }}>
+              <label
+                htmlFor="skills"
+                style={{
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
+                }}
+              >
+                Skills
+              </label>
+
+              <textarea
+                id="skills"
+                name="skills"
+                value={form.skills}
+                onChange={handleChange}
+                placeholder="e.g. JavaScript, HTML, CSS, Communication"
+                rows="4"
+                style={{
+                  ...inputStyle,
+                  resize: "vertical",
                 }}
               />
             </div>
 
-            <p
+            {/* CAREER GOALS */}
+            <div style={{ marginBottom: "25px" }}>
+              <label
+                htmlFor="career_goals"
+                style={{
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
+                }}
+              >
+                Career Goals
+              </label>
+
+              <textarea
+                id="career_goals"
+                name="career_goals"
+                value={form.career_goals}
+                onChange={handleChange}
+                placeholder="Tell companies about your career goals"
+                rows="5"
+                style={{
+                  ...inputStyle,
+                  resize: "vertical",
+                }}
+              />
+            </div>
+
+            {/* CV */}
+            <div
               style={{
-                marginTop: "15px",
-                color: "#666",
+                marginBottom: "25px",
+                padding: "20px",
+                background: "#f8fafc",
+                borderRadius: "12px",
               }}
             >
-              Complete your profile, upload
-              your documents and improve your
-              AI internship matching.
-            </p>
-          </div>
+              <label
+                htmlFor="cv"
+                style={{
+                  display: "block",
+                  marginBottom: "8px",
+                  fontWeight: "700",
+                }}
+              >
+                📄 CV
+              </label>
+
+              {existingCvUrl && (
+                <p
+                  style={{
+                    color: "#166534",
+                    fontSize: "14px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  ✅ CV already uploaded. Select a new file below only if you
+                  want to replace it.
+                </p>
+              )}
+
+              <input
+                id="cv"
+                type="file"
+                accept=".pdf,.doc,.docx"
+                onChange={(e) => {
+                  setCvFile(e.target.files?.[0] || null);
+                }}
+              />
+
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: "#666",
+                  marginTop: "8px",
+                }}
+              >
+                Accepted: PDF, DOC, DOCX
+              </p>
+            </div>
+
+            {/* QUALIFICATION DOCUMENT */}
+            <div
+              style={{
+                marginBottom: "30px",
+                padding: "20px",
+                background: "#f8fafc",
+                borderRadius: "12px",
+              }}
+            >
+              <label
+                htmlFor="qualification_document"
+                style={{
+                  display: "block",
+                  marginBottom: "8px",
+                  fontWeight: "700",
+                }}
+              >
+                🎓 Qualification Document
+              </label>
+
+              {existingQualificationUrl && (
+                <p
+                  style={{
+                    color: "#166534",
+                    fontSize: "14px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  ✅ Qualification document already uploaded. Select a new
+                  file only if you want to replace it.
+                </p>
+              )}
+
+              <input
+                id="qualification_document"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(e) => {
+                  setQualificationFile(e.target.files?.[0] || null);
+                }}
+              />
+
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: "#666",
+                  marginTop: "8px",
+                }}
+              >
+                Accepted: PDF, JPG, JPEG, PNG
+              </p>
+            </div>
+
+            {/* BUTTON */}
+            <button
+              type="submit"
+              disabled={saving}
+              style={{
+                width: "100%",
+                padding: "15px",
+                border: "none",
+                borderRadius: "10px",
+                background: saving ? "#94a3b8" : "#2563eb",
+                color: "#ffffff",
+                fontSize: "16px",
+                fontWeight: "700",
+                cursor: saving ? "not-allowed" : "pointer",
+              }}
+            >
+              {saving
+                ? "Updating Profile..."
+                : graduateId
+                ? "Update Graduate Profile"
+                : "Create Graduate Profile"}
+            </button>
+          </form>
         </div>
-
-        {/* FORM */}
-
-        <form onSubmit={handleSubmit}>
-          <div className="card">
-            <h2>
-              👤 Personal Information
-            </h2>
-
-            <label>Full Name</label>
-
-            <input
-              className="input"
-              name="full_name"
-              value={form.full_name}
-              onChange={handleChange}
-              required
-            />
-
-            <label>Email Address</label>
-
-            <input
-              className="input"
-              type="email"
-              name="email"
-              value={form.email}
-              onChange={handleChange}
-              required
-            />
-
-            <label>Phone Number</label>
-
-            <input
-              className="input"
-              name="phone"
-              value={form.phone}
-              onChange={handleChange}
-              required
-            />
-
-            <label>Province</label>
-
-            <select
-              className="input"
-              name="province"
-              value={form.province}
-              onChange={handleChange}
-              required
-            >
-              <option value="">
-                Select Province
-              </option>
-
-              <option>Gauteng</option>
-              <option>
-                Western Cape
-              </option>
-              <option>
-                KwaZulu-Natal
-              </option>
-              <option>
-                Eastern Cape
-              </option>
-              <option>
-                Free State
-              </option>
-              <option>Limpopo</option>
-              <option>
-                Mpumalanga
-              </option>
-              <option>
-                North West
-              </option>
-              <option>
-                Northern Cape
-              </option>
-            </select>
-          </div>
-
-          <div className="card">
-            <h2>🎓 Education</h2>
-
-            <label>Qualification</label>
-
-            <input
-              className="input"
-              name="qualification"
-              value={
-                form.qualification
-              }
-              onChange={handleChange}
-              required
-            />
-
-            <label>
-              Field of Study
-            </label>
-
-            <input
-              className="input"
-              name="field_of_study"
-              value={
-                form.field_of_study
-              }
-              onChange={handleChange}
-              required
-            />
-
-            <label>
-              Institution
-            </label>
-
-            <input
-              className="input"
-              name="institution"
-              value={
-                form.institution
-              }
-              onChange={handleChange}
-              required
-            />
-
-            <label>
-              Career Goals
-            </label>
-
-            <textarea
-              className="input"
-              name="career_goals"
-              value={
-                form.career_goals
-              }
-              onChange={handleChange}
-              rows={5}
-              required
-            />
-
-            <label>Skills</label>
-
-            <textarea
-              className="input"
-              name="skills"
-              value={form.skills}
-              onChange={handleChange}
-              rows={4}
-              placeholder="Example: JavaScript, React, SQL, Python, Communication, Teamwork"
-            />
-          </div>
-
-          {/* DOCUMENTS */}
-
-          <div className="card">
-            <h2>📄 Documents</h2>
-
-            <label>
-              {existingGraduate?.cv_url
-                ? "Replace CV (optional)"
-                : "Upload CV"}
-            </label>
-
-            <input
-              className="input"
-              type="file"
-              accept=".pdf,.doc,.docx"
-              onChange={(e) =>
-                setCv(
-                  e.target.files?.[0] ||
-                    null
-                )
-              }
-              required={
-                !existingGraduate?.cv_url
-              }
-            />
-
-            {existingGraduate?.cv_url && (
-              <p
-                style={{
-                  color: "#16803c",
-                  fontSize: "14px",
-                  marginTop: "-10px",
-                  marginBottom: "20px",
-                }}
-              >
-                ✅ CV already uploaded.
-                Select a new file only if
-                you want to replace it.
-              </p>
-            )}
-
-            <label
-              style={{
-                marginTop: "20px",
-                display: "block",
-              }}
-            >
-              {existingGraduate?.qualification_url
-                ? "Replace Qualification Document (optional)"
-                : "Upload Qualification"}
-            </label>
-
-            <input
-              className="input"
-              type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
-              onChange={(e) =>
-                setQualificationFile(
-                  e.target.files?.[0] ||
-                    null
-                )
-              }
-              required={
-                !existingGraduate?.qualification_url
-              }
-            />
-
-            {existingGraduate?.qualification_url && (
-              <p
-                style={{
-                  color: "#16803c",
-                  fontSize: "14px",
-                  marginTop: "-10px",
-                }}
-              >
-                ✅ Qualification document
-                already uploaded.
-              </p>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={saving}
-            style={{
-              width: "100%",
-              padding: "16px",
-              background: saving
-                ? "#7aa9d8"
-                : "#0056d2",
-              color: "#fff",
-              border: "none",
-              borderRadius: "10px",
-              fontSize: "16px",
-              fontWeight: "600",
-              cursor: saving
-                ? "not-allowed"
-                : "pointer",
-              marginTop: "20px",
-            }}
-          >
-            {saving
-              ? "💾 Saving..."
-              : existingGraduate
-              ? "💾 Update Graduate Profile"
-              : "🚀 Submit Graduate Profile"}
-          </button>
-        </form>
-
-        <p
-          style={{
-            textAlign: "center",
-            marginTop: "20px",
-            fontWeight: "bold",
-            color: "#0056d2",
-          }}
-        >
-          {message}
-        </p>
       </main>
     </>
   );
 }
+
+// =============================================================
+// INPUT STYLE
+// =============================================================
+const inputStyle = {
+  width: "100%",
+  padding: "13px 14px",
+  border: "1px solid #d1d5db",
+  borderRadius: "8px",
+  fontSize: "15px",
+  boxSizing: "border-box",
+  background: "#ffffff",
+};
