@@ -292,12 +292,15 @@ export default function GraduatePage() {
           existingGraduate.id
         );
 
-        const { data: updatedGraduate, error: updateError } =
-          await supabase
-            .from("graduates")
-            .update(graduateData)
-            .eq("id", existingGraduate.id)
-            .select("id");
+        const { error: updateError } = await supabase
+  .from("graduates")
+  .update(graduateData)
+  .eq("id", existingGraduate.id);
+
+if (updateError) {
+  console.error("Update graduate error:", updateError);
+  throw updateError;
+}
 
         if (updateError) {
           console.error("Update graduate error:", updateError);
