@@ -3,1930 +3,1064 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
+import Navbar from "../components/Navbar";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-export default function CompanyDashboard() {
+const emptyForm = {
+  full_name: "",
+  email: "",
+  phone: "",
+  qualification: "",
+  field_of_study: "",
+  institution: "",
+  province: "",
+  career_goals: "",
+  skills: "",
+};
+
+export default function GraduatePage() {
   const router = useRouter();
 
-  const [company, setCompany] = useState(null);
-  const [applications, setApplications] = useState([]);
+  const [form, setForm] = useState(emptyForm);
+
+  const [cvFile, setCvFile] = useState(null);
+  const [qualificationFile, setQualificationFile] = useState(null);
+
+  const [existingCvUrl, setExistingCvUrl] = useState("");
+  const [existingQualificationUrl, setExistingQualificationUrl] =
+    useState("");
+
+  const [graduateId, setGraduateId] = useState(null);
+
   const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState(null);
-  const [selectedApplication, setSelectedApplication] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  // =========================================================
+  // LOAD LOGGED-IN USER + EXISTING GRADUATE
+  // =========================================================
 
   useEffect(() => {
-  loadDashboard();
-
-  const handleFocus = () => {
-    loadDashboard();
-  };
-
-  window.addEventListener("focus", handleFocus);
-
-  return () => {
-    window.removeEventListener("focus", handleFocus);
-  };
-}, []);
-
-  // ----------------------------------------
-  // QUALIFICATION LEVEL
-  // ----------------------------------------
-
-  function getQualificationLevel(qualification) {
-    const value = (qualification || "").toLowerCase().trim();
-
-    if (value.includes("grade 12") || value.includes("matric")) {
-      return 1;
-    }
-
-    if (value.includes("certificate")) {
-      return 2;
-    }
-
-    if (
-      value.includes("diploma") ||
-      value.includes("national diploma")
-    ) {
-      return 3;
-    }
-
-    if (
-      value.includes("degree") ||
-      value.includes("bachelor")
-    ) {
-      return 4;
-    }
-
-    if (
-      value.includes("honours") ||
-      value.includes("honors")
-    ) {
-      return 5;
-    }
-
-    if (
-      value.includes("masters") ||
-      value.includes("master") ||
-      value.includes("postgraduate") ||
-      value.includes("phd") ||
-      value.includes("doctorate")
-    ) {
-      return 6;
-    }
-
-    return 0;
-  }
-
-  // ----------------------------------------
-  // QUALIFICATION MATCH
-  // ----------------------------------------
-
-  function qualificationMatches(
-    applicantQualification,
-    requiredQualification
-  ) {
-    const applicant = (applicantQualification || "")
-      .toLowerCase()
-      .trim();
-
-    const required = (requiredQualification || "")
-      .toLowerCase()
-      .trim();
-
-    if (!applicant || !required) {
-      return false;
-    }
-
-    const applicantLevel =
-      getQualificationLevel(applicant);
-
-    const requiredLevel =
-      getQualificationLevel(required);
-
-    if (applicantLevel > 0 && requiredLevel > 0) {
-      return applicantLevel >= requiredLevel;
-    }
-
-    return (
-      applicant === required ||
-      applicant.includes(required) ||
-      required.includes(applicant)
-    );
-  }
-
-  // ----------------------------------------
-  // MATCHING SCORE
-  // ----------------------------------------
-
-  function calculateMatch(application, internship) {
-    let score = 0;
-    const reasons = [];
-
-    const applicantField = (
-      application.field_of_study || ""
-    )
-      .toLowerCase()
-      .trim();
-
-    const requiredField = (
-      internship.field_of_study || ""
-    )
-      .toLowerCase()
-      .trim();
-
-    const applicantSkills = (
-      application.skills || ""
-    )
-      .toLowerCase()
-      .split(/[,;]/)
-      .map((skill) => skill.trim())
-      .filter(Boolean);
-
-    const requiredSkills = (
-      internship.skills || ""
-    )
-      .toLowerCase()
-      .split(/[,;]/)
-      .map((skill) => skill.trim())
-      .filter(Boolean);
-
-    // Qualification = 35 points
-
-    const qualificationMatch = qualificationMatches(
-      application.qualification,
-      internship.qualification
-    );
-
-    if (
-      qualificationMatch &&
-      application.qualification &&
-      internship.qualification
-    ) {
-      score += 35;
-
-      reasons.push(
-        `✅ Qualification requirement met (${application.qualification} vs ${internship.qualification})`
-      );
-    } else if (
-      application.qualification &&
-      internship.qualification
-    ) {
-      reasons.push(
-        `❌ Qualification requirement not met (${application.qualification} vs ${internship.qualification})`
-      );
-    }
-
-    // Field of study = 35 points
-
-    const fieldMatch =
-      applicantField &&
-      requiredField &&
-      (
-        applicantField === requiredField ||
-        applicantField.includes(requiredField) ||
-        requiredField.includes(applicantField)
-      );
-
-    if (fieldMatch) {
-      score += 35;
-
-      reasons.push(
-        `✅ Field of study matches (${application.field_of_study})`
-      );
-    } else if (
-      application.field_of_study &&
-      internship.field_of_study
-    ) {
-      reasons.push(
-        `❌ Field of study does not match (${application.field_of_study} vs ${internship.field_of_study})`
-      );
-    }
-
-    // Skills = 30 points
-
-    let matchingSkills = [];
-
-    if (
-      requiredSkills.length > 0 &&
-      applicantSkills.length > 0
-    ) {
-      requiredSkills.forEach((requiredSkill) => {
-        const matchedSkill = applicantSkills.find(
-          (applicantSkill) =>
-            applicantSkill.includes(requiredSkill) ||
-            requiredSkill.includes(applicantSkill)
-        );
-
-        if (matchedSkill) {
-          matchingSkills.push(requiredSkill);
-        }
-      });
-
-      const skillScore =
-        (matchingSkills.length / requiredSkills.length) * 30;
-
-      score += skillScore;
-
-      if (matchingSkills.length > 0) {
-        reasons.push(
-          `✅ Skills matched: ${matchingSkills.join(", ")}`
-        );
-      }
-
-      const missingSkills = requiredSkills.filter(
-        (skill) => !matchingSkills.includes(skill)
-      );
-
-      if (missingSkills.length > 0) {
-        reasons.push(
-          `❌ Missing skills: ${missingSkills.join(", ")}`
-        );
-      }
-    } else if (requiredSkills.length === 0) {
-      reasons.push(
-        "ℹ️ No specific skills were required"
-      );
-    } else {
-      reasons.push(
-        "❌ Applicant did not provide skills"
-      );
-    }
-
-    return {
-      score: Math.round(Math.min(score, 100)),
-      reasons,
-    };
-  }
-
-  // ----------------------------------------
-  // MATCH LABEL
-  // ----------------------------------------
-
-  function getMatchLabel(score) {
-    if (score >= 85) {
-      return {
-        label: "Strong Match",
-        background: "#e8f7ee",
-        color: "#16803c",
-      };
-    }
-
-    if (score >= 70) {
-      return {
-        label: "Good Match",
-        background: "#eef6ff",
-        color: "#0057B8",
-      };
-    }
-
-    if (score >= 40) {
-      return {
-        label: "Possible Match",
-        background: "#fff7e6",
-        color: "#b26a00",
-      };
-    }
-
-    return {
-      label: "Weak Match",
-      background: "#fff0f0",
-      color: "#c62828",
-    };
-  }
-
-  // ----------------------------------------
-  // UPDATE APPLICATION STATUS
-  // ----------------------------------------
-
-  async function updateApplicationStatus(
-    applicationId,
-    newStatus
-  ) {
-    setUpdatingId(applicationId);
-
-    const { error } = await supabase
-      .from("applications")
-      .update({
-        status: newStatus,
-      })
-      .eq("id", applicationId);
-
-    if (error) {
-      alert(
-        `Could not update application status: ${error.message}`
-      );
-
-      setUpdatingId(null);
-      return false;
-    }
-
-    setApplications((currentApplications) =>
-      currentApplications.map((application) =>
-        application.id === applicationId
-          ? {
-              ...application,
-              status: newStatus,
-            }
-          : application
-      )
-    );
-
-    setSelectedApplication((currentApplication) =>
-      currentApplication?.id === applicationId
-        ? {
-            ...currentApplication,
-            status: newStatus,
-          }
-        : currentApplication
-    );
-
-    setUpdatingId(null);
-
-    return true;
-  }
-
-  // ----------------------------------------
-  // OPEN CV
-  // ----------------------------------------
-
-  async function openCV(application) {
-  try {
-    let cvPath =
-      application.cv_url ||
-      application.cv ||
-      application.resume_url ||
-      application.document_url ||
-      null;
-
-    // -------------------------------------------------
-    // IF APPLICATION DOES NOT HAVE CV,
-    // LOOK DIRECTLY IN GRADUATES TABLE
-    // -------------------------------------------------
-
-    if (!cvPath && application.graduate_id) {
-      console.log(
-        "Application has no CV. Looking up graduate:",
-        application.graduate_id
-      );
-
-      const { data: graduate, error: graduateError } =
-        await supabase
-          .from("graduates")
-          .select("id, cv_url")
-          .eq("id", application.graduate_id)
-          .maybeSingle();
-
-      if (graduateError) {
-        console.error(
-          "Graduate CV lookup error:",
-          graduateError
-        );
-
-        alert(
-          `Could not find the graduate CV: ${graduateError.message}`
-        );
-
+    loadGraduateProfile();
+  }, []);
+
+  async function loadGraduateProfile() {
+    try {
+      setLoading(true);
+      setError("");
+
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError) {
+        console.error(authError);
+        router.push("/login");
         return;
       }
 
-      cvPath = graduate?.cv_url || null;
-    }
-
-    // -------------------------------------------------
-    // NO CV FOUND
-    // -------------------------------------------------
-
-    if (!cvPath) {
-      alert(
-        "No CV has been uploaded for this graduate."
-      );
-
-      return;
-    }
-
-    console.log("CV path found:", cvPath);
-
-    // -------------------------------------------------
-    // IF IT IS ALREADY A FULL URL
-    // -------------------------------------------------
-
-    if (
-      cvPath.startsWith("http://") ||
-      cvPath.startsWith("https://")
-    ) {
-      window.open(cvPath, "_blank");
-      return;
-    }
-
-    // -------------------------------------------------
-    // CREATE SIGNED URL FROM DOCUMENTS BUCKET
-    // -------------------------------------------------
-
-    const {
-      data: signedData,
-      error: signedError,
-    } = await supabase.storage
-      .from("documents")
-      .createSignedUrl(cvPath, 60 * 10);
-
-    if (signedError) {
-      console.error(
-        "Signed URL error:",
-        signedError
-      );
-
-      alert(
-        `Could not open the CV: ${signedError.message}`
-      );
-
-      return;
-    }
-
-    if (!signedData?.signedUrl) {
-      console.error(
-        "No signed URL returned:",
-        signedData
-      );
-
-      alert(
-        "The CV was found, but a viewing link could not be created."
-      );
-
-      return;
-    }
-
-    console.log(
-      "Opening signed CV URL:",
-      signedData.signedUrl
-    );
-
-    window.open(
-      signedData.signedUrl,
-      "_blank"
-    );
-  } catch (error) {
-    console.error(
-      "Open CV error:",
-      error
-    );
-
-    alert(
-      `Could not open the CV: ${
-        error.message || "Unknown error"
-      }`
-    );
-  }
-}
-
-  // ----------------------------------------
-  // VIEW APPLICATION
-  // ----------------------------------------
-
-  function viewApplication(application) {
-    setSelectedApplication(application);
-  }
-
-  // ----------------------------------------
-  // LOAD DASHBOARD
-  // ----------------------------------------
-
-  async function loadDashboard() {
-    setLoading(true);
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      router.push("/login");
-      return;
-    }
-
-    const {
-      data: companyData,
-      error: companyError,
-    } = await supabase
-      .from("companies")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (companyError || !companyData) {
-      setLoading(false);
-      return;
-    }
-
-    setCompany(companyData);
-
-    const {
-      data: internships,
-      error: internshipError,
-    } = await supabase
-      .from("internships")
-      .select(
-        "id, job_title, company_name, qualification, field_of_study, skills"
-      )
-      .eq("company_name", companyData.company_name);
-
-    if (
-      internshipError ||
-      !internships ||
-      internships.length === 0
-    ) {
-      setApplications([]);
-      setLoading(false);
-      return;
-    }
-
-    const internshipIds = internships.map(
-      (internship) => internship.id
-    );
-
-    const {
-      data: applicationData,
-      error: applicationError,
-    } = await supabase
-      .from("applications")
-      .select("*")
-      .in("internship_id", internshipIds)
-      .order("created_at", { ascending: false });
-
-    if (applicationError) {
-      setApplications([]);
-      setLoading(false);
-      return;
-    }
-
-    // ----------------------------------------
-    // GET GRADUATE CVs
-    // ----------------------------------------
-
-    const graduateIds = [
-      ...new Set(
-        (applicationData || [])
-          .map((application) => application.graduate_id)
-          .filter(Boolean)
-      ),
-    ];
-
-    let graduates = [];
-
-    if (graduateIds.length > 0) {
-      const {
-  data: graduateData,
-  error: graduateError,
-} = await supabase
-  .from("graduates")
-  .select("id, user_id, cv_url")
-  .in("id", graduateIds);
-
-      if (!graduateError && graduateData) {
-        graduates = graduateData;
+      if (!user) {
+        router.push("/login");
+        return;
       }
+
+      // IMPORTANT:
+      // We DO NOT use .single().
+      // This prevents the "Cannot coerce the result
+      // to a single JSON object" error.
+
+      const {
+        data: graduates,
+        error: graduateError,
+      } = await supabase
+        .from("graduates")
+        .select(
+          "id, user_id, full_name, email, phone, qualification, field_of_study, institution, province, career_goals, skills, cv_url, qualification_url"
+        )
+        .eq("user_id", user.id)
+        .order("id", { ascending: true })
+        .limit(1);
+
+      if (graduateError) {
+        console.error(
+          "Graduate lookup error:",
+          graduateError
+        );
+
+        setError(graduateError.message);
+        return;
+      }
+
+      // =======================================================
+      // EXISTING GRADUATE
+      // =======================================================
+
+      if (graduates && graduates.length > 0) {
+        const graduate = graduates[0];
+
+        setGraduateId(graduate.id);
+
+        setForm({
+          full_name: graduate.full_name || "",
+          email: graduate.email || user.email || "",
+          phone: graduate.phone || "",
+          qualification: graduate.qualification || "",
+          field_of_study: graduate.field_of_study || "",
+          institution: graduate.institution || "",
+          province: graduate.province || "",
+          career_goals: graduate.career_goals || "",
+          skills: graduate.skills || "",
+        });
+
+        setExistingCvUrl(graduate.cv_url || "");
+
+        setExistingQualificationUrl(
+          graduate.qualification_url || ""
+        );
+
+        console.log(
+          "Existing graduate loaded:",
+          graduate.id
+        );
+      } else {
+        // =====================================================
+        // NO GRADUATE YET
+        // =====================================================
+
+        setForm({
+          ...emptyForm,
+          email: user.email || "",
+        });
+
+        setGraduateId(null);
+
+        console.log(
+          "No graduate profile found."
+        );
+      }
+    } catch (err) {
+      console.error(
+        "Load profile error:",
+        err
+      );
+
+      setError(
+        err.message ||
+          "Could not load graduate profile."
+      );
+    } finally {
+      setLoading(false);
     }
-
-    // ----------------------------------------
-    // ADD INTERNSHIP + MATCH DATA
-    // ----------------------------------------
-
-    const applicationsWithJobs = (
-      applicationData || []
-    ).map((application) => {
-      const internship = internships.find(
-        (job) =>
-          job.id === application.internship_id
-      );
-
-      const graduate = graduates.find(
-        (item) =>
-          item.id === application.graduate_id
-      );
-
-      const match = internship
-        ? calculateMatch(application, internship)
-        : {
-            score: 0,
-            reasons: [],
-          };
-
-      return {
-        ...application,
-
-        job_title:
-          internship?.job_title || "Internship",
-
-        internship_qualification:
-          internship?.qualification || "",
-
-        internship_field_of_study:
-          internship?.field_of_study || "",
-
-        internship_skills:
-          internship?.skills || "",
-
-        ai_score: match.score,
-
-        match_reasons: match.reasons,
-
-        cv_url:
-          application.cv_url ||
-          graduate?.cv_url ||
-          null,
-      };
-    });
-
-    applicationsWithJobs.sort(
-      (a, b) => b.ai_score - a.ai_score
-    );
-
-    setApplications(applicationsWithJobs);
-    setLoading(false);
   }
 
-  // ----------------------------------------
+  // =========================================================
+  // HANDLE FORM CHANGES
+  // =========================================================
+
+  function handleChange(e) {
+    const { name, value } = e.target;
+
+    setForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  }
+
+  // =========================================================
+  // UPLOAD FILE
+  // =========================================================
+
+  async function uploadFile(file, folder) {
+    if (!file) return null;
+
+    const safeFileName = file.name.replace(
+      /[^a-zA-Z0-9._-]/g,
+      "_"
+    );
+
+    const filePath =
+      `${folder}/${Date.now()}-${safeFileName}`;
+
+    const { error: uploadError } =
+      await supabase.storage
+        .from("documents")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    return filePath;
+  }
+
+  // =========================================================
+  // SUBMIT / UPDATE PROFILE
+  // =========================================================
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+
+    setMessage("");
+    setError("");
+    setSaving(true);
+
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user) {
+        throw new Error(
+          "Your session has expired. Please log in again."
+        );
+      }
+
+      // =====================================================
+      // BASIC VALIDATION
+      // =====================================================
+
+      if (!form.full_name.trim()) {
+        throw new Error(
+          "Please enter your full name."
+        );
+      }
+
+      if (!form.email.trim()) {
+        throw new Error(
+          "Please enter your email."
+        );
+      }
+
+      if (!form.phone.trim()) {
+        throw new Error(
+          "Please enter your phone number."
+        );
+      }
+
+      if (!form.qualification.trim()) {
+        throw new Error(
+          "Please enter your qualification."
+        );
+      }
+
+      if (!form.field_of_study.trim()) {
+        throw new Error(
+          "Please enter your field of study."
+        );
+      }
+
+      // =====================================================
+      // FIND EXISTING GRADUATE
+      // =====================================================
+
+      const {
+        data: existingGraduates,
+        error: findError,
+      } = await supabase
+        .from("graduates")
+        .select(
+          "id, cv_url, qualification_url"
+        )
+        .eq("user_id", user.id)
+        .order("id", { ascending: true })
+        .limit(1);
+
+      if (findError) {
+        console.error(
+          "Find graduate error:",
+          findError
+        );
+
+        throw findError;
+      }
+
+      let existingGraduate = null;
+
+      if (
+        existingGraduates &&
+        existingGraduates.length > 0
+      ) {
+        existingGraduate =
+          existingGraduates[0];
+      }
+
+      // =====================================================
+      // UPLOAD NEW CV IF SELECTED
+      // =====================================================
+
+      let cvUrl =
+        existingGraduate?.cv_url ||
+        existingCvUrl ||
+        null;
+
+      if (cvFile) {
+        cvUrl = await uploadFile(
+          cvFile,
+          "cv"
+        );
+      }
+
+      // =====================================================
+      // UPLOAD NEW QUALIFICATION DOCUMENT
+      // =====================================================
+
+      let qualificationUrl =
+        existingGraduate?.qualification_url ||
+        existingQualificationUrl ||
+        null;
+
+      if (qualificationFile) {
+        qualificationUrl =
+          await uploadFile(
+            qualificationFile,
+            "qualifications"
+          );
+      }
+      if (qualificationFile) {
+  qualificationUrl =
+    await uploadFile(
+      qualificationFile,
+      "qualifications"
+    );
+}
+      // =====================================================
+      // DATA TO SAVE
+      // =====================================================
+
+      const graduateData = {
+        user_id: user.id,
+        full_name: form.full_name.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        qualification: form.qualification.trim(),
+        field_of_study: form.field_of_study.trim(),
+        institution: form.institution.trim(),
+        province: form.province.trim(),
+        career_goals: form.career_goals.trim(),
+        skills: form.skills.trim(),
+        cv_url: cvUrl,
+        qualification_url: qualificationUrl,
+      };
+
+      // =====================================================
+      // UPDATE EXISTING GRADUATE
+      // =====================================================
+
+      if (existingGraduate) {
+        console.log(
+          "Updating existing graduate:",
+          existingGraduate.id
+        );
+
+        const { error: updateError } =
+          await supabase
+            .from("graduates")
+            .update(graduateData)
+            .eq("id", existingGraduate.id);
+
+        if (updateError) {
+          console.error(
+            "Update graduate error:",
+            updateError
+          );
+
+          throw updateError;
+        }
+
+        setGraduateId(
+          existingGraduate.id
+        );
+
+        console.log(
+          "Graduate updated successfully:",
+          existingGraduate.id
+        );
+
+        setMessage(
+          "✅ Your graduate profile and documents have been updated successfully!"
+        );
+      }
+
+      // =====================================================
+      // INSERT NEW GRADUATE
+      // =====================================================
+
+      else {
+        console.log(
+          "Creating new graduate profile."
+        );
+
+        const {
+          data: newGraduate,
+          error: insertError,
+        } = await supabase
+          .from("graduates")
+          .insert(graduateData)
+          .select("id");
+
+        if (insertError) {
+          console.error(
+            "Insert graduate error:",
+            insertError
+          );
+
+          throw insertError;
+        }
+
+        if (
+          newGraduate &&
+          newGraduate.length > 0
+        ) {
+          setGraduateId(
+            newGraduate[0].id
+          );
+        }
+
+        setMessage(
+          "✅ Your graduate profile and documents have been created successfully!"
+        );
+      }
+
+      // =====================================================
+      // UPDATE LOCAL STATE
+      // =====================================================
+
+      setExistingCvUrl(
+        cvUrl || ""
+      );
+
+      setExistingQualificationUrl(
+        qualificationUrl || ""
+      );
+
+      setCvFile(null);
+      setQualificationFile(null);
+
+      // =====================================================
+      // RESET FILE INPUTS
+      // =====================================================
+
+      const cvInput =
+        document.getElementById("cv");
+
+      const qualificationInput =
+        document.getElementById(
+          "qualification_document"
+        );
+
+      if (cvInput) {
+        cvInput.value = "";
+      }
+
+      if (qualificationInput) {
+        qualificationInput.value = "";
+      }
+
+      // =====================================================
+      // RELOAD PROFILE
+      // =====================================================
+
+      await loadGraduateProfile();
+
+    } catch (err) {
+      console.error(
+        "Save graduate profile error:",
+        err
+      );
+
+      setError(
+        err.message ||
+          "Something went wrong while updating your graduate profile."
+      );
+
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // =========================================================
   // LOADING
-  // ----------------------------------------
+  // =========================================================
 
   if (loading) {
     return (
-      <main
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          background: "#f5f9ff",
-          color: "#0057B8",
-          fontSize: "22px",
-          fontWeight: "bold",
-        }}
-      >
-        Loading company dashboard...
-      </main>
-    );
-  }
+      <>
+        <Navbar />
 
-  // ----------------------------------------
-  // NO COMPANY
-  // ----------------------------------------
-
-  if (!company) {
-    return (
-      <main
-        style={{
-          minHeight: "100vh",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          background: "#f5f9ff",
-          padding: "20px",
-        }}
-      >
-        <div
+        <main
           style={{
-            background: "#fff",
-            padding: "35px",
-            borderRadius: "18px",
+            maxWidth: "900px",
+            margin: "0 auto",
+            padding: "40px 20px",
             textAlign: "center",
-            maxWidth: "500px",
-            boxShadow:
-              "0 10px 30px rgba(0,0,0,.08)",
           }}
         >
-          <h2 style={{ color: "#0057B8" }}>
-            Company Profile Required
-          </h2>
+          <h1>
+            Loading Graduate Profile...
+          </h1>
 
-          <p
-            style={{
-              color: "#666",
-              lineHeight: "1.6",
-            }}
-          >
-            Please complete your company profile
-            before accessing the dashboard.
+          <p>
+            Please wait.
           </p>
-
-          <button
-            onClick={() =>
-              router.push("/company")
-            }
-            style={{
-              marginTop: "15px",
-              background: "#0057B8",
-              color: "#fff",
-              border: "none",
-              padding: "13px 22px",
-              borderRadius: "10px",
-              fontWeight: "bold",
-              cursor: "pointer",
-            }}
-          >
-            Complete Company Profile
-          </button>
-        </div>
-      </main>
+        </main>
+      </>
     );
   }
 
-  // ----------------------------------------
-  // DASHBOARD
-  // ----------------------------------------
+  // =========================================================
+  // PAGE
+  // =========================================================
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#f5f9ff",
-        padding: "30px 20px 60px",
-      }}
-    >
-      <div
+    <>
+      <Navbar />
+
+      <main
         style={{
-          maxWidth: "1100px",
+          maxWidth: "900px",
           margin: "0 auto",
+          padding:
+            "30px 20px 60px",
         }}
       >
-        {/* HEADER */}
-
         <div
           style={{
-            background:
-              "linear-gradient(135deg,#0057B8,#0a84ff)",
-            color: "#fff",
-            borderRadius: "20px",
-            padding: "35px",
-            marginBottom: "25px",
+            background: "#ffffff",
+            borderRadius: "16px",
+            padding: "30px",
+            boxShadow:
+              "0 4px 20px rgba(0,0,0,0.08)",
           }}
         >
-          <h1 style={{ marginTop: 0 }}>
-            🏢 Company Dashboard
+          <h1
+            style={{
+              marginBottom: "10px",
+              fontSize: "32px",
+              fontWeight: "700",
+            }}
+          >
+            🎓 Graduate Profile
           </h1>
 
           <p
             style={{
-              marginBottom: 0,
-              fontSize: "18px",
+              color: "#666",
+              marginBottom: "30px",
             }}
           >
-            Welcome, {company.company_name}
+            Keep your graduate profile and
+            documents up to date.
           </p>
-        </div>
 
-        {/* STATISTICS */}
+          {/* SUCCESS MESSAGE */}
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit,minmax(200px,1fr))",
-            gap: "18px",
-            marginBottom: "30px",
-          }}
-        >
-          <div style={statCard}>
-            <div style={{ fontSize: "32px" }}>
-              📋
-            </div>
-
-            <h2>{applications.length}</h2>
-
-            <p>Total Applications</p>
-          </div>
-
-          <div style={statCard}>
-            <div style={{ fontSize: "32px" }}>
-              👥
-            </div>
-
-            <h2>
-              {
-                new Set(
-                  applications.map(
-                    (application) =>
-                      application.graduate_id
-                  )
-                ).size
-              }
-            </h2>
-
-            <p>Applicants</p>
-          </div>
-        </div>
-
-        {/* APPLICANTS */}
-
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: "18px",
-            padding: "30px",
-            boxShadow:
-              "0 10px 30px rgba(0,0,0,.08)",
-          }}
-        >
-          <h2
-            style={{
-              color: "#0057B8",
-              marginTop: 0,
-            }}
-          >
-            👥 Applicants
-          </h2>
-
-          {applications.length === 0 ? (
+          {message && (
             <div
               style={{
-                padding: "30px 10px",
-                textAlign: "center",
-                color: "#777",
-              }}
-            >
-              <div style={{ fontSize: "45px" }}>
-                📭
-              </div>
-
-              <h3>No applications yet</h3>
-
-              <p>
-                When graduates apply for your
-                internships, their applications will
-                appear here.
-              </p>
-            </div>
-          ) : (
-            applications.map(
-              (application, index) => {
-                const match = getMatchLabel(
-                  application.ai_score
-                );
-
-                const currentStatus =
-                  application.status || "Pending";
-
-                return (
-                  <div
-                    key={application.id}
-                    style={{
-                      border:
-                        index === 0 &&
-                        application.ai_score >= 70
-                          ? "2px solid #0057B8"
-                          : "1px solid #e1e7ef",
-
-                      borderRadius: "14px",
-                      padding: "22px",
-                      marginBottom: "18px",
-                    }}
-                  >
-                    {/* RANK */}
-
-                    <div
-                      style={{
-                        fontSize: "14px",
-                        fontWeight: "bold",
-                        color: "#777",
-                        marginBottom: "10px",
-                      }}
-                    >
-                      #{index + 1} Applicant
-                    </div>
-
-                    {/* NAME + STATUS */}
-
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent:
-                          "space-between",
-                        gap: "15px",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <div>
-                        <h3
-                          style={{
-                            marginTop: 0,
-                            marginBottom: "6px",
-                            color: "#003b7a",
-                          }}
-                        >
-                          {application.full_name}
-                        </h3>
-
-                        <p
-                          style={{
-                            margin: "5px 0",
-                            color: "#666",
-                          }}
-                        >
-                          💼 {application.job_title}
-                        </p>
-                      </div>
-
-                      <div
-                        style={{
-                          background:
-                            currentStatus ===
-                            "Shortlisted"
-                              ? "#e8f7ee"
-                              : currentStatus ===
-                                "Rejected"
-                              ? "#fff0f0"
-                              : currentStatus ===
-                                "Review"
-                              ? "#eef6ff"
-                              : "#f5f5f5",
-
-                          color:
-                            currentStatus ===
-                            "Shortlisted"
-                              ? "#16803c"
-                              : currentStatus ===
-                                "Rejected"
-                              ? "#c62828"
-                              : currentStatus ===
-                                "Review"
-                              ? "#0057B8"
-                              : "#666",
-
-                          padding: "8px 12px",
-                          borderRadius: "20px",
-                          height: "fit-content",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {currentStatus}
-                      </div>
-                    </div>
-
-                    <hr
-                      style={{
-                        border: "none",
-                        borderTop:
-                          "1px solid #eee",
-                        margin: "18px 0",
-                      }}
-                    />
-
-                    {/* APPLICANT DETAILS */}
-
-                    <p>
-                      <strong>
-                        📧 Email:
-                      </strong>{" "}
-                      {application.email}
-                    </p>
-
-                    <p>
-                      <strong>
-                        📱 Phone:
-                      </strong>{" "}
-                      {application.phone}
-                    </p>
-
-                    <p>
-                      <strong>
-                        🎓 Qualification:
-                      </strong>{" "}
-                      {application.qualification}
-                    </p>
-
-                    <p>
-                      <strong>
-                        💻 Field of Study:
-                      </strong>{" "}
-                      {application.field_of_study}
-                    </p>
-
-                    <p>
-                      <strong>
-                        🛠️ Skills:
-                      </strong>{" "}
-                      {application.skills ||
-                        "Not provided"}
-                    </p>
-
-                    {/* AI SCORE */}
-
-                    <div
-                      style={{
-                        marginTop: "20px",
-                        padding: "18px",
-                        borderRadius: "14px",
-                        background:
-                          match.background,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent:
-                            "space-between",
-                          alignItems: "center",
-                          gap: "10px",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <div>
-                          <div
-                            style={{
-                              fontWeight: "bold",
-                              fontSize: "16px",
-                              color: match.color,
-                            }}
-                          >
-                            🎯 AI Match Score
-                          </div>
-
-                          <div
-                            style={{
-                              fontSize: "28px",
-                              fontWeight: "bold",
-                              color: match.color,
-                              marginTop: "5px",
-                            }}
-                          >
-                            {application.ai_score}%
-                          </div>
-                        </div>
-
-                        <div
-                          style={{
-                            background: "#fff",
-                            color: match.color,
-                            padding: "9px 14px",
-                            borderRadius: "20px",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {match.label}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* WHY THIS SCORE */}
-
-                    <div
-                      style={{
-                        marginTop: "15px",
-                        padding: "18px",
-                        background: "#f8fafc",
-                        borderRadius: "12px",
-                        border:
-                          "1px solid #e5eaf0",
-                      }}
-                    >
-                      <h4
-                        style={{
-                          marginTop: 0,
-                          color: "#003b7a",
-                        }}
-                      >
-                        🔎 Why this score?
-                      </h4>
-
-                      {application.match_reasons &&
-                      application.match_reasons
-                        .length > 0 ? (
-                        application.match_reasons.map(
-                          (reason, reasonIndex) => (
-                            <p
-                              key={reasonIndex}
-                              style={{
-                                margin: "8px 0",
-                                color: "#555",
-                              }}
-                            >
-                              {reason}
-                            </p>
-                          )
-                        )
-                      ) : (
-                        <p
-                          style={{
-                            color: "#777",
-                          }}
-                        >
-                          No matching information
-                          available.
-                        </p>
-                      )}
-                    </div>
-
-                    {/* RECRUITMENT ACTIONS */}
-
-                    <div
-                      style={{
-                        marginTop: "20px",
-                        paddingTop: "18px",
-                        borderTop:
-                          "1px solid #eee",
-                      }}
-                    >
-                      <h4
-                        style={{
-                          marginTop: 0,
-                          color: "#003b7a",
-                        }}
-                      >
-                        Recruitment Decision
-                      </h4>
-
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "10px",
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        {/* VIEW APPLICATION */}
-
-                        <button
-                          onClick={() =>
-                            viewApplication(application)
-                          }
-                          disabled={
-                            updatingId ===
-                            application.id
-                          }
-                          style={{
-                            background: "#eef6ff",
-                            color: "#0057B8",
-                            border:
-                              "1px solid #0057B8",
-                            padding: "11px 16px",
-                            borderRadius: "9px",
-                            fontWeight: "bold",
-                            cursor: "pointer",
-                            opacity:
-                              updatingId ===
-                              application.id
-                                ? 0.6
-                                : 1,
-                          }}
-                        >
-                          👁️ View Application
-                        </button>
-
-                        {/* SHORTLIST */}
-
-                        <button
-                          onClick={() =>
-                            updateApplicationStatus(
-                              application.id,
-                              "Shortlisted"
-                            )
-                          }
-                          disabled={
-                            updatingId ===
-                              application.id ||
-                            currentStatus ===
-                              "Shortlisted"
-                          }
-                          style={{
-                            background:
-                              currentStatus ===
-                              "Shortlisted"
-                                ? "#16803c"
-                                : "#e8f7ee",
-                            color:
-                              currentStatus ===
-                              "Shortlisted"
-                                ? "#fff"
-                                : "#16803c",
-                            border:
-                              "1px solid #16803c",
-                            padding: "11px 16px",
-                            borderRadius: "9px",
-                            fontWeight: "bold",
-                            cursor:
-                              currentStatus ===
-                              "Shortlisted"
-                                ? "default"
-                                : "pointer",
-                            opacity:
-                              updatingId ===
-                              application.id
-                                ? 0.6
-                                : 1,
-                          }}
-                        >
-                          {updatingId ===
-                          application.id
-                            ? "Updating..."
-                            : currentStatus ===
-                              "Shortlisted"
-                            ? "✅ Shortlisted"
-                            : "🟢 Shortlist"}
-                        </button>
-
-                        {/* REJECT */}
-
-                        <button
-                          onClick={() =>
-                            updateApplicationStatus(
-                              application.id,
-                              "Rejected"
-                            )
-                          }
-                          disabled={
-                            updatingId ===
-                              application.id ||
-                            currentStatus ===
-                              "Rejected"
-                          }
-                          style={{
-                            background:
-                              currentStatus ===
-                              "Rejected"
-                                ? "#c62828"
-                                : "#fff0f0",
-                            color:
-                              currentStatus ===
-                              "Rejected"
-                                ? "#fff"
-                                : "#c62828",
-                            border:
-                              "1px solid #c62828",
-                            padding: "11px 16px",
-                            borderRadius: "9px",
-                            fontWeight: "bold",
-                            cursor:
-                              currentStatus ===
-                              "Rejected"
-                                ? "default"
-                                : "pointer",
-                            opacity:
-                              updatingId ===
-                              application.id
-                                ? 0.6
-                                : 1,
-                          }}
-                        >
-                          {updatingId ===
-                          application.id
-                            ? "Updating..."
-                            : currentStatus ===
-                              "Rejected"
-                            ? "❌ Rejected"
-                            : "🔴 Reject"}
-                        </button>
-
-                        {/* RESET */}
-
-                        {currentStatus !==
-                          "Pending" && (
-                          <button
-                            onClick={() =>
-                              updateApplicationStatus(
-                                application.id,
-                                "Pending"
-                              )
-                            }
-                            disabled={
-                              updatingId ===
-                              application.id
-                            }
-                            style={{
-                              background: "#fff",
-                              color: "#555",
-                              border:
-                                "1px solid #aaa",
-                              padding: "11px 16px",
-                              borderRadius: "9px",
-                              fontWeight: "bold",
-                              cursor: "pointer",
-                              opacity:
-                                updatingId ===
-                                application.id
-                                  ? 0.6
-                                  : 1,
-                            }}
-                          >
-                            🔄 Reset to Pending
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* APPLIED DATE */}
-
-                    <p
-                      style={{
-                        color: "#777",
-                        fontSize: "14px",
-                        marginTop: "18px",
-                      }}
-                    >
-                      Applied:{" "}
-                      {application.created_at
-                        ? new Date(
-                            application.created_at
-                          ).toLocaleDateString()
-                        : "Unknown"}
-                    </p>
-                  </div>
-                );
-              }
-            )
-          )}
-        </div>
-
-        {/* ACTIONS */}
-
-        <div
-          style={{
-            display: "flex",
-            gap: "12px",
-            flexWrap: "wrap",
-            marginTop: "25px",
-          }}
-        >
-          <button
-            onClick={() =>
-              router.push("/internships")
-            }
-            style={actionButton}
-          >
-            🚀 Post Internship
-          </button>
-
-          <button 
-  onClick={() =>
-    router.push(`/company/${company.id}`)
-  }
-  style={secondaryButton}
->
-  ⚙️ Edit Company Profile
-</button>
-        </div>
-      </div>
-
-      {/* ----------------------------------------
-          VIEW APPLICATION MODAL
-      ---------------------------------------- */}
-
-      {selectedApplication && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.55)",
-            zIndex: 9999,
-            padding: "20px",
-            overflowY: "auto",
-          }}
-          onClick={(event) => {
-            if (event.target === event.currentTarget) {
-              setSelectedApplication(null);
-            }
-          }}
-        >
-          <div
-            style={{
-              maxWidth: "750px",
-              margin: "30px auto",
-              background: "#fff",
-              borderRadius: "20px",
-              padding: "30px",
-              boxShadow:
-                "0 20px 60px rgba(0,0,0,.25)",
-            }}
-          >
-            {/* HEADER */}
-
-            <div
-              style={{
-                display: "flex",
-                justifyContent:
-                  "space-between",
-                alignItems: "flex-start",
-                gap: "15px",
-                marginBottom: "25px",
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    color: "#0057B8",
-                    fontSize: "14px",
-                    fontWeight: "bold",
-                    marginBottom: "6px",
-                  }}
-                >
-                  APPLICATION DETAILS
-                </div>
-
-                <h2
-                  style={{
-                    margin: 0,
-                    color: "#003b7a",
-                  }}
-                >
-                  👤{" "}
-                  {selectedApplication.full_name}
-                </h2>
-
-                <p
-                  style={{
-                    color: "#666",
-                    marginBottom: 0,
-                  }}
-                >
-                  💼{" "}
-                  {selectedApplication.job_title}
-                </p>
-              </div>
-
-              <button
-                onClick={() =>
-                  setSelectedApplication(null)
-                }
-                style={{
-                  background: "#f1f3f5",
-                  border: "none",
-                  width: "40px",
-                  height: "40px",
-                  borderRadius: "50%",
-                  fontSize: "20px",
-                  cursor: "pointer",
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* STATUS */}
-
-            <div
-              style={{
+                background: "#dcfce7",
+                color: "#166534",
                 padding: "15px",
-                background: "#f5f9ff",
-                borderRadius: "12px",
+                borderRadius: "10px",
                 marginBottom: "20px",
+                fontWeight: "600",
               }}
             >
-              <strong>Status:</strong>{" "}
-              {selectedApplication.status ||
-                "Pending"}
+              {message}
             </div>
+          )}
 
-            {/* PERSONAL INFORMATION */}
+          {/* ERROR MESSAGE */}
+
+          {error && (
+            <div
+              style={{
+                background: "#fee2e2",
+                color: "#991b1b",
+                padding: "15px",
+                borderRadius: "10px",
+                marginBottom: "20px",
+                fontWeight: "600",
+              }}
+            >
+              ❌ {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit}>
+
+            {/* FULL NAME */}
 
             <div
               style={{
-                border: "1px solid #e5eaf0",
-                borderRadius: "14px",
-                padding: "20px",
                 marginBottom: "18px",
               }}
             >
-              <h3
+              <label
+                htmlFor="full_name"
                 style={{
-                  color: "#0057B8",
-                  marginTop: 0,
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
                 }}
               >
-                👤 Personal Information
-              </h3>
+                Full Name
+              </label>
 
-              <p>
-                <strong>Full Name:</strong>{" "}
-                {selectedApplication.full_name ||
-                  "Not provided"}
-              </p>
-
-              <p>
-                <strong>Email:</strong>{" "}
-                {selectedApplication.email ||
-                  "Not provided"}
-              </p>
-
-              <p>
-                <strong>Phone:</strong>{" "}
-                {selectedApplication.phone ||
-                  "Not provided"}
-              </p>
-
-              <p>
-                <strong>Province:</strong>{" "}
-                {selectedApplication.province ||
-                  "Not provided"}
-              </p>
+              <input
+                id="full_name"
+                name="full_name"
+                type="text"
+                value={form.full_name}
+                onChange={handleChange}
+                placeholder="Enter your full name"
+                style={inputStyle}
+              />
             </div>
 
-            {/* EDUCATION */}
+            {/* EMAIL */}
 
             <div
               style={{
-                border: "1px solid #e5eaf0",
-                borderRadius: "14px",
-                padding: "20px",
                 marginBottom: "18px",
               }}
             >
-              <h3
+              <label
+                htmlFor="email"
                 style={{
-                  color: "#0057B8",
-                  marginTop: 0,
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
                 }}
               >
-                🎓 Education
-              </h3>
+                Email
+              </label>
 
-              <p>
-                <strong>
-                  Qualification:
-                </strong>{" "}
-                {selectedApplication.qualification ||
-                  "Not provided"}
-              </p>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                value={form.email}
+                onChange={handleChange}
+                placeholder="Enter your email"
+                style={inputStyle}
+              />
+            </div>
 
-              <p>
-                <strong>
-                  Field of Study:
-                </strong>{" "}
-                {selectedApplication.field_of_study ||
-                  "Not provided"}
-              </p>
+            {/* PHONE */}
 
-              <p>
-                <strong>Institution:</strong>{" "}
-                {selectedApplication.institution ||
-                  "Not provided"}
-              </p>
+            <div
+              style={{
+                marginBottom: "18px",
+              }}
+            >
+              <label
+                htmlFor="phone"
+                style={{
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
+                }}
+              >
+                Phone Number
+              </label>
+
+              <input
+                id="phone"
+                name="phone"
+                type="tel"
+                value={form.phone}
+                onChange={handleChange}
+                placeholder="Enter your phone number"
+                style={inputStyle}
+              />
+            </div>
+
+            {/* QUALIFICATION */}
+
+            <div
+              style={{
+                marginBottom: "18px",
+              }}
+            >
+              <label
+                htmlFor="qualification"
+                style={{
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
+                }}
+              >
+                Qualification
+              </label>
+
+              <input
+                id="qualification"
+                name="qualification"
+                type="text"
+                value={form.qualification}
+                onChange={handleChange}
+                placeholder="e.g. Diploma in Information Technology"
+                style={inputStyle}
+              />
+            </div>
+
+            {/* FIELD OF STUDY */}
+
+            <div
+              style={{
+                marginBottom: "18px",
+              }}
+            >
+              <label
+                htmlFor="field_of_study"
+                style={{
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
+                }}
+              >
+                Field of Study
+              </label>
+
+              <input
+                id="field_of_study"
+                name="field_of_study"
+                type="text"
+                value={form.field_of_study}
+                onChange={handleChange}
+                placeholder="e.g. Computer Science"
+                style={inputStyle}
+              />
+            </div>
+
+            {/* INSTITUTION */}
+
+            <div
+              style={{
+                marginBottom: "18px",
+              }}
+            >
+              <label
+                htmlFor="institution"
+                style={{
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
+                }}
+              >
+                Institution
+              </label>
+
+              <input
+                id="institution"
+                name="institution"
+                type="text"
+                value={form.institution}
+                onChange={handleChange}
+                placeholder="e.g. University of Johannesburg"
+                style={inputStyle}
+              />
+            </div>
+
+            {/* PROVINCE */}
+
+            <div
+              style={{
+                marginBottom: "18px",
+              }}
+            >
+              <label
+                htmlFor="province"
+                style={{
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
+                }}
+              >
+                Province
+              </label>
+
+              <select
+                id="province"
+                name="province"
+                value={form.province}
+                onChange={handleChange}
+                style={inputStyle}
+              >
+                <option value="">
+                  Select Province
+                </option>
+
+                <option value="Gauteng">
+                  Gauteng
+                </option>
+
+                <option value="KwaZulu-Natal">
+                  KwaZulu-Natal
+                </option>
+
+                <option value="Western Cape">
+                  Western Cape
+                </option>
+
+                <option value="Eastern Cape">
+                  Eastern Cape
+                </option>
+
+                <option value="Free State">
+                  Free State
+                </option>
+
+                <option value="Limpopo">
+                  Limpopo
+                </option>
+
+                <option value="Mpumalanga">
+                  Mpumalanga
+                </option>
+
+                <option value="North West">
+                  North West
+                </option>
+
+                <option value="Northern Cape">
+                  Northern Cape
+                </option>
+              </select>
             </div>
 
             {/* SKILLS */}
 
             <div
               style={{
-                border: "1px solid #e5eaf0",
-                borderRadius: "14px",
-                padding: "20px",
                 marginBottom: "18px",
               }}
             >
-              <h3
+              <label
+                htmlFor="skills"
                 style={{
-                  color: "#0057B8",
-                  marginTop: 0,
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
                 }}
               >
-                🛠️ Skills
-              </h3>
+                Skills
+              </label>
 
-              <p
+              <textarea
+                id="skills"
+                name="skills"
+                value={form.skills}
+                onChange={handleChange}
+                placeholder="e.g. JavaScript, HTML, CSS, Communication"
+                rows="4"
                 style={{
-                  lineHeight: "1.7",
-                  color: "#555",
+                  ...inputStyle,
+                  resize: "vertical",
                 }}
-              >
-                {selectedApplication.skills ||
-                  "No skills provided"}
-              </p>
+              />
             </div>
 
             {/* CAREER GOALS */}
 
             <div
               style={{
-                border: "1px solid #e5eaf0",
-                borderRadius: "14px",
-                padding: "20px",
-                marginBottom: "18px",
-              }}
-            >
-              <h3
-                style={{
-                  color: "#0057B8",
-                  marginTop: 0,
-                }}
-              >
-                🎯 Career Goals
-              </h3>
-
-              <p
-                style={{
-                  lineHeight: "1.7",
-                  color: "#555",
-                }}
-              >
-                {selectedApplication.career_goals ||
-                  "No career goals provided"}
-              </p>
-            </div>
-
-            {/* AI MATCH */}
-
-            <div
-              style={{
-                background:
-                  getMatchLabel(
-                    selectedApplication.ai_score
-                  ).background,
-                borderRadius: "14px",
-                padding: "20px",
-                marginBottom: "18px",
-              }}
-            >
-              <h3
-                style={{
-                  marginTop: 0,
-                  color: "#003b7a",
-                }}
-              >
-                🎯 AI Match Assessment
-              </h3>
-
-              <div
-                style={{
-                  fontSize: "36px",
-                  fontWeight: "bold",
-                  color:
-                    getMatchLabel(
-                      selectedApplication.ai_score
-                    ).color,
-                }}
-              >
-                {selectedApplication.ai_score}%
-              </div>
-
-              <p
-                style={{
-                  fontWeight: "bold",
-                  color:
-                    getMatchLabel(
-                      selectedApplication.ai_score
-                    ).color,
-                }}
-              >
-                {
-                  getMatchLabel(
-                    selectedApplication.ai_score
-                  ).label
-                }
-              </p>
-
-              {selectedApplication.match_reasons?.map(
-                (reason, index) => (
-                  <p
-                    key={index}
-                    style={{
-                      margin: "7px 0",
-                      color: "#555",
-                    }}
-                  >
-                    {reason}
-                  </p>
-                )
-              )}
-            </div>
-
-            {/* CV */}
-
-            <div
-              style={{
-                border: "1px solid #e5eaf0",
-                borderRadius: "14px",
-                padding: "20px",
                 marginBottom: "25px",
-                textAlign: "center",
               }}
             >
-              <div
+              <label
+                htmlFor="career_goals"
                 style={{
-                  fontSize: "45px",
-                  marginBottom: "10px",
+                  display: "block",
+                  marginBottom: "7px",
+                  fontWeight: "600",
                 }}
               >
-                📄
-              </div>
+                Career Goals
+              </label>
 
-              <h3
+              <textarea
+                id="career_goals"
+                name="career_goals"
+                value={form.career_goals}
+                onChange={handleChange}
+                placeholder="Tell companies about your career goals"
+                rows="5"
                 style={{
-                  color: "#003b7a",
-                  marginTop: 0,
+                  ...inputStyle,
+                  resize: "vertical",
                 }}
-              >
-                Applicant CV
-              </h3>
-
-              <button
-                onClick={() =>
-                  openCV(selectedApplication)
-                }
-                style={{
-                  background: "#0057B8",
-                  color: "#fff",
-                  border: "none",
-                  padding: "13px 22px",
-                  borderRadius: "10px",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                }}
-              >
-                📄 View CV
-              </button>
+              />
             </div>
-
-            {/* DECISION BUTTONS */}
+            
+                        {/* CV */}
 
             <div
               style={{
-                borderTop: "1px solid #eee",
-                paddingTop: "20px",
+                marginBottom: "25px",
+                padding: "20px",
+                background: "#f8fafc",
+                borderRadius: "12px",
               }}
             >
-              <h3
+              <label
+                htmlFor="cv"
                 style={{
-                  color: "#003b7a",
-                  marginTop: 0,
+                  display: "block",
+                  marginBottom: "8px",
+                  fontWeight: "700",
                 }}
               >
-                Recruitment Decision
-              </h3>
+                📄 CV
+              </label>
 
-              <div
+              {existingCvUrl && (
+                <p
+                  style={{
+                    color: "#166534",
+                    fontSize: "14px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  ✅ CV already uploaded. Select a
+                  new file below only if you want to
+                  replace it.
+                </p>
+              )}
+
+              <input
+                id="cv"
+                type="file"
+                accept=".pdf,.doc,.docx"
+                onChange={(e) => {
+                  setCvFile(
+                    e.target.files?.[0] || null
+                  );
+                }}
+              />
+
+              <p
                 style={{
-                  display: "flex",
-                  gap: "10px",
-                  flexWrap: "wrap",
+                  fontSize: "13px",
+                  color: "#666",
+                  marginTop: "8px",
                 }}
               >
-                {/* SHORTLIST */}
-
-                <button
-                  onClick={async () => {
-                    const success =
-                      await updateApplicationStatus(
-                        selectedApplication.id,
-                        "Shortlisted"
-                      );
-
-                    if (success) {
-                      setSelectedApplication(null);
-                    }
-                  }}
-                  disabled={
-                    updatingId ===
-                    selectedApplication.id
-                  }
-                  style={{
-                    background: "#16803c",
-                    color: "#fff",
-                    border: "none",
-                    padding: "13px 18px",
-                    borderRadius: "9px",
-                    fontWeight: "bold",
-                    cursor: "pointer",
-                    opacity:
-                      updatingId ===
-                      selectedApplication.id
-                        ? 0.6
-                        : 1,
-                  }}
-                >
-                  🟢 Shortlist
-                </button>
-
-                {/* REJECT */}
-
-                <button
-                  onClick={async () => {
-                    const success =
-                      await updateApplicationStatus(
-                        selectedApplication.id,
-                        "Rejected"
-                      );
-
-                    if (success) {
-                      setSelectedApplication(null);
-                    }
-                  }}
-                  disabled={
-                    updatingId ===
-                    selectedApplication.id
-                  }
-                  style={{
-                    background: "#c62828",
-                    color: "#fff",
-                    border: "none",
-                    padding: "13px 18px",
-                    borderRadius: "9px",
-                    fontWeight: "bold",
-                    cursor: "pointer",
-                    opacity:
-                      updatingId ===
-                      selectedApplication.id
-                        ? 0.6
-                        : 1,
-                  }}
-                >
-                  🔴 Reject
-                </button>
-
-                {/* RESET */}
-
-                {selectedApplication.status !==
-                  "Pending" && (
-                  <button
-                    onClick={async () => {
-                      const success =
-                        await updateApplicationStatus(
-                          selectedApplication.id,
-                          "Pending"
-                        );
-
-                      if (success) {
-                        setSelectedApplication(
-                          (current) => ({
-                            ...current,
-                            status: "Pending",
-                          })
-                        );
-                      }
-                    }}
-                    disabled={
-                      updatingId ===
-                      selectedApplication.id
-                    }
-                    style={{
-                      background: "#fff",
-                      color: "#555",
-                      border: "1px solid #aaa",
-                      padding: "13px 18px",
-                      borderRadius: "9px",
-                      fontWeight: "bold",
-                      cursor: "pointer",
-                      opacity:
-                        updatingId ===
-                        selectedApplication.id
-                          ? 0.6
-                          : 1,
-                    }}
-                  >
-                    🔄 Reset to Pending
-                  </button>
-                )}
-
-                {/* CLOSE */}
-
-                <button
-                  onClick={() =>
-                    setSelectedApplication(null)
-                  }
-                  style={{
-                    background: "#fff",
-                    color: "#555",
-                    border: "1px solid #aaa",
-                    padding: "13px 18px",
-                    borderRadius: "9px",
-                    fontWeight: "bold",
-                    cursor: "pointer",
-                  }}
-                >
-                  Close
-                </button>
-              </div>
+                Accepted: PDF, DOC, DOCX
+              </p>
             </div>
-          </div>
+
+            {/* QUALIFICATION DOCUMENT */}
+
+            <div
+              style={{
+                marginBottom: "30px",
+                padding: "20px",
+                background: "#f8fafc",
+                borderRadius: "12px",
+              }}
+            >
+              <label
+                htmlFor="qualification_document"
+                style={{
+                  display: "block",
+                  marginBottom: "8px",
+                  fontWeight: "700",
+                }}
+              >
+                🎓 Qualification Document
+              </label>
+
+              {existingQualificationUrl && (
+                <p
+                  style={{
+                    color: "#166534",
+                    fontSize: "14px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  ✅ Qualification document already
+                  uploaded. Select a new file only if
+                  you want to replace it.
+                </p>
+              )}
+
+              <input
+                id="qualification_document"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(e) => {
+                  setQualificationFile(
+                    e.target.files?.[0] || null
+                  );
+                }}
+              />
+
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: "#666",
+                  marginTop: "8px",
+                }}
+              >
+                Accepted: PDF, JPG, JPEG, PNG
+              </p>
+            </div>
+
+            {/* BUTTON */}
+
+            <button
+              type="submit"
+              disabled={saving}
+              style={{
+                width: "100%",
+                padding: "15px",
+                border: "none",
+                borderRadius: "10px",
+                background: saving
+                  ? "#94a3b8"
+                  : "#2563eb",
+                color: "#ffffff",
+                fontSize: "16px",
+                fontWeight: "700",
+                cursor: saving
+                  ? "not-allowed"
+                  : "pointer",
+              }}
+            >
+              {saving
+                ? "Updating Profile..."
+                : graduateId
+                ? "Update Graduate Profile"
+                : "Create Graduate Profile"}
+            </button>
+          </form>
         </div>
-      )}
-    </main>
+      </main>
+    </>
   );
 }
 
-const statCard = {
-  background: "#fff",
-  borderRadius: "16px",
-  padding: "25px",
-  textAlign: "center",
-  boxShadow:
-    "0 10px 25px rgba(0,0,0,.07)",
-};
+// =============================================================
+// INPUT STYLE
+// =============================================================
 
-const actionButton = {
-  background: "#0057B8",
-  color: "#fff",
-  border: "none",
-  padding: "14px 20px",
-  borderRadius: "10px",
-  fontWeight: "bold",
-  cursor: "pointer",
-};
-
-const secondaryButton = {
-  background: "#fff",
-  color: "#0057B8",
-  border: "2px solid #0057B8",
-  padding: "12px 20px",
-  borderRadius: "10px",
-  fontWeight: "bold",
-  cursor: "pointer",
+const inputStyle = {
+  width: "100%",
+  padding: "13px 14px",
+  border: "1px solid #d1d5db",
+  borderRadius: "8px",
+  fontSize: "15px",
+  boxSizing: "border-box",
+  background: "#ffffff",
 };
