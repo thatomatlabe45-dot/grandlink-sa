@@ -354,16 +354,65 @@ export default function CompanyDashboard() {
   // ----------------------------------------
 
   async function openCV(application) {
-    const cvPath =
+  try {
+    let cvPath =
       application.cv_url ||
       application.cv ||
       application.resume_url ||
-      application.document_url;
+      application.document_url ||
+      null;
+
+    // -------------------------------------------------
+    // IF APPLICATION DOES NOT HAVE CV,
+    // LOOK DIRECTLY IN GRADUATES TABLE
+    // -------------------------------------------------
+
+    if (!cvPath && application.graduate_id) {
+      console.log(
+        "Application has no CV. Looking up graduate:",
+        application.graduate_id
+      );
+
+      const { data: graduate, error: graduateError } =
+        await supabase
+          .from("graduates")
+          .select("id, cv_url")
+          .eq("id", application.graduate_id)
+          .maybeSingle();
+
+      if (graduateError) {
+        console.error(
+          "Graduate CV lookup error:",
+          graduateError
+        );
+
+        alert(
+          `Could not find the graduate CV: ${graduateError.message}`
+        );
+
+        return;
+      }
+
+      cvPath = graduate?.cv_url || null;
+    }
+
+    // -------------------------------------------------
+    // NO CV FOUND
+    // -------------------------------------------------
 
     if (!cvPath) {
-      alert("No CV has been uploaded for this application.");
+      alert(
+        "No CV has been uploaded for this graduate."
+      );
+
       return;
     }
+
+    console.log("CV path found:", cvPath);
+
+    // -------------------------------------------------
+    // IF IT IS ALREADY A FULL URL
+    // -------------------------------------------------
 
     if (
       cvPath.startsWith("http://") ||
@@ -373,17 +422,65 @@ export default function CompanyDashboard() {
       return;
     }
 
-    const { data, error } = await supabase.storage
+    // -------------------------------------------------
+    // CREATE SIGNED URL FROM DOCUMENTS BUCKET
+    // -------------------------------------------------
+
+    const {
+      data: signedData,
+      error: signedError,
+    } = await supabase.storage
       .from("documents")
       .createSignedUrl(cvPath, 60 * 10);
 
-    if (error || !data?.signedUrl) {
-      alert("Could not open the CV. Please try again.");
+    if (signedError) {
+      console.error(
+        "Signed URL error:",
+        signedError
+      );
+
+      alert(
+        `Could not open the CV: ${signedError.message}`
+      );
+
       return;
     }
 
-    window.open(data.signedUrl, "_blank");
+    if (!signedData?.signedUrl) {
+      console.error(
+        "No signed URL returned:",
+        signedData
+      );
+
+      alert(
+        "The CV was found, but a viewing link could not be created."
+      );
+
+      return;
+    }
+
+    console.log(
+      "Opening signed CV URL:",
+      signedData.signedUrl
+    );
+
+    window.open(
+      signedData.signedUrl,
+      "_blank"
+    );
+  } catch (error) {
+    console.error(
+      "Open CV error:",
+      error
+    );
+
+    alert(
+      `Could not open the CV: ${
+        error.message || "Unknown error"
+      }`
+    );
   }
+}
 
   // ----------------------------------------
   // VIEW APPLICATION
@@ -480,12 +577,12 @@ export default function CompanyDashboard() {
 
     if (graduateIds.length > 0) {
       const {
-        data: graduateData,
-        error: graduateError,
-      } = await supabase
-        .from("graduates")
-        .select("id, cv_url")
-        .in("id", graduateIds);
+  data: graduateData,
+  error: graduateError,
+} = await supabase
+  .from("graduates")
+  .select("id, user_id, cv_url")
+  .in("id", graduateIds);
 
       if (!graduateError && graduateData) {
         graduates = graduateData;
