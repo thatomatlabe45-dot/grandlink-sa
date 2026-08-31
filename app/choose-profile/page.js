@@ -8,7 +8,9 @@ export default function ChooseProfilePage() {
 
   async function handleLogout() {
     await supabase.auth.signOut();
+
     localStorage.removeItem("gradlink_profile");
+
     router.push("/login");
   }
 
@@ -17,17 +19,7 @@ export default function ChooseProfilePage() {
   // ----------------------------------------
 
   async function handleGraduate() {
-    localStorage.setItem("gradlink_profile", "graduate");
-    router.push("/graduate");
-  }
-
-  // ----------------------------------------
-  // COMPANY
-  // ----------------------------------------
-
-  async function handleCompany() {
     try {
-      // Get logged-in user
       const {
         data: { user },
         error: userError,
@@ -38,10 +30,7 @@ export default function ChooseProfilePage() {
         return;
       }
 
-      // Remember that this account is a company
-      localStorage.setItem("gradlink_profile", "company");
-
-      // Check whether the company already exists
+      // Check if this account already has a company
       const {
         data: company,
         error: companyError,
@@ -52,10 +41,83 @@ export default function ChooseProfilePage() {
         .maybeSingle();
 
       if (companyError) {
-        console.error(
-          "Company check error:",
-          companyError
-        );
+        console.error("Company check error:", companyError);
+
+        alert("Could not check your account. Please try again.");
+        return;
+      }
+
+      // Prevent a company account from being used
+      // as a graduate account
+      if (company) {
+        localStorage.setItem("gradlink_profile", "company");
+        router.push("/company-dashboard");
+        return;
+      }
+
+      // Check if graduate already exists
+      const {
+        data: graduate,
+        error: graduateError,
+      } = await supabase
+        .from("graduates")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (graduateError) {
+        console.error("Graduate check error:", graduateError);
+
+        alert("Could not check your graduate profile.");
+        return;
+      }
+
+      localStorage.setItem("gradlink_profile", "graduate");
+
+      // Existing graduate
+      if (graduate) {
+        router.push("/graduate");
+        return;
+      }
+
+      // New graduate
+      router.push("/graduate");
+
+    } catch (error) {
+      console.error("Graduate selection error:", error);
+
+      alert("Something went wrong. Please try again.");
+    }
+  }
+
+  // ----------------------------------------
+  // COMPANY
+  // ----------------------------------------
+
+  async function handleCompany() {
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        router.push("/login");
+        return;
+      }
+
+      // Check whether company already exists
+      const {
+        data: company,
+        error: companyError,
+      } = await supabase
+        .from("companies")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (companyError) {
+        console.error("Company check error:", companyError);
 
         alert(
           "Could not check your company profile. Please try again."
@@ -64,27 +126,21 @@ export default function ChooseProfilePage() {
         return;
       }
 
-      // ----------------------------------------
-      // EXISTING COMPANY
-      // ----------------------------------------
+      localStorage.setItem("gradlink_profile", "company");
 
+      // Existing company
       if (company) {
         router.push("/company-dashboard");
         return;
       }
 
-      // ----------------------------------------
-      // NEW COMPANY
-      // ----------------------------------------
-
+      // New company
       router.push("/company");
 
     } catch (error) {
       console.error("Company selection error:", error);
 
-      alert(
-        "Something went wrong. Please try again."
-      );
+      alert("Something went wrong. Please try again.");
     }
   }
 
@@ -97,8 +153,6 @@ export default function ChooseProfilePage() {
         padding: "30px 20px 60px",
       }}
     >
-      {/* Top Bar */}
-
       <div
         style={{
           maxWidth: "900px",
@@ -139,8 +193,6 @@ export default function ChooseProfilePage() {
         </button>
       </div>
 
-      {/* Main Content */}
-
       <div
         style={{
           width: "100%",
@@ -177,8 +229,6 @@ export default function ChooseProfilePage() {
             justifyContent: "center",
           }}
         >
-          {/* GRADUATE */}
-
           <div
             onClick={handleGraduate}
             style={{
@@ -213,8 +263,6 @@ export default function ChooseProfilePage() {
               and apply for internships.
             </p>
           </div>
-
-          {/* COMPANY */}
 
           <div
             onClick={handleCompany}
