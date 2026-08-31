@@ -21,128 +21,190 @@ export default function LoginPage() {
     setError("");
     setMessage("");
 
-    // ----------------------------------------
-    // LOGIN USER
-    // ----------------------------------------
+    try {
+      // ==========================================
+      // LOGIN USER
+      // ==========================================
 
-    const { data, error: loginError } =
-      await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error: loginError } =
+        await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
 
-    if (loginError) {
-      setError(loginError.message);
-      setLoading(false);
-      return;
-    }
+      if (loginError) {
+        setError(loginError.message);
+        setLoading(false);
+        return;
+      }
 
-    const user = data?.user;
+      const user = data?.user;
 
-    if (!user) {
-      setError("Could not find your account.");
-      setLoading(false);
-      return;
-    }
+      if (!user) {
+        setError("Could not find your account.");
+        setLoading(false);
+        return;
+      }
 
-    setMessage("Login successful! Redirecting...");
+      setMessage("Login successful! Redirecting...");
 
-    // ----------------------------------------
-    // IMPORTANT:
-    // REMOVE OLD BROWSER PROFILE TYPE
-    // ----------------------------------------
+      // ==========================================
+      // CLEAR OLD PROFILE TYPE
+      // ==========================================
 
-    localStorage.removeItem("gradlink_profile");
+      localStorage.removeItem("gradlink_profile");
 
-    // ----------------------------------------
-    // CHECK IF USER IS A COMPANY
-    // ----------------------------------------
+      const cleanEmail = user.email?.trim().toLowerCase();
 
-    const {
-      data: company,
-      error: companyError,
-    } = await supabase
-      .from("companies")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle();
+      // ==========================================
+      // STEP 1: CHECK COMPANY BY USER ID
+      // ==========================================
 
-    if (companyError) {
-      console.error(
-        "Company check error:",
-        companyError
-      );
+      const {
+        data: companyByUserId,
+        error: companyUserIdError,
+      } = await supabase
+        .from("companies")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (companyUserIdError) {
+        console.error(
+          "Company user_id check error:",
+          companyUserIdError
+        );
+      }
+
+      // ==========================================
+      // COMPANY FOUND BY USER ID
+      // ==========================================
+
+      if (companyByUserId) {
+        localStorage.setItem(
+          "gradlink_profile",
+          "company"
+        );
+
+        router.replace("/company-dashboard");
+        return;
+      }
+
+      // ==========================================
+      // STEP 2: CHECK COMPANY BY EMAIL
+      // This fixes companies created before
+      // user_id was correctly saved.
+      // ==========================================
+
+      let companyByEmail = null;
+
+      if (cleanEmail) {
+        const {
+          data,
+          error: companyEmailError,
+        } = await supabase
+          .from("companies")
+          .select("*")
+          .ilike("email", cleanEmail)
+          .maybeSingle();
+
+        if (companyEmailError) {
+          console.error(
+            "Company email check error:",
+            companyEmailError
+          );
+        } else {
+          companyByEmail = data;
+        }
+      }
+
+      // ==========================================
+      // COMPANY FOUND BY EMAIL
+      // LINK IT TO CURRENT USER
+      // ==========================================
+
+      if (companyByEmail) {
+        // Try to repair/save the correct user_id
+        const { error: updateCompanyError } =
+          await supabase
+            .from("companies")
+            .update({
+              user_id: user.id,
+            })
+            .eq("id", companyByEmail.id);
+
+        if (updateCompanyError) {
+          console.error(
+            "Could not update company user_id:",
+            updateCompanyError
+          );
+        }
+
+        localStorage.setItem(
+          "gradlink_profile",
+          "company"
+        );
+
+        router.replace("/company-dashboard");
+        return;
+      }
+
+      // ==========================================
+      // STEP 3: CHECK GRADUATE BY USER ID
+      // ==========================================
+
+      const {
+        data: graduate,
+        error: graduateError,
+      } = await supabase
+        .from("graduates")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (graduateError) {
+        console.error(
+          "Graduate check error:",
+          graduateError
+        );
+
+        setError(
+          "Could not check your account type. Please try again."
+        );
+
+        setLoading(false);
+        return;
+      }
+
+      // ==========================================
+      // GRADUATE FOUND
+      // ==========================================
+
+      if (graduate) {
+        localStorage.setItem(
+          "gradlink_profile",
+          "graduate"
+        );
+
+        router.replace("/graduate");
+        return;
+      }
+
+      // ==========================================
+      // NEW USER WITH NO PROFILE
+      // ==========================================
+
+      router.replace("/choose-profile");
+
+    } catch (err) {
+      console.error("Login error:", err);
 
       setError(
-        "Could not check your account type. Please try again."
+        "Something went wrong while logging in. Please try again."
       );
 
       setLoading(false);
-      return;
     }
-
-    // ----------------------------------------
-    // COMPANY FOUND
-    // ----------------------------------------
-
-    if (company) {
-      localStorage.setItem(
-        "gradlink_profile",
-        "company"
-      );
-
-      router.push("/company-dashboard");
-      return;
-    }
-
-    // ----------------------------------------
-    // CHECK IF USER IS A GRADUATE
-    // ----------------------------------------
-
-    const {
-      data: graduate,
-      error: graduateError,
-    } = await supabase
-      .from("graduates")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    if (graduateError) {
-      console.error(
-        "Graduate check error:",
-        graduateError
-      );
-
-      setError(
-        "Could not check your account type. Please try again."
-      );
-
-      setLoading(false);
-      return;
-    }
-
-    // ----------------------------------------
-    // GRADUATE FOUND
-    // ----------------------------------------
-
-    if (graduate) {
-      localStorage.setItem(
-        "gradlink_profile",
-        "graduate"
-      );
-
-      router.push("/graduate");
-      return;
-    }
-
-    // ----------------------------------------
-    // NEW USER
-    // ----------------------------------------
-    // User has no company or graduate
-    // profile yet.
-
-    router.push("/choose-profile");
   }
 
   return (
@@ -206,6 +268,7 @@ export default function LoginPage() {
             }
             placeholder="Enter your email"
             required
+            disabled={loading}
             style={{
               width: "100%",
               padding: "14px",
@@ -235,6 +298,7 @@ export default function LoginPage() {
             }
             placeholder="Enter your password"
             required
+            disabled={loading}
             style={{
               width: "100%",
               padding: "14px",
