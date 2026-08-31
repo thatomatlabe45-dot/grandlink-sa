@@ -22,17 +22,17 @@ export default function LoginPage() {
     setMessage("");
 
     // ----------------------------------------
-    // LOGIN
+    // LOGIN USER
     // ----------------------------------------
 
-    const { data, error } =
+    const { data, error: loginError } =
       await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-    if (error) {
-      setError(error.message);
+    if (loginError) {
+      setError(loginError.message);
       setLoading(false);
       return;
     }
@@ -48,72 +48,99 @@ export default function LoginPage() {
     setMessage("Login successful! Redirecting...");
 
     // ----------------------------------------
-    // CHECK SAVED PROFILE TYPE
+    // IMPORTANT:
+    // REMOVE OLD BROWSER PROFILE TYPE
     // ----------------------------------------
 
-    const savedProfile =
-      localStorage.getItem("gradlink_profile");
+    localStorage.removeItem("gradlink_profile");
 
     // ----------------------------------------
-    // GRADUATE
+    // CHECK IF USER IS A COMPANY
     // ----------------------------------------
 
-    if (savedProfile === "graduate") {
+    const {
+      data: company,
+      error: companyError,
+    } = await supabase
+      .from("companies")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (companyError) {
+      console.error(
+        "Company check error:",
+        companyError
+      );
+
+      setError(
+        "Could not check your account type. Please try again."
+      );
+
+      setLoading(false);
+      return;
+    }
+
+    // ----------------------------------------
+    // COMPANY FOUND
+    // ----------------------------------------
+
+    if (company) {
+      localStorage.setItem(
+        "gradlink_profile",
+        "company"
+      );
+
+      router.push("/company-dashboard");
+      return;
+    }
+
+    // ----------------------------------------
+    // CHECK IF USER IS A GRADUATE
+    // ----------------------------------------
+
+    const {
+      data: graduate,
+      error: graduateError,
+    } = await supabase
+      .from("graduates")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (graduateError) {
+      console.error(
+        "Graduate check error:",
+        graduateError
+      );
+
+      setError(
+        "Could not check your account type. Please try again."
+      );
+
+      setLoading(false);
+      return;
+    }
+
+    // ----------------------------------------
+    // GRADUATE FOUND
+    // ----------------------------------------
+
+    if (graduate) {
+      localStorage.setItem(
+        "gradlink_profile",
+        "graduate"
+      );
+
       router.push("/graduate");
       return;
     }
 
     // ----------------------------------------
-    // COMPANY
+    // NEW USER
     // ----------------------------------------
-
-    if (savedProfile === "company") {
-      // Check whether this user already has
-      // a company profile.
-
-      const {
-        data: company,
-        error: companyError,
-      } = await supabase
-        .from("companies")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (companyError) {
-        console.error(
-          "Company check error:",
-          companyError
-        );
-
-        setError(
-          "Could not check your company profile. Please try again."
-        );
-
-        setLoading(false);
-        return;
-      }
-
-      // ----------------------------------------
-      // EXISTING COMPANY
-      // ----------------------------------------
-
-      if (company) {
-        router.push("/company-dashboard");
-        return;
-      }
-
-      // ----------------------------------------
-      // NEW COMPANY
-      // ----------------------------------------
-
-      router.push("/company");
-      return;
-    }
-
-    // ----------------------------------------
-    // NO PROFILE TYPE SAVED
-    // ----------------------------------------
+    // User has no company or graduate
+    // profile yet.
 
     router.push("/choose-profile");
   }
