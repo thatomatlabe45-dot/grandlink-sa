@@ -16,10 +16,7 @@ const supabase = createClient(
 function getQualificationLevel(qualification = "") {
   const text = qualification.toLowerCase();
 
-  if (
-    text.includes("phd") ||
-    text.includes("doctorate")
-  ) {
+  if (text.includes("phd") || text.includes("doctorate")) {
     return 6;
   }
 
@@ -53,9 +50,7 @@ function getQualificationLevel(qualification = "") {
     return 3;
   }
 
-  if (
-    text.includes("certificate")
-  ) {
+  if (text.includes("certificate")) {
     return 2;
   }
 
@@ -70,7 +65,7 @@ function getQualificationLevel(qualification = "") {
 }
 
 // ===========================================================
-// FORMAT SKILLS
+// SPLIT SKILLS
 // ===========================================================
 
 function splitSkills(skills = "") {
@@ -137,10 +132,6 @@ function skillMatches(
 
 // ===========================================================
 // AI MATCH CALCULATION
-//
-// Qualification = 35
-// Field          = 35
-// Skills         = 30
 // ===========================================================
 
 function calculateMatch(
@@ -300,7 +291,7 @@ function calculateMatch(
     applicantSkills.length === 0
   ) {
     improvements.push(
-      "No skills were provided on the application."
+      "No skills were provided by the applicant."
     );
 
     reasons.push(
@@ -311,9 +302,7 @@ function calculateMatch(
       (requiredSkill) => {
         const matched =
           applicantSkills.some(
-            (
-              applicantSkill
-            ) =>
+            (applicantSkill) =>
               skillMatches(
                 applicantSkill,
                 requiredSkill
@@ -373,10 +362,6 @@ function calculateMatch(
   // =========================================================
 
   score = Math.round(score);
-
-  // =========================================================
-  // GENERAL AI EXPLANATION
-  // =========================================================
 
   let summary = "";
 
@@ -577,7 +562,7 @@ export default function CompanyDashboard() {
         );
 
       // =====================================================
-      // LOAD APPLICATIONS
+      // NO INTERNSHIPS
       // =====================================================
 
       if (
@@ -590,6 +575,10 @@ export default function CompanyDashboard() {
 
         return;
       }
+
+      // =====================================================
+      // LOAD APPLICATIONS
+      // =====================================================
 
       const {
         data: applicationData,
@@ -620,11 +609,157 @@ export default function CompanyDashboard() {
         [];
 
       // =====================================================
+      // GET GRADUATE IDS
+      // =====================================================
+
+      const graduateIds =
+        loadedApplications
+          .map(
+            (application) =>
+              application.graduate_id
+          )
+          .filter(Boolean);
+
+      let graduatesMap = {};
+
+      // =====================================================
+      // LOAD LATEST GRADUATE PROFILES
+      // =====================================================
+
+      if (
+        graduateIds.length > 0
+      ) {
+        const {
+          data: graduatesData,
+          error: graduatesError,
+        } = await supabase
+          .from("graduates")
+          .select(
+            `
+            id,
+            user_id,
+            full_name,
+            email,
+            phone,
+            qualification,
+            field_of_study,
+            institution,
+            province,
+            career_goals,
+            skills,
+            cv_url,
+            qualification_url
+            `
+          )
+          .in(
+            "id",
+            graduateIds
+          );
+
+        if (
+          graduatesError
+        ) {
+          console.error(
+            "Graduate profiles error:",
+            graduatesError
+          );
+        } else {
+          graduatesMap =
+            (graduatesData || []).reduce(
+              (
+                map,
+                graduate
+              ) => {
+                map[
+                  graduate.id
+                ] = graduate;
+
+                return map;
+              },
+              {}
+            );
+        }
+      }
+
+      // =====================================================
+      // MERGE LATEST GRADUATE PROFILE WITH APPLICATION
+      // IMPORTANT:
+      // Graduate profile information takes priority
+      // =====================================================
+
+      const updatedApplications =
+        loadedApplications.map(
+          (application) => {
+            const graduate =
+              graduatesMap[
+                application.graduate_id
+              ];
+
+            if (!graduate) {
+              return application;
+            }
+
+            return {
+              ...application,
+
+              full_name:
+                graduate.full_name ||
+                application.full_name,
+
+              email:
+                graduate.email ||
+                application.email,
+
+              phone:
+                graduate.phone ||
+                application.phone,
+
+              qualification:
+                graduate.qualification ||
+                application.qualification,
+
+              field_of_study:
+                graduate.field_of_study ||
+                application.field_of_study,
+
+              institution:
+                graduate.institution ||
+                application.institution,
+
+              province:
+                graduate.province ||
+                application.province,
+
+              career_goals:
+                graduate.career_goals ||
+                application.career_goals,
+
+              // IMPORTANT:
+              // THIS USES THE LATEST SKILLS
+              skills:
+                graduate.skills ||
+                application.skills,
+
+              cv_url:
+                graduate.cv_url ||
+                application.cv_url,
+
+              qualification_url:
+                graduate.qualification_url ||
+                application.qualification_url,
+
+              graduate_profile:
+                graduate,
+            };
+          }
+        );
+
+      // =====================================================
       // ADD INTERNSHIP + AI ANALYSIS
       // =====================================================
 
       const analysedApplications =
-        loadedApplications.map(
+        updatedApplications.map(
           (application) => {
             const internship =
               loadedInternships.find(
@@ -690,7 +825,7 @@ export default function CompanyDashboard() {
   }
 
   // =========================================================
-  // UPDATE STATUS
+  // UPDATE APPLICATION STATUS
   // =========================================================
 
   async function updateApplicationStatus(
@@ -765,14 +900,11 @@ export default function CompanyDashboard() {
 
       let cvPath =
         application.cv_url ||
+        application.graduate_profile?.cv_url ||
         application.cv ||
         application.resume_url ||
         application.document_url ||
         null;
-
-      // =====================================================
-      // GET CV FROM GRADUATE PROFILE
-      // =====================================================
 
       if (
         !cvPath &&
@@ -854,12 +986,25 @@ export default function CompanyDashboard() {
         throw signedError;
       }
 
+      if (
+        !signedData?.signedUrl
+      ) {
+        throw new Error(
+          "Could not create a secure CV link."
+        );
+      }
+
       window.open(
         signedData.signedUrl,
         "_blank"
       );
 
     } catch (err) {
+      console.error(
+        "Review CV error:",
+        err
+      );
+
       setError(
         err.message ||
           "Could not open the CV."
@@ -914,8 +1059,7 @@ export default function CompanyDashboard() {
           </h2>
 
           <p>
-            Preparing your recruitment insights
-            🤖
+            Preparing your recruitment insights 🤖
           </p>
         </div>
       </main>
@@ -931,13 +1075,6 @@ export default function CompanyDashboard() {
       (application) =>
         application.status ===
         "Shortlisted"
-    ).length;
-
-  const underReview =
-    applications.filter(
-      (application) =>
-        application.status ===
-        "Review"
     ).length;
 
   const strongMatches =
@@ -1069,13 +1206,17 @@ export default function CompanyDashboard() {
               </button>
 
               <button
-  onClick={() =>
-    router.push("/internships")
-  }
-  style={headerButtonStyle}
->
-  ➕ Post Internship
-</button>
+                onClick={() =>
+                  router.push(
+                    "/internships"
+                  )
+                }
+                style={
+                  headerButtonStyle
+                }
+              >
+                ➕ Post Internship
+              </button>
             </div>
           </div>
         </div>
@@ -1167,13 +1308,15 @@ export default function CompanyDashboard() {
           {internships.length ===
           0 ? (
             <EmptyState
-  icon="💼"
-  text="You haven't posted an internship yet."
-  buttonText="➕ Post Internship"
-  onClick={() =>
-    router.push("/internships")
-  }
-/>
+              icon="💼"
+              text="You haven't posted an internship yet."
+              buttonText="➕ Post Internship"
+              onClick={() =>
+                router.push(
+                  "/internships"
+                )
+              }
+            />
           ) : (
             <div
               style={{
@@ -1186,14 +1329,10 @@ export default function CompanyDashboard() {
               }}
             >
               {internships.map(
-                (
-                  internship
-                ) => {
+                (internship) => {
                   const applicantCount =
                     applications.filter(
-                      (
-                        application
-                      ) =>
+                      (application) =>
                         application.internship_id ===
                         internship.id
                     ).length;
@@ -1318,7 +1457,7 @@ export default function CompanyDashboard() {
                     0,
                 }}
               >
-                Applicants are ranked according to qualification, field of study and skills.
+                Applicant information automatically uses the latest graduate profile details and skills.
               </p>
             </div>
 
@@ -1389,8 +1528,6 @@ export default function CompanyDashboard() {
                           "0 8px 25px rgba(15,23,42,.05)",
                       }}
                     >
-                      {/* TOP */}
-
                       <div
                         style={{
                           padding:
@@ -1449,11 +1586,7 @@ export default function CompanyDashboard() {
                                   "20px",
                               }}
                             >
-                              #
-                              {
-                                index +
-                                1
-                              }
+                              #{index + 1}
                             </div>
 
                             <div>
@@ -1507,8 +1640,6 @@ export default function CompanyDashboard() {
                             </div>
                           </div>
 
-                          {/* SCORE */}
-
                           <div
                             style={{
                               minWidth:
@@ -1535,10 +1666,7 @@ export default function CompanyDashboard() {
                                     scoreColor,
                                 }}
                               >
-                                {
-                                  score
-                                }
-                                %
+                                {score}%
                               </strong>
                             </div>
 
@@ -1564,8 +1692,6 @@ export default function CompanyDashboard() {
                                     scoreColor,
                                   borderRadius:
                                     "20px",
-                                  transition:
-                                    "width .5s ease",
                                 }}
                               />
                             </div>
@@ -1593,16 +1719,12 @@ export default function CompanyDashboard() {
                         </div>
                       </div>
 
-                      {/* BODY */}
-
                       <div
                         style={{
                           padding:
                             "22px",
                         }}
                       >
-                        {/* APPLICANT INFO */}
-
                         <div
                           style={{
                             display:
@@ -1649,8 +1771,6 @@ export default function CompanyDashboard() {
                           />
                         </div>
 
-                        {/* AI SUMMARY */}
-
                         <div
                           style={{
                             background:
@@ -1692,8 +1812,6 @@ export default function CompanyDashboard() {
                           </p>
                         </div>
 
-                        {/* STRENGTHS */}
-
                         {analysis.strengths
                           .length >
                           0 && (
@@ -1706,8 +1824,6 @@ export default function CompanyDashboard() {
                           />
                         )}
 
-                        {/* LOW SCORE REASONS */}
-
                         {analysis.improvements
                           .length >
                           0 && (
@@ -1719,8 +1835,6 @@ export default function CompanyDashboard() {
                             type="warning"
                           />
                         )}
-
-                        {/* SKILLS */}
 
                         {(analysis
                           .matchedSkills
@@ -1759,8 +1873,6 @@ export default function CompanyDashboard() {
                             />
                           </div>
                         )}
-
-                        {/* ACTIONS */}
 
                         <div
                           style={{
