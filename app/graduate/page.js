@@ -43,7 +43,7 @@ export default function GraduatePage() {
   const [error, setError] = useState("");
 
   // =========================================================
-  // LOAD GRADUATE PROFILE
+  // LOAD PROFILE
   // =========================================================
 
   useEffect(() => {
@@ -70,11 +70,12 @@ export default function GraduatePage() {
       }
 
       // -------------------------------------------------------
-      // Find graduate profile by logged-in user's ID
+      // Get ALL graduate records for this user.
+      // We use the newest ID if more than one exists.
       // -------------------------------------------------------
 
       const {
-        data: graduate,
+        data: graduates,
         error: graduateError,
       } = await supabase
         .from("graduates")
@@ -82,43 +83,64 @@ export default function GraduatePage() {
           "id, user_id, full_name, email, phone, qualification, field_of_study, institution, province, career_goals, skills, cv_url, qualification_url"
         )
         .eq("user_id", user.id)
-        .maybeSingle();
+        .order("id", { ascending: false });
 
       if (graduateError) {
-        console.error("Graduate lookup error:", graduateError);
+        console.error(
+          "Graduate lookup error:",
+          graduateError
+        );
+
         throw graduateError;
       }
 
-      // -------------------------------------------------------
-      // Existing profile
-      // -------------------------------------------------------
+      const graduate =
+        graduates && graduates.length > 0
+          ? graduates[0]
+          : null;
 
       if (graduate) {
         setGraduateId(graduate.id);
 
         setForm({
           full_name: graduate.full_name || "",
-          email: graduate.email || user.email || "",
+          email:
+            graduate.email ||
+            user.email ||
+            "",
           phone: graduate.phone || "",
-          qualification: graduate.qualification || "",
-          field_of_study: graduate.field_of_study || "",
-          institution: graduate.institution || "",
-          province: graduate.province || "",
-          career_goals: graduate.career_goals || "",
-          skills: graduate.skills || "",
+          qualification:
+            graduate.qualification || "",
+          field_of_study:
+            graduate.field_of_study || "",
+          institution:
+            graduate.institution || "",
+          province:
+            graduate.province || "",
+          career_goals:
+            graduate.career_goals || "",
+          skills:
+            graduate.skills || "",
         });
 
-        setExistingCvUrl(graduate.cv_url || "");
+        setExistingCvUrl(
+          graduate.cv_url || ""
+        );
+
         setExistingQualificationUrl(
           graduate.qualification_url || ""
         );
 
-        console.log("Graduate profile loaded:", graduate);
-      } else {
-        // -----------------------------------------------------
-        // No profile yet
-        // -----------------------------------------------------
+        console.log(
+          "Current graduate profile:",
+          graduate
+        );
 
+        console.log(
+          "Current skills:",
+          graduate.skills
+        );
+      } else {
         setGraduateId(null);
 
         setForm({
@@ -129,10 +151,15 @@ export default function GraduatePage() {
         setExistingCvUrl("");
         setExistingQualificationUrl("");
 
-        console.log("No graduate profile found.");
+        console.log(
+          "No graduate profile found."
+        );
       }
     } catch (err) {
-      console.error("Load graduate profile error:", err);
+      console.error(
+        "Load graduate profile error:",
+        err
+      );
 
       setError(
         err.message ||
@@ -144,7 +171,7 @@ export default function GraduatePage() {
   }
 
   // =========================================================
-  // HANDLE INPUT CHANGE
+  // HANDLE INPUT
   // =========================================================
 
   function handleChange(e) {
@@ -177,13 +204,21 @@ export default function GraduatePage() {
       error: uploadError,
     } = await supabase.storage
       .from("documents")
-      .upload(filePath, file, {
-        cacheControl: "3600",
-        upsert: false,
-      });
+      .upload(
+        filePath,
+        file,
+        {
+          cacheControl: "3600",
+          upsert: false,
+        }
+      );
 
     if (uploadError) {
-      console.error("File upload error:", uploadError);
+      console.error(
+        "File upload error:",
+        uploadError
+      );
+
       throw uploadError;
     }
 
@@ -202,10 +237,6 @@ export default function GraduatePage() {
     setSaving(true);
 
     try {
-      // -------------------------------------------------------
-      // Get logged-in user
-      // -------------------------------------------------------
-
       const {
         data: { user },
         error: authError,
@@ -222,7 +253,7 @@ export default function GraduatePage() {
       }
 
       // -------------------------------------------------------
-      // Validation
+      // VALIDATION
       // -------------------------------------------------------
 
       if (!form.full_name.trim()) {
@@ -256,19 +287,21 @@ export default function GraduatePage() {
       }
 
       // -------------------------------------------------------
-      // Find existing graduate
+      // FIND CURRENT PROFILE
       // -------------------------------------------------------
 
       const {
-        data: existingGraduate,
+        data: existingGraduates,
         error: findError,
       } = await supabase
         .from("graduates")
         .select(
-          "id, cv_url, qualification_url"
+          "id, user_id, cv_url, qualification_url"
         )
         .eq("user_id", user.id)
-        .maybeSingle();
+        .order("id", {
+          ascending: false,
+        });
 
       if (findError) {
         console.error(
@@ -279,8 +312,14 @@ export default function GraduatePage() {
         throw findError;
       }
 
+      const existingGraduate =
+        existingGraduates &&
+        existingGraduates.length > 0
+          ? existingGraduates[0]
+          : null;
+
       // -------------------------------------------------------
-      // Keep existing CV unless a new one is selected
+      // CV
       // -------------------------------------------------------
 
       let cvUrl =
@@ -296,7 +335,7 @@ export default function GraduatePage() {
       }
 
       // -------------------------------------------------------
-      // Keep existing qualification document unless replaced
+      // QUALIFICATION DOCUMENT
       // -------------------------------------------------------
 
       let qualificationUrl =
@@ -313,10 +352,9 @@ export default function GraduatePage() {
       }
 
       // -------------------------------------------------------
-      // IMPORTANT:
-      // Create the exact data that must be saved.
-      //
-      // Skills are explicitly included here.
+      // IMPORTANT
+      // EVERYTHING IN THE FORM IS SAVED HERE.
+      // INCLUDING ALL SKILLS.
       // -------------------------------------------------------
 
       const graduateData = {
@@ -357,8 +395,30 @@ export default function GraduatePage() {
       };
 
       console.log(
-        "Saving graduate data:",
+        "================================"
+      );
+
+      console.log(
+        "SAVING GRADUATE PROFILE"
+      );
+
+      console.log(
+        "User ID:",
+        user.id
+      );
+
+      console.log(
+        "Skills being saved:",
+        graduateData.skills
+      );
+
+      console.log(
+        "Full data:",
         graduateData
+      );
+
+      console.log(
+        "================================"
       );
 
       // =====================================================
@@ -367,18 +427,23 @@ export default function GraduatePage() {
 
       if (existingGraduate) {
         console.log(
-          "Updating graduate ID:",
-          existingGraduate.id
+          "Updating graduate profile..."
         );
 
+        // IMPORTANT:
+        // Update by USER ID, not only graduate ID.
+        // This prevents an old graduate record from
+        // remaining with the old information.
+
         const {
+          data: updatedRows,
           error: updateError,
         } = await supabase
           .from("graduates")
           .update(graduateData)
-          .eq(
-            "id",
-            existingGraduate.id
+          .eq("user_id", user.id)
+          .select(
+            "id, user_id, full_name, email, phone, qualification, field_of_study, institution, province, career_goals, skills, cv_url, qualification_url"
           );
 
         if (updateError) {
@@ -390,46 +455,42 @@ export default function GraduatePage() {
           throw updateError;
         }
 
-        setGraduateId(
-          existingGraduate.id
-        );
-
         // -----------------------------------------------------
-        // IMPORTANT:
-        // Read the profile again directly from Supabase.
-        // This confirms that the new skills really saved.
+        // Make sure Supabase actually updated a row.
         // -----------------------------------------------------
 
-        const {
-          data: savedGraduate,
-          error: verifyError,
-        } = await supabase
-          .from("graduates")
-          .select(
-            "id, user_id, full_name, email, phone, qualification, field_of_study, institution, province, career_goals, skills, cv_url, qualification_url"
-          )
-          .eq(
-            "id",
-            existingGraduate.id
-          )
-          .single();
-
-        if (verifyError) {
-          console.error(
-            "Verification error:",
-            verifyError
+        if (
+          !updatedRows ||
+          updatedRows.length === 0
+        ) {
+          throw new Error(
+            "Supabase did not update your graduate profile. Please check your Supabase Row Level Security policies."
           );
-
-          throw verifyError;
         }
 
         console.log(
-          "Profile saved in Supabase:",
-          savedGraduate
+          "Updated graduate rows:",
+          updatedRows
         );
 
         // -----------------------------------------------------
-        // Put the SAVED database values back into the form.
+        // Find the updated profile.
+        // -----------------------------------------------------
+
+        const savedGraduate =
+          updatedRows[0];
+
+        console.log(
+          "Saved skills:",
+          savedGraduate.skills
+        );
+
+        setGraduateId(
+          savedGraduate.id
+        );
+
+        // -----------------------------------------------------
+        // Put the EXACT DATABASE VALUES back into the form.
         // -----------------------------------------------------
 
         setForm({
@@ -445,19 +506,24 @@ export default function GraduatePage() {
             savedGraduate.phone || "",
 
           qualification:
-            savedGraduate.qualification || "",
+            savedGraduate.qualification ||
+            "",
 
           field_of_study:
-            savedGraduate.field_of_study || "",
+            savedGraduate.field_of_study ||
+            "",
 
           institution:
-            savedGraduate.institution || "",
+            savedGraduate.institution ||
+            "",
 
           province:
-            savedGraduate.province || "",
+            savedGraduate.province ||
+            "",
 
           career_goals:
-            savedGraduate.career_goals || "",
+            savedGraduate.career_goals ||
+            "",
 
           skills:
             savedGraduate.skills || "",
@@ -472,6 +538,10 @@ export default function GraduatePage() {
             ""
         );
 
+        // -----------------------------------------------------
+        // SUCCESS
+        // -----------------------------------------------------
+
         setMessage(
           "✅ Your graduate profile has been updated successfully!"
         );
@@ -483,19 +553,18 @@ export default function GraduatePage() {
 
       else {
         console.log(
-          "Creating new graduate profile..."
+          "Creating graduate profile..."
         );
 
         const {
-          data: newGraduate,
+          data: newRows,
           error: insertError,
         } = await supabase
           .from("graduates")
           .insert(graduateData)
           .select(
             "id, user_id, full_name, email, phone, qualification, field_of_study, institution, province, career_goals, skills, cv_url, qualification_url"
-          )
-          .single();
+          );
 
         if (insertError) {
           console.error(
@@ -506,9 +575,26 @@ export default function GraduatePage() {
           throw insertError;
         }
 
+        if (
+          !newRows ||
+          newRows.length === 0
+        ) {
+          throw new Error(
+            "Graduate profile was not created."
+          );
+        }
+
+        const newGraduate =
+          newRows[0];
+
         console.log(
-          "New graduate created:",
+          "New graduate:",
           newGraduate
+        );
+
+        console.log(
+          "New skills:",
+          newGraduate.skills
         );
 
         setGraduateId(
@@ -528,19 +614,24 @@ export default function GraduatePage() {
             newGraduate.phone || "",
 
           qualification:
-            newGraduate.qualification || "",
+            newGraduate.qualification ||
+            "",
 
           field_of_study:
-            newGraduate.field_of_study || "",
+            newGraduate.field_of_study ||
+            "",
 
           institution:
-            newGraduate.institution || "",
+            newGraduate.institution ||
+            "",
 
           province:
-            newGraduate.province || "",
+            newGraduate.province ||
+            "",
 
           career_goals:
-            newGraduate.career_goals || "",
+            newGraduate.career_goals ||
+            "",
 
           skills:
             newGraduate.skills || "",
@@ -560,9 +651,9 @@ export default function GraduatePage() {
         );
       }
 
-      // -------------------------------------------------------
-      // Clear selected files
-      // -------------------------------------------------------
+      // =====================================================
+      // CLEAR FILE INPUTS
+      // =====================================================
 
       setCvFile(null);
       setQualificationFile(null);
@@ -582,6 +673,16 @@ export default function GraduatePage() {
       if (qualificationInput) {
         qualificationInput.value = "";
       }
+
+      // -------------------------------------------------------
+      // Reload profile once more from Supabase.
+      // This ensures the page is showing the database value.
+      // -------------------------------------------------------
+
+      setTimeout(() => {
+        loadGraduateProfile();
+      }, 300);
+
     } catch (err) {
       console.error(
         "Save graduate profile error:",
@@ -598,7 +699,7 @@ export default function GraduatePage() {
   }
 
   // =========================================================
-  // LOADING SCREEN
+  // LOADING
   // =========================================================
 
   if (loading) {
@@ -665,8 +766,6 @@ export default function GraduatePage() {
               "1px solid #e5e7eb",
           }}
         >
-          {/* HEADER */}
-
           <div
             style={{
               marginBottom: "30px",
@@ -708,8 +807,6 @@ export default function GraduatePage() {
             </p>
           </div>
 
-          {/* SUCCESS MESSAGE */}
-
           {message && (
             <div
               style={{
@@ -726,8 +823,6 @@ export default function GraduatePage() {
               {message}
             </div>
           )}
-
-          {/* ERROR MESSAGE */}
 
           {error && (
             <div
@@ -747,8 +842,6 @@ export default function GraduatePage() {
           )}
 
           <form onSubmit={handleSubmit}>
-            {/* FULL NAME */}
-
             <FormField
               label="Full Name"
               name="full_name"
@@ -757,8 +850,6 @@ export default function GraduatePage() {
               placeholder="Enter your full name"
               type="text"
             />
-
-            {/* EMAIL */}
 
             <FormField
               label="Email"
@@ -769,8 +860,6 @@ export default function GraduatePage() {
               type="email"
             />
 
-            {/* PHONE */}
-
             <FormField
               label="Phone Number"
               name="phone"
@@ -779,8 +868,6 @@ export default function GraduatePage() {
               placeholder="Enter your phone number"
               type="tel"
             />
-
-            {/* QUALIFICATION */}
 
             <FormField
               label="Qualification"
@@ -791,8 +878,6 @@ export default function GraduatePage() {
               type="text"
             />
 
-            {/* FIELD */}
-
             <FormField
               label="Field of Study"
               name="field_of_study"
@@ -801,8 +886,6 @@ export default function GraduatePage() {
               placeholder="e.g. Computer Science"
               type="text"
             />
-
-            {/* INSTITUTION */}
 
             <FormField
               label="Institution"
@@ -946,9 +1029,7 @@ export default function GraduatePage() {
 
             {/* CV */}
 
-            <div
-              style={documentBoxStyle}
-            >
+            <div style={documentBoxStyle}>
               <label
                 htmlFor="cv"
                 style={{
@@ -1046,7 +1127,7 @@ export default function GraduatePage() {
               </p>
             </div>
 
-            {/* SAVE BUTTON */}
+            {/* SAVE */}
 
             <button
               type="submit"
