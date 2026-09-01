@@ -1069,17 +1069,13 @@ export default function CompanyDashboard() {
               </button>
 
               <button
-                onClick={() =>
-                  router.push(
-                    "/internship"
-                  )
-                }
-                style={
-                  headerButtonStyle
-                }
-              >
-                ➕ Post Internship
-              </button>
+  onClick={() =>
+    router.push("/internships")
+  }
+  style={headerButtonStyle}
+>
+  ➕ Post Internship
+</button>
             </div>
           </div>
         </div>
@@ -1171,15 +1167,13 @@ export default function CompanyDashboard() {
           {internships.length ===
           0 ? (
             <EmptyState
-              icon="💼"
-              text="You haven't posted an internship yet."
-              buttonText="➕ Post Internship"
-              onClick={() =>
-                router.push(
-                  "/internship"
-                )
-              }
-            />
+  icon="💼"
+  text="You haven't posted an internship yet."
+  buttonText="➕ Post Internship"
+  onClick={() =>
+    router.push("/internships")
+  }
+/>
           ) : (
             <div
               style={{
