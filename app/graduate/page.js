@@ -42,7 +42,7 @@ export default function GraduatePage() {
   const [error, setError] = useState("");
 
   // =========================================================
-  // LOAD LOGGED-IN USER + EXISTING GRADUATE
+  // LOAD GRADUATE PROFILE
   // =========================================================
   useEffect(() => {
     loadGraduateProfile();
@@ -58,34 +58,32 @@ export default function GraduatePage() {
         error: authError,
       } = await supabase.auth.getUser();
 
-      if (authError) {
-        console.error(authError);
+      if (authError || !user) {
         router.push("/login");
         return;
       }
 
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-
-      const { data: graduates, error: graduateError } = await supabase
-        .from("graduates")
-        .select(
-          "id, user_id, full_name, email, phone, qualification, field_of_study, institution, province, career_goals, skills, cv_url, qualification_url"
-        )
-        .eq("user_id", user.id)
-        .order("id", { ascending: true })
-        .limit(1);
+      const { data: graduates, error: graduateError } =
+        await supabase
+          .from("graduates")
+          .select(
+            "id, user_id, full_name, email, phone, qualification, field_of_study, institution, province, career_goals, skills, cv_url, qualification_url"
+          )
+          .eq("user_id", user.id)
+          .order("id", { ascending: true })
+          .limit(1);
 
       if (graduateError) {
-        console.error("Graduate lookup error:", graduateError);
-        setError(graduateError.message);
-        return;
+        console.error(
+          "Graduate lookup error:",
+          graduateError
+        );
+
+        throw graduateError;
       }
 
       // =====================================================
-      // EXISTING GRADUATE FOUND
+      // EXISTING PROFILE
       // =====================================================
       if (graduates && graduates.length > 0) {
         const graduate = graduates[0];
@@ -97,42 +95,64 @@ export default function GraduatePage() {
           email: graduate.email || user.email || "",
           phone: graduate.phone || "",
           qualification: graduate.qualification || "",
-          field_of_study: graduate.field_of_study || "",
+          field_of_study:
+            graduate.field_of_study || "",
           institution: graduate.institution || "",
           province: graduate.province || "",
-          career_goals: graduate.career_goals || "",
+          career_goals:
+            graduate.career_goals || "",
           skills: graduate.skills || "",
         });
 
-        setExistingCvUrl(graduate.cv_url || "");
-        setExistingQualificationUrl(graduate.qualification_url || "");
+        setExistingCvUrl(
+          graduate.cv_url || ""
+        );
 
-        console.log("Existing graduate loaded:", graduate.id);
-      } else {
-        // ===================================================
-        // NO GRADUATE PROFILE YET
-        // ===================================================
+        setExistingQualificationUrl(
+          graduate.qualification_url || ""
+        );
+
+        console.log(
+          "Graduate profile loaded:",
+          graduate.id
+        );
+      }
+
+      // =====================================================
+      // NO PROFILE YET
+      // =====================================================
+      else {
+        setGraduateId(null);
+
         setForm({
           ...emptyForm,
           email: user.email || "",
         });
 
-        setGraduateId(null);
         setExistingCvUrl("");
         setExistingQualificationUrl("");
 
-        console.log("No graduate profile found.");
+        console.log(
+          "No graduate profile found."
+        );
       }
     } catch (err) {
-      console.error("Load profile error:", err);
-      setError(err.message || "Could not load graduate profile.");
+      console.error(
+        "Load graduate profile error:",
+        err
+      );
+
+      setError(
+        err.message ||
+          "Could not load your graduate profile."
+      );
     } finally {
       setLoading(false);
     }
   }
 
   // =========================================================
-  // HANDLE FORM CHANGES
+  // HANDLE FORM CHANGE
   // =========================================================
   function handleChange(e) {
     const { name, value } = e.target;
@@ -149,19 +169,28 @@ export default function GraduatePage() {
   async function uploadFile(file, folder) {
     if (!file) return null;
 
-    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const safeFileName = file.name.replace(
+      /[^a-zA-Z0-9._-]/g,
+      "_"
+    );
 
-    const filePath = `${folder}/${Date.now()}-${safeFileName}`;
+    const filePath =
+      `${folder}/${Date.now()}-${safeFileName}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from("documents")
-      .upload(filePath, file, {
-        cacheControl: "3600",
-        upsert: false,
-      });
+    const { error: uploadError } =
+      await supabase.storage
+        .from("documents")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
 
     if (uploadError) {
-      console.error("File upload error:", uploadError);
+      console.error(
+        "File upload error:",
+        uploadError
+      );
+
       throw uploadError;
     }
 
@@ -169,7 +198,7 @@ export default function GraduatePage() {
   }
 
   // =========================================================
-  // SUBMIT / UPDATE PROFILE
+  // SUBMIT PROFILE
   // =========================================================
   async function handleSubmit(e) {
     e.preventDefault();
@@ -179,6 +208,9 @@ export default function GraduatePage() {
     setSaving(true);
 
     try {
+      // =====================================================
+      // GET LOGGED-IN USER
+      // =====================================================
       const {
         data: { user },
         error: authError,
@@ -194,23 +226,33 @@ export default function GraduatePage() {
       // VALIDATION
       // =====================================================
       if (!form.full_name.trim()) {
-        throw new Error("Please enter your full name.");
+        throw new Error(
+          "Please enter your full name."
+        );
       }
 
       if (!form.email.trim()) {
-        throw new Error("Please enter your email.");
+        throw new Error(
+          "Please enter your email."
+        );
       }
 
       if (!form.phone.trim()) {
-        throw new Error("Please enter your phone number.");
+        throw new Error(
+          "Please enter your phone number."
+        );
       }
 
       if (!form.qualification.trim()) {
-        throw new Error("Please enter your qualification.");
+        throw new Error(
+          "Please enter your qualification."
+        );
       }
 
       if (!form.field_of_study.trim()) {
-        throw new Error("Please enter your field of study.");
+        throw new Error(
+          "Please enter your field of study."
+        );
       }
 
       // =====================================================
@@ -221,13 +263,19 @@ export default function GraduatePage() {
         error: findError,
       } = await supabase
         .from("graduates")
-        .select("id, cv_url, qualification_url")
+        .select(
+          "id, cv_url, qualification_url"
+        )
         .eq("user_id", user.id)
         .order("id", { ascending: true })
         .limit(1);
 
       if (findError) {
-        console.error("Find graduate error:", findError);
+        console.error(
+          "Find graduate error:",
+          findError
+        );
+
         throw findError;
       }
 
@@ -237,12 +285,12 @@ export default function GraduatePage() {
         existingGraduates &&
         existingGraduates.length > 0
       ) {
-        existingGraduate = existingGraduates[0];
+        existingGraduate =
+          existingGraduates[0];
       }
 
       // =====================================================
-      // CV
-      // Keep old CV unless a new one is selected
+      // KEEP EXISTING CV OR UPLOAD NEW CV
       // =====================================================
       let cvUrl =
         existingGraduate?.cv_url ||
@@ -250,13 +298,18 @@ export default function GraduatePage() {
         null;
 
       if (cvFile) {
-        console.log("Uploading new CV...");
-        cvUrl = await uploadFile(cvFile, "cv");
+        console.log(
+          "Uploading new CV..."
+        );
+
+        cvUrl = await uploadFile(
+          cvFile,
+          "cv"
+        );
       }
 
       // =====================================================
-      // QUALIFICATION DOCUMENT
-      // Keep old document unless a new one is selected
+      // KEEP EXISTING QUALIFICATION OR UPLOAD NEW ONE
       // =====================================================
       let qualificationUrl =
         existingGraduate?.qualification_url ||
@@ -265,31 +318,39 @@ export default function GraduatePage() {
 
       if (qualificationFile) {
         console.log(
-          "Uploading new qualification document..."
+          "Uploading qualification document..."
         );
 
-        qualificationUrl = await uploadFile(
-          qualificationFile,
-          "qualifications"
-        );
+        qualificationUrl =
+          await uploadFile(
+            qualificationFile,
+            "qualifications"
+          );
       }
 
       // =====================================================
-      // GRADUATE DATA
+      // DATA TO SAVE
       // =====================================================
       const graduateData = {
         user_id: user.id,
         full_name: form.full_name.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
-        qualification: form.qualification.trim(),
-        field_of_study: form.field_of_study.trim(),
-        institution: form.institution.trim(),
-        province: form.province.trim(),
-        career_goals: form.career_goals.trim(),
-        skills: form.skills.trim(),
+        qualification:
+          form.qualification.trim(),
+        field_of_study:
+          form.field_of_study.trim(),
+        institution:
+          form.institution.trim(),
+        province:
+          form.province.trim(),
+        career_goals:
+          form.career_goals.trim(),
+        skills:
+          form.skills.trim(),
         cv_url: cvUrl,
-        qualification_url: qualificationUrl,
+        qualification_url:
+          qualificationUrl,
       };
 
       // =====================================================
@@ -297,45 +358,38 @@ export default function GraduatePage() {
       // =====================================================
       if (existingGraduate) {
         console.log(
-          "Updating existing graduate:",
+          "Updating graduate:",
           existingGraduate.id
         );
 
-        const {
-          data: updatedGraduates,
-          error: updateError,
-        } = await supabase
-          .from("graduates")
-          .update(graduateData)
-          .eq("id", existingGraduate.id)
-          .select("id");
+        const { error: updateError } =
+          await supabase
+            .from("graduates")
+            .update(graduateData)
+            .eq(
+              "id",
+              existingGraduate.id
+            );
 
         if (updateError) {
           console.error(
             "Update graduate error:",
             updateError
           );
+
           throw updateError;
         }
 
-        // Confirm that the update actually returned a graduate
-        if (
-          !updatedGraduates ||
-          updatedGraduates.length === 0
-        ) {
-          throw new Error(
-            "Your graduate profile could not be updated."
-          );
-        }
-
-        const updatedGraduate =
-          updatedGraduates[0];
-
-        setGraduateId(updatedGraduate.id);
+        // IMPORTANT:
+        // We already know the graduate ID.
+        // No .select() is needed here.
+        setGraduateId(
+          existingGraduate.id
+        );
 
         console.log(
           "Graduate updated successfully:",
-          updatedGraduate
+          existingGraduate.id
         );
 
         setMessage(
@@ -344,7 +398,7 @@ export default function GraduatePage() {
       }
 
       // =====================================================
-      // INSERT NEW GRADUATE
+      // CREATE NEW GRADUATE
       // =====================================================
       else {
         console.log(
@@ -364,27 +418,18 @@ export default function GraduatePage() {
             "Insert graduate error:",
             insertError
           );
+
           throw insertError;
         }
 
         if (
-          !newGraduates ||
-          newGraduates.length === 0
+          newGraduates &&
+          newGraduates.length > 0
         ) {
-          throw new Error(
-            "Your graduate profile could not be created."
+          setGraduateId(
+            newGraduates[0].id
           );
         }
-
-        const newGraduate =
-          newGraduates[0];
-
-        setGraduateId(newGraduate.id);
-
-        console.log(
-          "Graduate created successfully:",
-          newGraduate
-        );
 
         setMessage(
           "✅ Your graduate profile and documents have been created successfully!"
@@ -392,9 +437,12 @@ export default function GraduatePage() {
       }
 
       // =====================================================
-      // UPDATE LOCAL STATE
+      // UPDATE LOCAL FILE STATE
       // =====================================================
-      setExistingCvUrl(cvUrl || "");
+      setExistingCvUrl(
+        cvUrl || ""
+      );
+
       setExistingQualificationUrl(
         qualificationUrl || ""
       );
@@ -402,7 +450,9 @@ export default function GraduatePage() {
       setCvFile(null);
       setQualificationFile(null);
 
-      // Reset file inputs
+      // =====================================================
+      // CLEAR FILE INPUTS
+      // =====================================================
       const cvInput =
         document.getElementById("cv");
 
@@ -419,7 +469,9 @@ export default function GraduatePage() {
         qualificationInput.value = "";
       }
 
-      // Reload profile from Supabase
+      // =====================================================
+      // RELOAD PROFILE FROM SUPABASE
+      // =====================================================
       await loadGraduateProfile();
     } catch (err) {
       console.error(
@@ -437,7 +489,7 @@ export default function GraduatePage() {
   }
 
   // =========================================================
-  // LOADING
+  // LOADING SCREEN
   // =========================================================
   if (loading) {
     return (
@@ -452,8 +504,13 @@ export default function GraduatePage() {
             textAlign: "center",
           }}
         >
-          <h1>Loading Graduate Profile...</h1>
-          <p>Please wait.</p>
+          <h1>
+            Loading Graduate Profile...
+          </h1>
+
+          <p>
+            Please wait.
+          </p>
         </main>
       </>
     );
@@ -470,7 +527,8 @@ export default function GraduatePage() {
         style={{
           maxWidth: "900px",
           margin: "0 auto",
-          padding: "30px 20px 60px",
+          padding:
+            "30px 20px 60px",
         }}
       >
         <div
@@ -501,7 +559,7 @@ export default function GraduatePage() {
             Keep your graduate profile and documents up to date.
           </p>
 
-          {/* SUCCESS MESSAGE */}
+          {/* SUCCESS */}
           {message && (
             <div
               style={{
@@ -517,7 +575,7 @@ export default function GraduatePage() {
             </div>
           )}
 
-          {/* ERROR MESSAGE */}
+          {/* ERROR */}
           {error && (
             <div
               style={{
@@ -533,17 +591,18 @@ export default function GraduatePage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit}>
-
+          <form
+            onSubmit={handleSubmit}
+          >
             {/* FULL NAME */}
-            <div style={{ marginBottom: "18px" }}>
+            <div
+              style={{
+                marginBottom: "18px",
+              }}
+            >
               <label
                 htmlFor="full_name"
-                style={{
-                  display: "block",
-                  marginBottom: "7px",
-                  fontWeight: "600",
-                }}
+                style={labelStyle}
               >
                 Full Name
               </label>
@@ -560,14 +619,14 @@ export default function GraduatePage() {
             </div>
 
             {/* EMAIL */}
-            <div style={{ marginBottom: "18px" }}>
+            <div
+              style={{
+                marginBottom: "18px",
+              }}
+            >
               <label
                 htmlFor="email"
-                style={{
-                  display: "block",
-                  marginBottom: "7px",
-                  fontWeight: "600",
-                }}
+                style={labelStyle}
               >
                 Email
               </label>
@@ -584,14 +643,14 @@ export default function GraduatePage() {
             </div>
 
             {/* PHONE */}
-            <div style={{ marginBottom: "18px" }}>
+            <div
+              style={{
+                marginBottom: "18px",
+              }}
+            >
               <label
                 htmlFor="phone"
-                style={{
-                  display: "block",
-                  marginBottom: "7px",
-                  fontWeight: "600",
-                }}
+                style={labelStyle}
               >
                 Phone Number
               </label>
@@ -608,14 +667,14 @@ export default function GraduatePage() {
             </div>
 
             {/* QUALIFICATION */}
-            <div style={{ marginBottom: "18px" }}>
+            <div
+              style={{
+                marginBottom: "18px",
+              }}
+            >
               <label
                 htmlFor="qualification"
-                style={{
-                  display: "block",
-                  marginBottom: "7px",
-                  fontWeight: "600",
-                }}
+                style={labelStyle}
               >
                 Qualification
               </label>
@@ -632,14 +691,14 @@ export default function GraduatePage() {
             </div>
 
             {/* FIELD OF STUDY */}
-            <div style={{ marginBottom: "18px" }}>
+            <div
+              style={{
+                marginBottom: "18px",
+              }}
+            >
               <label
                 htmlFor="field_of_study"
-                style={{
-                  display: "block",
-                  marginBottom: "7px",
-                  fontWeight: "600",
-                }}
+                style={labelStyle}
               >
                 Field of Study
               </label>
@@ -656,14 +715,14 @@ export default function GraduatePage() {
             </div>
 
             {/* INSTITUTION */}
-            <div style={{ marginBottom: "18px" }}>
+            <div
+              style={{
+                marginBottom: "18px",
+              }}
+            >
               <label
                 htmlFor="institution"
-                style={{
-                  display: "block",
-                  marginBottom: "7px",
-                  fontWeight: "600",
-                }}
+                style={labelStyle}
               >
                 Institution
               </label>
@@ -680,14 +739,14 @@ export default function GraduatePage() {
             </div>
 
             {/* PROVINCE */}
-            <div style={{ marginBottom: "18px" }}>
+            <div
+              style={{
+                marginBottom: "18px",
+              }}
+            >
               <label
                 htmlFor="province"
-                style={{
-                  display: "block",
-                  marginBottom: "7px",
-                  fontWeight: "600",
-                }}
+                style={labelStyle}
               >
                 Province
               </label>
@@ -702,30 +761,39 @@ export default function GraduatePage() {
                 <option value="">
                   Select Province
                 </option>
+
                 <option value="Gauteng">
                   Gauteng
                 </option>
+
                 <option value="KwaZulu-Natal">
                   KwaZulu-Natal
                 </option>
+
                 <option value="Western Cape">
                   Western Cape
                 </option>
+
                 <option value="Eastern Cape">
                   Eastern Cape
                 </option>
+
                 <option value="Free State">
                   Free State
                 </option>
+
                 <option value="Limpopo">
                   Limpopo
                 </option>
+
                 <option value="Mpumalanga">
                   Mpumalanga
                 </option>
+
                 <option value="North West">
                   North West
                 </option>
+
                 <option value="Northern Cape">
                   Northern Cape
                 </option>
@@ -733,14 +801,14 @@ export default function GraduatePage() {
             </div>
 
             {/* SKILLS */}
-            <div style={{ marginBottom: "18px" }}>
+            <div
+              style={{
+                marginBottom: "18px",
+              }}
+            >
               <label
                 htmlFor="skills"
-                style={{
-                  display: "block",
-                  marginBottom: "7px",
-                  fontWeight: "600",
-                }}
+                style={labelStyle}
               >
                 Skills
               </label>
@@ -760,14 +828,14 @@ export default function GraduatePage() {
             </div>
 
             {/* CAREER GOALS */}
-            <div style={{ marginBottom: "25px" }}>
+            <div
+              style={{
+                marginBottom: "25px",
+              }}
+            >
               <label
                 htmlFor="career_goals"
-                style={{
-                  display: "block",
-                  marginBottom: "7px",
-                  fontWeight: "600",
-                }}
+                style={labelStyle}
               >
                 Career Goals
               </label>
@@ -788,18 +856,12 @@ export default function GraduatePage() {
 
             {/* CV */}
             <div
-              style={{
-                marginBottom: "25px",
-                padding: "20px",
-                background: "#f8fafc",
-                borderRadius: "12px",
-              }}
+              style={documentBoxStyle}
             >
               <label
                 htmlFor="cv"
                 style={{
-                  display: "block",
-                  marginBottom: "8px",
+                  ...labelStyle,
                   fontWeight: "700",
                 }}
               >
@@ -822,19 +884,16 @@ export default function GraduatePage() {
                 id="cv"
                 type="file"
                 accept=".pdf,.doc,.docx"
-                onChange={(e) => {
+                onChange={(e) =>
                   setCvFile(
-                    e.target.files?.[0] || null
-                  );
-                }}
+                    e.target.files?.[0] ||
+                      null
+                  )
+                }
               />
 
               <p
-                style={{
-                  fontSize: "13px",
-                  color: "#666",
-                  marginTop: "8px",
-                }}
+                style={helpTextStyle}
               >
                 Accepted: PDF, DOC, DOCX
               </p>
@@ -843,17 +902,14 @@ export default function GraduatePage() {
             {/* QUALIFICATION DOCUMENT */}
             <div
               style={{
+                ...documentBoxStyle,
                 marginBottom: "30px",
-                padding: "20px",
-                background: "#f8fafc",
-                borderRadius: "12px",
               }}
             >
               <label
                 htmlFor="qualification_document"
                 style={{
-                  display: "block",
-                  marginBottom: "8px",
+                  ...labelStyle,
                   fontWeight: "700",
                 }}
               >
@@ -876,25 +932,22 @@ export default function GraduatePage() {
                 id="qualification_document"
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png"
-                onChange={(e) => {
+                onChange={(e) =>
                   setQualificationFile(
-                    e.target.files?.[0] || null
-                  );
-                }}
+                    e.target.files?.[0] ||
+                      null
+                  )
+                }
               />
 
               <p
-                style={{
-                  fontSize: "13px",
-                  color: "#666",
-                  marginTop: "8px",
-                }}
+                style={helpTextStyle}
               >
                 Accepted: PDF, JPG, JPEG, PNG
               </p>
             </div>
 
-            {/* BUTTON */}
+            {/* SAVE BUTTON */}
             <button
               type="submit"
               disabled={saving}
@@ -920,7 +973,6 @@ export default function GraduatePage() {
                 ? "Update Graduate Profile"
                 : "Create Graduate Profile"}
             </button>
-
           </form>
         </div>
       </main>
@@ -929,8 +981,9 @@ export default function GraduatePage() {
 }
 
 // =============================================================
-// INPUT STYLE
+// STYLES
 // =============================================================
+
 const inputStyle = {
   width: "100%",
   padding: "13px 14px",
@@ -939,4 +992,23 @@ const inputStyle = {
   fontSize: "15px",
   boxSizing: "border-box",
   background: "#ffffff",
+};
+
+const labelStyle = {
+  display: "block",
+  marginBottom: "7px",
+  fontWeight: "600",
+};
+
+const documentBoxStyle = {
+  marginBottom: "25px",
+  padding: "20px",
+  background: "#f8fafc",
+  borderRadius: "12px",
+};
+
+const helpTextStyle = {
+  fontSize: "13px",
+  color: "#666",
+  marginTop: "8px",
 };
