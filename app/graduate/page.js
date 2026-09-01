@@ -69,12 +69,6 @@ export default function GraduatePage() {
         return;
       }
 
-      // -------------------------------------------------------
-      // IMPORTANT:
-      // DO NOT USE .single() HERE.
-      // This prevents:
-      // "Cannot coerce the result to a single JSON object"
-      // -------------------------------------------------------
       const { data: graduates, error: graduateError } = await supabase
         .from("graduates")
         .select(
@@ -90,9 +84,9 @@ export default function GraduatePage() {
         return;
       }
 
-      // =======================================================
-      // EXISTING GRADUATE
-      // =======================================================
+      // =====================================================
+      // EXISTING GRADUATE FOUND
+      // =====================================================
       if (graduates && graduates.length > 0) {
         const graduate = graduates[0];
 
@@ -115,15 +109,17 @@ export default function GraduatePage() {
 
         console.log("Existing graduate loaded:", graduate.id);
       } else {
-        // =====================================================
-        // NO GRADUATE YET
-        // =====================================================
+        // ===================================================
+        // NO GRADUATE PROFILE YET
+        // ===================================================
         setForm({
           ...emptyForm,
           email: user.email || "",
         });
 
         setGraduateId(null);
+        setExistingCvUrl("");
+        setExistingQualificationUrl("");
 
         console.log("No graduate profile found.");
       }
@@ -165,6 +161,7 @@ export default function GraduatePage() {
       });
 
     if (uploadError) {
+      console.error("File upload error:", uploadError);
       throw uploadError;
     }
 
@@ -188,12 +185,14 @@ export default function GraduatePage() {
       } = await supabase.auth.getUser();
 
       if (authError || !user) {
-        throw new Error("Your session has expired. Please log in again.");
+        throw new Error(
+          "Your session has expired. Please log in again."
+        );
       }
 
-      // -------------------------------------------------------
-      // BASIC VALIDATION
-      // -------------------------------------------------------
+      // =====================================================
+      // VALIDATION
+      // =====================================================
       if (!form.full_name.trim()) {
         throw new Error("Please enter your full name.");
       }
@@ -214,12 +213,9 @@ export default function GraduatePage() {
         throw new Error("Please enter your field of study.");
       }
 
-      // -------------------------------------------------------
+      // =====================================================
       // FIND EXISTING GRADUATE
-      //
-      // IMPORTANT:
-      // We use an array + limit(1), NOT .single()
-      // -------------------------------------------------------
+      // =====================================================
       const {
         data: existingGraduates,
         error: findError,
@@ -237,37 +233,50 @@ export default function GraduatePage() {
 
       let existingGraduate = null;
 
-      if (existingGraduates && existingGraduates.length > 0) {
+      if (
+        existingGraduates &&
+        existingGraduates.length > 0
+      ) {
         existingGraduate = existingGraduates[0];
       }
 
-      // -------------------------------------------------------
-      // UPLOAD NEW CV IF SELECTED
-      // -------------------------------------------------------
-      let cvUrl = existingGraduate?.cv_url || existingCvUrl || null;
+      // =====================================================
+      // CV
+      // Keep old CV unless a new one is selected
+      // =====================================================
+      let cvUrl =
+        existingGraduate?.cv_url ||
+        existingCvUrl ||
+        null;
 
       if (cvFile) {
+        console.log("Uploading new CV...");
         cvUrl = await uploadFile(cvFile, "cv");
       }
 
-      // -------------------------------------------------------
-      // UPLOAD NEW QUALIFICATION DOCUMENT IF SELECTED
-      // -------------------------------------------------------
+      // =====================================================
+      // QUALIFICATION DOCUMENT
+      // Keep old document unless a new one is selected
+      // =====================================================
       let qualificationUrl =
         existingGraduate?.qualification_url ||
         existingQualificationUrl ||
         null;
 
       if (qualificationFile) {
+        console.log(
+          "Uploading new qualification document..."
+        );
+
         qualificationUrl = await uploadFile(
           qualificationFile,
           "qualifications"
         );
       }
 
-      // -------------------------------------------------------
-      // DATA TO SAVE
-      // -------------------------------------------------------
+      // =====================================================
+      // GRADUATE DATA
+      // =====================================================
       const graduateData = {
         user_id: user.id,
         full_name: form.full_name.trim(),
@@ -283,86 +292,140 @@ export default function GraduatePage() {
         qualification_url: qualificationUrl,
       };
 
-      // =======================================================
+      // =====================================================
       // UPDATE EXISTING GRADUATE
-      // =======================================================
+      // =====================================================
       if (existingGraduate) {
         console.log(
           "Updating existing graduate:",
           existingGraduate.id
         );
 
-        const { error: updateError } = await supabase
-  .from("graduates")
-  .update(graduateData)
-  .eq("id", existingGraduate.id);
-
-if (updateError) {
-  console.error("Update graduate error:", updateError);
-  throw updateError;
-}
+        const {
+          data: updatedGraduates,
+          error: updateError,
+        } = await supabase
+          .from("graduates")
+          .update(graduateData)
+          .eq("id", existingGraduate.id)
+          .select("id");
 
         if (updateError) {
-          console.error("Update graduate error:", updateError);
+          console.error(
+            "Update graduate error:",
+            updateError
+          );
           throw updateError;
         }
 
-        setGraduateId(existingGraduate.id);
+        // Confirm that the update actually returned a graduate
+        if (
+          !updatedGraduates ||
+          updatedGraduates.length === 0
+        ) {
+          throw new Error(
+            "Your graduate profile could not be updated."
+          );
+        }
 
-        console.log("Graduate updated:", updatedGraduate);
+        const updatedGraduate =
+          updatedGraduates[0];
+
+        setGraduateId(updatedGraduate.id);
+
+        console.log(
+          "Graduate updated successfully:",
+          updatedGraduate
+        );
 
         setMessage(
           "✅ Your graduate profile and documents have been updated successfully!"
         );
       }
 
-      // =======================================================
+      // =====================================================
       // INSERT NEW GRADUATE
-      // =======================================================
+      // =====================================================
       else {
-        console.log("Creating new graduate profile.");
+        console.log(
+          "Creating new graduate profile..."
+        );
 
-        const { data: newGraduate, error: insertError } =
-          await supabase
-            .from("graduates")
-            .insert(graduateData)
-            .select("id");
+        const {
+          data: newGraduates,
+          error: insertError,
+        } = await supabase
+          .from("graduates")
+          .insert(graduateData)
+          .select("id");
 
         if (insertError) {
-          console.error("Insert graduate error:", insertError);
+          console.error(
+            "Insert graduate error:",
+            insertError
+          );
           throw insertError;
         }
 
-        if (newGraduate && newGraduate.length > 0) {
-          setGraduateId(newGraduate[0].id);
+        if (
+          !newGraduates ||
+          newGraduates.length === 0
+        ) {
+          throw new Error(
+            "Your graduate profile could not be created."
+          );
         }
+
+        const newGraduate =
+          newGraduates[0];
+
+        setGraduateId(newGraduate.id);
+
+        console.log(
+          "Graduate created successfully:",
+          newGraduate
+        );
 
         setMessage(
           "✅ Your graduate profile and documents have been created successfully!"
         );
       }
 
-      // -------------------------------------------------------
+      // =====================================================
       // UPDATE LOCAL STATE
-      // -------------------------------------------------------
+      // =====================================================
       setExistingCvUrl(cvUrl || "");
-      setExistingQualificationUrl(qualificationUrl || "");
+      setExistingQualificationUrl(
+        qualificationUrl || ""
+      );
 
       setCvFile(null);
       setQualificationFile(null);
 
       // Reset file inputs
-      const cvInput = document.getElementById("cv");
+      const cvInput =
+        document.getElementById("cv");
+
       const qualificationInput =
-        document.getElementById("qualification_document");
+        document.getElementById(
+          "qualification_document"
+        );
 
-      if (cvInput) cvInput.value = "";
-      if (qualificationInput) qualificationInput.value = "";
+      if (cvInput) {
+        cvInput.value = "";
+      }
 
-      // Reload profile so everything is confirmed from Supabase
+      if (qualificationInput) {
+        qualificationInput.value = "";
+      }
+
+      // Reload profile from Supabase
       await loadGraduateProfile();
     } catch (err) {
-      console.error("Save graduate profile error:", err);
+      console.error(
+        "Save graduate profile error:",
+        err
+      );
 
       setError(
         err.message ||
@@ -415,7 +478,8 @@ if (updateError) {
             background: "#ffffff",
             borderRadius: "16px",
             padding: "30px",
-            boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+            boxShadow:
+              "0 4px 20px rgba(0,0,0,0.08)",
           }}
         >
           <h1
@@ -470,6 +534,7 @@ if (updateError) {
           )}
 
           <form onSubmit={handleSubmit}>
+
             {/* FULL NAME */}
             <div style={{ marginBottom: "18px" }}>
               <label
@@ -634,16 +699,36 @@ if (updateError) {
                 onChange={handleChange}
                 style={inputStyle}
               >
-                <option value="">Select Province</option>
-                <option value="Gauteng">Gauteng</option>
-                <option value="KwaZulu-Natal">KwaZulu-Natal</option>
-                <option value="Western Cape">Western Cape</option>
-                <option value="Eastern Cape">Eastern Cape</option>
-                <option value="Free State">Free State</option>
-                <option value="Limpopo">Limpopo</option>
-                <option value="Mpumalanga">Mpumalanga</option>
-                <option value="North West">North West</option>
-                <option value="Northern Cape">Northern Cape</option>
+                <option value="">
+                  Select Province
+                </option>
+                <option value="Gauteng">
+                  Gauteng
+                </option>
+                <option value="KwaZulu-Natal">
+                  KwaZulu-Natal
+                </option>
+                <option value="Western Cape">
+                  Western Cape
+                </option>
+                <option value="Eastern Cape">
+                  Eastern Cape
+                </option>
+                <option value="Free State">
+                  Free State
+                </option>
+                <option value="Limpopo">
+                  Limpopo
+                </option>
+                <option value="Mpumalanga">
+                  Mpumalanga
+                </option>
+                <option value="North West">
+                  North West
+                </option>
+                <option value="Northern Cape">
+                  Northern Cape
+                </option>
               </select>
             </div>
 
@@ -729,8 +814,7 @@ if (updateError) {
                     marginBottom: "10px",
                   }}
                 >
-                  ✅ CV already uploaded. Select a new file below only if you
-                  want to replace it.
+                  ✅ CV already uploaded. Select a new file below only if you want to replace it.
                 </p>
               )}
 
@@ -739,7 +823,9 @@ if (updateError) {
                 type="file"
                 accept=".pdf,.doc,.docx"
                 onChange={(e) => {
-                  setCvFile(e.target.files?.[0] || null);
+                  setCvFile(
+                    e.target.files?.[0] || null
+                  );
                 }}
               />
 
@@ -782,8 +868,7 @@ if (updateError) {
                     marginBottom: "10px",
                   }}
                 >
-                  ✅ Qualification document already uploaded. Select a new
-                  file only if you want to replace it.
+                  ✅ Qualification document already uploaded. Select a new file only if you want to replace it.
                 </p>
               )}
 
@@ -792,7 +877,9 @@ if (updateError) {
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png"
                 onChange={(e) => {
-                  setQualificationFile(e.target.files?.[0] || null);
+                  setQualificationFile(
+                    e.target.files?.[0] || null
+                  );
                 }}
               />
 
@@ -816,11 +903,15 @@ if (updateError) {
                 padding: "15px",
                 border: "none",
                 borderRadius: "10px",
-                background: saving ? "#94a3b8" : "#2563eb",
+                background: saving
+                  ? "#94a3b8"
+                  : "#2563eb",
                 color: "#ffffff",
                 fontSize: "16px",
                 fontWeight: "700",
-                cursor: saving ? "not-allowed" : "pointer",
+                cursor: saving
+                  ? "not-allowed"
+                  : "pointer",
               }}
             >
               {saving
@@ -829,6 +920,7 @@ if (updateError) {
                 ? "Update Graduate Profile"
                 : "Create Graduate Profile"}
             </button>
+
           </form>
         </div>
       </main>
