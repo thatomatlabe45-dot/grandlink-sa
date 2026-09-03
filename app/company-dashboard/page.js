@@ -29,10 +29,7 @@ function getQualificationLevel(qualification = "") {
     return 6;
   }
 
-  if (
-    text.includes("honours") ||
-    text.includes("honors")
-  ) {
+  if (text.includes("honours") || text.includes("honors")) {
     return 5;
   }
 
@@ -73,9 +70,7 @@ function splitSkills(skills = "") {
 
   return skills
     .split(/[,;|]/)
-    .map((skill) =>
-      skill.trim().toLowerCase()
-    )
+    .map((skill) => skill.trim().toLowerCase())
     .filter(Boolean);
 }
 
@@ -87,15 +82,13 @@ function fieldMatches(
   applicantField = "",
   requiredField = ""
 ) {
-  const applicant =
-    applicantField
-      .toLowerCase()
-      .trim();
+  const applicant = applicantField
+    .toLowerCase()
+    .trim();
 
-  const required =
-    requiredField
-      .toLowerCase()
-      .trim();
+  const required = requiredField
+    .toLowerCase()
+    .trim();
 
   if (!required) {
     return true;
@@ -121,12 +114,8 @@ function skillMatches(
   requiredSkill
 ) {
   return (
-    applicantSkill.includes(
-      requiredSkill
-    ) ||
-    requiredSkill.includes(
-      applicantSkill
-    )
+    applicantSkill.includes(requiredSkill) ||
+    requiredSkill.includes(applicantSkill)
   );
 }
 
@@ -175,8 +164,7 @@ function calculateMatch(
     requiredLevel > 0
   ) {
     if (
-      applicantLevel >=
-      requiredLevel
+      applicantLevel >= requiredLevel
     ) {
       score += 35;
 
@@ -194,20 +182,14 @@ function calculateMatch(
     }
   } else {
     const applicantText =
-      applicantQualification
-        .toLowerCase();
+      applicantQualification.toLowerCase();
 
     const requiredText =
-      requiredQualification
-        .toLowerCase();
+      requiredQualification.toLowerCase();
 
     if (
-      applicantText.includes(
-        requiredText
-      ) ||
-      requiredText.includes(
-        applicantText
-      )
+      applicantText.includes(requiredText) ||
+      requiredText.includes(applicantText)
     ) {
       score += 35;
 
@@ -267,21 +249,15 @@ function calculateMatch(
   // =========================================================
 
   const applicantSkills =
-    splitSkills(
-      application.skills
-    );
+    splitSkills(application.skills);
 
   const requiredSkills =
-    splitSkills(
-      internship.skills
-    );
+    splitSkills(internship.skills);
 
   const matchedSkills = [];
   const missingSkills = [];
 
-  if (
-    requiredSkills.length === 0
-  ) {
+  if (requiredSkills.length === 0) {
     score += 30;
 
     strengths.push(
@@ -328,9 +304,7 @@ function calculateMatch(
 
     score += skillScore;
 
-    if (
-      matchedSkills.length > 0
-    ) {
+    if (matchedSkills.length > 0) {
       strengths.push(
         `${matchedSkills.length} of ${requiredSkills.length} required skill${
           requiredSkills.length === 1
@@ -340,9 +314,7 @@ function calculateMatch(
       );
     }
 
-    if (
-      missingSkills.length > 0
-    ) {
+    if (missingSkills.length > 0) {
       improvements.push(
         `Missing or unmatched skills: ${missingSkills.join(", ")}.`
       );
@@ -476,14 +448,8 @@ export default function CompanyDashboard() {
         error: userError,
       } = await supabase.auth.getUser();
 
-      if (
-        userError ||
-        !user
-      ) {
-        router.replace(
-          "/login"
-        );
-
+      if (userError || !user) {
+        router.replace("/login");
         return;
       }
 
@@ -497,10 +463,7 @@ export default function CompanyDashboard() {
       } = await supabase
         .from("companies")
         .select("*")
-        .eq(
-          "user_id",
-          user.id
-        )
+        .eq("user_id", user.id)
         .maybeSingle();
 
       if (companyError) {
@@ -511,13 +474,10 @@ export default function CompanyDashboard() {
         setError(
           "No company profile was found for this account."
         );
-
         return;
       }
 
-      setCompany(
-        companyData
-      );
+      setCompany(companyData);
 
       // =====================================================
       // LOAD INTERNSHIPS
@@ -533,23 +493,16 @@ export default function CompanyDashboard() {
           "company_name",
           companyData.company_name
         )
-        .order(
-          "created_at",
-          {
-            ascending:
-              false,
-          }
-        );
+        .order("created_at", {
+          ascending: false,
+        });
 
-      if (
-        internshipError
-      ) {
+      if (internshipError) {
         throw internshipError;
       }
 
       const loadedInternships =
-        internshipData ||
-        [];
+        internshipData || [];
 
       setInternships(
         loadedInternships
@@ -565,14 +518,8 @@ export default function CompanyDashboard() {
       // NO INTERNSHIPS
       // =====================================================
 
-      if (
-        internshipIds.length ===
-        0
-      ) {
-        setApplications(
-          []
-        );
-
+      if (internshipIds.length === 0) {
+        setApplications([]);
         return;
       }
 
@@ -590,23 +537,16 @@ export default function CompanyDashboard() {
           "internship_id",
           internshipIds
         )
-        .order(
-          "created_at",
-          {
-            ascending:
-              false,
-          }
-        );
+        .order("created_at", {
+          ascending: false,
+        });
 
-      if (
-        applicationError
-      ) {
+      if (applicationError) {
         throw applicationError;
       }
 
       const loadedApplications =
-        applicationData ||
-        [];
+        applicationData || [];
 
       // =====================================================
       // GET GRADUATE IDS
@@ -626,16 +566,13 @@ export default function CompanyDashboard() {
       // LOAD LATEST GRADUATE PROFILES
       // =====================================================
 
-      if (
-        graduateIds.length > 0
-      ) {
+      if (graduateIds.length > 0) {
         const {
           data: graduatesData,
           error: graduatesError,
         } = await supabase
           .from("graduates")
-          .select(
-            `
+          .select(`
             id,
             user_id,
             full_name,
@@ -649,16 +586,10 @@ export default function CompanyDashboard() {
             skills,
             cv_url,
             qualification_url
-            `
-          )
-          .in(
-            "id",
-            graduateIds
-          );
+          `)
+          .in("id", graduateIds);
 
-        if (
-          graduatesError
-        ) {
+        if (graduatesError) {
           console.error(
             "Graduate profiles error:",
             graduatesError
@@ -683,8 +614,6 @@ export default function CompanyDashboard() {
 
       // =====================================================
       // MERGE LATEST GRADUATE PROFILE WITH APPLICATION
-      // IMPORTANT:
-      // Graduate profile information takes priority
       // =====================================================
 
       const updatedApplications =
@@ -734,8 +663,6 @@ export default function CompanyDashboard() {
                 graduate.career_goals ||
                 application.career_goals,
 
-              // IMPORTANT:
-              // THIS USES THE LATEST SKILLS
               skills:
                 graduate.skills ||
                 application.skills,
@@ -777,7 +704,7 @@ export default function CompanyDashboard() {
                 : {
                     score: 0,
                     reasons: [
-                      "The internship could not be found."
+                      "The internship could not be found.",
                     ],
                     strengths: [],
                     improvements: [],
@@ -833,10 +760,7 @@ export default function CompanyDashboard() {
     status
   ) {
     try {
-      setUpdatingId(
-        applicationId
-      );
-
+      setUpdatingId(applicationId);
       setError("");
       setMessage("");
 
@@ -852,9 +776,7 @@ export default function CompanyDashboard() {
           applicationId
         );
 
-      if (
-        updateError
-      ) {
+      if (updateError) {
         throw updateError;
       }
 
@@ -877,26 +799,65 @@ export default function CompanyDashboard() {
       );
 
     } catch (err) {
+      console.error(
+        "Application update error:",
+        err
+      );
+
       setError(
         err.message ||
           "Could not update the application."
       );
     } finally {
-      setUpdatingId(
-        null
-      );
+      setUpdatingId(null);
     }
   }
 
   // =========================================================
   // REVIEW CV
+  // IMPORTANT:
+  // Opens a new tab immediately for iPhone/Safari,
+  // then loads the latest graduate CV into it.
   // =========================================================
 
-  async function reviewCV(
-    application
-  ) {
+  async function reviewCV(application) {
+    const cvWindow = window.open(
+      "",
+      "_blank"
+    );
+
     try {
       setError("");
+
+      if (!cvWindow) {
+        throw new Error(
+          "Your browser blocked the CV window. Please allow pop-ups and try again."
+        );
+      }
+
+      cvWindow.document.write(`
+        <html>
+          <head>
+            <title>Opening CV...</title>
+          </head>
+          <body style="
+            margin:0;
+            min-height:100vh;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-family:Arial,sans-serif;
+            background:#f5f9ff;
+            color:#0057B8;
+          ">
+            <div style="text-align:center;padding:30px;">
+              <div style="font-size:50px;">📄</div>
+              <h2>Opening CV...</h2>
+              <p>Please wait while the applicant's CV is loaded.</p>
+            </div>
+          </body>
+        </html>
+      `);
 
       let cvPath =
         application.cv_url ||
@@ -906,46 +867,44 @@ export default function CompanyDashboard() {
         application.document_url ||
         null;
 
+      // Get the latest CV directly from graduate profile
       if (
         !cvPath &&
         application.graduate_id
       ) {
         const {
           data: graduate,
-          error:
-            graduateError,
+          error: graduateError,
         } = await supabase
-          .from(
-            "graduates"
-          )
-          .select(
-            "cv_url"
-          )
+          .from("graduates")
+          .select("cv_url")
           .eq(
             "id",
             application.graduate_id
           )
           .maybeSingle();
 
-        if (
-          graduateError
-        ) {
+        if (graduateError) {
           console.error(
+            "Graduate CV error:",
             graduateError
           );
         }
 
-        if (
-          graduate?.cv_url
-        ) {
+        if (graduate?.cv_url) {
           cvPath =
             graduate.cv_url;
         }
       }
 
-      if (
-        !cvPath
-      ) {
+      if (!cvPath) {
+        if (
+          cvWindow &&
+          !cvWindow.closed
+        ) {
+          cvWindow.close();
+        }
+
         alert(
           "No CV uploaded for this applicant."
         );
@@ -953,57 +912,64 @@ export default function CompanyDashboard() {
         return;
       }
 
+      // If the database already contains a full URL
       if (
-        cvPath.startsWith(
-          "http"
-        )
+        cvPath.startsWith("http://") ||
+        cvPath.startsWith("https://")
       ) {
-        window.open(
-          cvPath,
-          "_blank"
-        );
+        cvWindow.location.href =
+          cvPath;
 
         return;
       }
 
+      // Clean storage path
+      cvPath = cvPath
+        .replace(/^\/+/, "")
+        .replace(/^documents\//, "");
+
+      // Create secure signed URL
       const {
-        data:
-          signedData,
-        error:
-          signedError,
+        data: signedData,
+        error: signedError,
       } = await supabase.storage
-        .from(
-          "documents"
-        )
+        .from("documents")
         .createSignedUrl(
           cvPath,
           600
         );
 
-      if (
-        signedError
-      ) {
+      if (signedError) {
+        console.error(
+          "Signed URL error:",
+          signedError
+        );
+
         throw signedError;
       }
 
-      if (
-        !signedData?.signedUrl
-      ) {
+      if (!signedData?.signedUrl) {
         throw new Error(
-          "Could not create a secure CV link."
+          "Could not create a secure link for this CV."
         );
       }
 
-      window.open(
-        signedData.signedUrl,
-        "_blank"
-      );
+      // Load the CV in the already-opened tab
+      cvWindow.location.href =
+        signedData.signedUrl;
 
     } catch (err) {
       console.error(
         "Review CV error:",
         err
       );
+
+      if (
+        cvWindow &&
+        !cvWindow.closed
+      ) {
+        cvWindow.close();
+      }
 
       setError(
         err.message ||
@@ -1016,34 +982,25 @@ export default function CompanyDashboard() {
   // LOADING
   // =========================================================
 
-  if (
-    loading
-  ) {
+  if (loading) {
     return (
       <main
         style={{
-          minHeight:
-            "100vh",
-          display:
-            "flex",
-          justifyContent:
-            "center",
-          alignItems:
-            "center",
-          background:
-            "#f5f9ff",
+          minHeight: "100vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          background: "#f5f9ff",
         }}
       >
         <div
           style={{
-            textAlign:
-              "center",
+            textAlign: "center",
           }}
         >
           <div
             style={{
-              fontSize:
-                "45px",
+              fontSize: "45px",
             }}
           >
             🏢
@@ -1051,8 +1008,7 @@ export default function CompanyDashboard() {
 
           <h2
             style={{
-              color:
-                "#0057B8",
+              color: "#0057B8",
             }}
           >
             Loading Dashboard...
@@ -1089,22 +1045,18 @@ export default function CompanyDashboard() {
   // =========================================================
 
   return (
-    <main
+      <main
       style={{
-        minHeight:
-          "100vh",
+        minHeight: "100vh",
         background:
           "linear-gradient(180deg,#eef6ff,#f8fafc)",
-        padding:
-          "25px 15px 70px",
+        padding: "25px 15px 70px",
       }}
     >
       <div
         style={{
-          maxWidth:
-            "1150px",
-          margin:
-            "0 auto",
+          maxWidth: "1150px",
+          margin: "0 auto",
         }}
       >
         {/* HEADER */}
@@ -1113,41 +1065,29 @@ export default function CompanyDashboard() {
           style={{
             background:
               "linear-gradient(135deg,#003f88,#0077e6)",
-            color:
-              "#ffffff",
-            padding:
-              "35px",
-            borderRadius:
-              "24px",
+            color: "#ffffff",
+            padding: "35px",
+            borderRadius: "24px",
             boxShadow:
               "0 15px 40px rgba(0,87,184,.20)",
-            marginBottom:
-              "25px",
+            marginBottom: "25px",
           }}
         >
           <div
             style={{
-              display:
-                "flex",
-              justifyContent:
-                "space-between",
-              gap:
-                "20px",
-              flexWrap:
-                "wrap",
-              alignItems:
-                "center",
+              display: "flex",
+              justifyContent: "space-between",
+              gap: "20px",
+              flexWrap: "wrap",
+              alignItems: "center",
             }}
           >
             <div>
               <div
                 style={{
-                  fontSize:
-                    "14px",
-                  opacity:
-                    0.8,
-                  marginBottom:
-                    "8px",
+                  fontSize: "14px",
+                  opacity: 0.8,
+                  marginBottom: "8px",
                 }}
               >
                 GRADLINK SA • RECRUITMENT PORTAL
@@ -1155,10 +1095,8 @@ export default function CompanyDashboard() {
 
               <h1
                 style={{
-                  margin:
-                    "0 0 10px",
-                  fontSize:
-                    "32px",
+                  margin: "0 0 10px",
+                  fontSize: "32px",
                 }}
               >
                 🏢 Company Dashboard
@@ -1166,54 +1104,41 @@ export default function CompanyDashboard() {
 
               <p
                 style={{
-                  margin:
-                    0,
-                  opacity:
-                    0.9,
-                  fontSize:
-                    "17px",
+                  margin: 0,
+                  opacity: 0.9,
+                  fontSize: "17px",
                 }}
               >
                 Welcome back
                 {company?.company_name
                   ? `, ${company.company_name}`
-                  : ""}.
-                Manage your internships and discover your best candidates.
+                  : ""}
+                . Manage your internships and discover
+                your best candidates.
               </p>
             </div>
 
             <div
               style={{
-                display:
-                  "flex",
-                flexWrap:
-                  "wrap",
-                gap:
-                  "10px",
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "10px",
               }}
             >
               <button
                 onClick={() =>
-                  router.push(
-                    "/company"
-                  )
+                  router.push("/company")
                 }
-                style={
-                  headerButtonStyle
-                }
+                style={headerButtonStyle}
               >
                 ⚙️ Company Profile
               </button>
 
               <button
                 onClick={() =>
-                  router.push(
-                    "/internships"
-                  )
+                  router.push("/internships")
                 }
-                style={
-                  headerButtonStyle
-                }
+                style={headerButtonStyle}
               >
                 ➕ Post Internship
               </button>
@@ -1224,17 +1149,13 @@ export default function CompanyDashboard() {
         {/* MESSAGE */}
 
         {message && (
-          <div
-            style={successStyle}
-          >
+          <div style={successStyle}>
             ✅ {message}
           </div>
         )}
 
         {error && (
-          <div
-            style={errorStyle}
-          >
+          <div style={errorStyle}>
             ❌ {error}
           </div>
         )}
@@ -1243,89 +1164,65 @@ export default function CompanyDashboard() {
 
         <div
           style={{
-            display:
-              "grid",
+            display: "grid",
             gridTemplateColumns:
               "repeat(auto-fit,minmax(210px,1fr))",
-            gap:
-              "18px",
-            marginBottom:
-              "28px",
+            gap: "18px",
+            marginBottom: "28px",
           }}
         >
           <StatCard
             icon="💼"
             title="Internships"
-            value={
-              internships.length
-            }
+            value={internships.length}
             subtitle="Currently posted"
           />
 
           <StatCard
             icon="👨‍🎓"
             title="Applicants"
-            value={
-              applications.length
-            }
+            value={applications.length}
             subtitle="Total applications"
           />
 
           <StatCard
             icon="🏆"
             title="Strong Matches"
-            value={
-              strongMatches
-            }
+            value={strongMatches}
             subtitle="AI score 85%+"
           />
 
           <StatCard
             icon="⭐"
             title="Shortlisted"
-            value={
-              shortlisted
-            }
+            value={shortlisted}
             subtitle="Top candidates"
           />
         </div>
 
         {/* INTERNSHIPS */}
 
-        <section
-          style={
-            sectionStyle
-          }
-        >
-          <h2
-            style={
-              sectionTitleStyle
-            }
-          >
+        <section style={sectionStyle}>
+          <h2 style={sectionTitleStyle}>
             💼 Your Internships
           </h2>
 
-          {internships.length ===
-          0 ? (
+          {internships.length === 0 ? (
             <EmptyState
               icon="💼"
               text="You haven't posted an internship yet."
               buttonText="➕ Post Internship"
               onClick={() =>
-                router.push(
-                  "/internships"
-                )
+                router.push("/internships")
               }
             />
           ) : (
             <div
               style={{
-                display:
-                  "grid",
+                display: "grid",
                 gridTemplateColumns:
                   "repeat(auto-fit,minmax(260px,1fr))",
-                gap:
-                  "18px",
+                gap: "18px",
               }}
             >
               {internships.map(
@@ -1339,71 +1236,48 @@ export default function CompanyDashboard() {
 
                   return (
                     <div
-                      key={
-                        internship.id
-                      }
+                      key={internship.id}
                       style={{
                         border:
                           "1px solid #e5e7eb",
-                        borderRadius:
-                          "18px",
-                        padding:
-                          "20px",
-                        background:
-                          "#fbfdff",
+                        borderRadius: "18px",
+                        padding: "20px",
+                        background: "#fbfdff",
                       }}
                     >
                       <h3
                         style={{
-                          marginTop:
-                            0,
-                          color:
-                            "#0f172a",
+                          marginTop: 0,
+                          color: "#0f172a",
                         }}
                       >
-                        {
-                          internship.job_title
-                        }
+                        {internship.job_title}
                       </h3>
 
                       <p>
                         📍{" "}
-                        {
-                          internship.location ||
-                          "Location not specified"
-                        }
+                        {internship.location ||
+                          "Location not specified"}
                       </p>
 
                       <p>
                         🎓{" "}
-                        {
-                          internship.qualification ||
-                          "Qualification not specified"
-                        }
+                        {internship.qualification ||
+                          "Qualification not specified"}
                       </p>
 
                       <div
                         style={{
-                          marginTop:
-                            "15px",
-                          padding:
-                            "10px 14px",
-                          background:
-                            "#eaf3ff",
-                          color:
-                            "#0057B8",
-                          borderRadius:
-                            "10px",
-                          fontWeight:
-                            "bold",
+                          marginTop: "15px",
+                          padding: "10px 14px",
+                          background: "#eaf3ff",
+                          color: "#0057B8",
+                          borderRadius: "10px",
+                          fontWeight: "bold",
                         }}
                       >
-                        👨‍🎓{" "}
-                        {
-                          applicantCount
-                        } Applicant
-                        {applicantCount ===
-                        1
+                        👨‍🎓 {applicantCount} Applicant
+                        {applicantCount === 1
                           ? ""
                           : "s"}
                       </div>
@@ -1417,33 +1291,22 @@ export default function CompanyDashboard() {
 
         {/* APPLICANTS */}
 
-        <section
-          style={
-            sectionStyle
-          }
-        >
+        <section style={sectionStyle}>
           <div
             style={{
-              display:
-                "flex",
-              justifyContent:
-                "space-between",
-              alignItems:
-                "center",
-              flexWrap:
-                "wrap",
-              gap:
-                "10px",
-              marginBottom:
-                "10px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "10px",
+              marginBottom: "10px",
             }}
           >
             <div>
               <h2
                 style={{
                   ...sectionTitleStyle,
-                  marginBottom:
-                    "5px",
+                  marginBottom: "5px",
                 }}
               >
                 🤖 AI Ranked Applicants
@@ -1451,36 +1314,30 @@ export default function CompanyDashboard() {
 
               <p
                 style={{
-                  color:
-                    "#64748b",
-                  marginTop:
-                    0,
+                  color: "#64748b",
+                  marginTop: 0,
                 }}
               >
-                Applicant information automatically uses the latest graduate profile details and skills.
+                Applicant information automatically uses
+                the latest graduate profile details and
+                skills.
               </p>
             </div>
 
             <div
               style={{
-                background:
-                  "#eff6ff",
-                color:
-                  "#0057B8",
-                padding:
-                  "10px 15px",
-                borderRadius:
-                  "20px",
-                fontWeight:
-                  "bold",
+                background: "#eff6ff",
+                color: "#0057B8",
+                padding: "10px 15px",
+                borderRadius: "20px",
+                fontWeight: "bold",
               }}
             >
               {applications.length} Candidates
             </div>
           </div>
 
-          {applications.length ===
-          0 ? (
+          {applications.length === 0 ? (
             <EmptyState
               icon="👨‍🎓"
               text="No applications have been received yet."
@@ -1488,17 +1345,12 @@ export default function CompanyDashboard() {
           ) : (
             <div
               style={{
-                display:
-                  "grid",
-                gap:
-                  "22px",
+                display: "grid",
+                gap: "22px",
               }}
             >
               {applications.map(
-                (
-                  application,
-                  index
-                ) => {
+                (application, index) => {
                   const analysis =
                     application.analysis;
 
@@ -1506,32 +1358,24 @@ export default function CompanyDashboard() {
                     analysis.score;
 
                   const scoreColor =
-                    getMatchColor(
-                      score
-                    );
+                    getMatchColor(score);
 
                   return (
                     <div
-                      key={
-                        application.id
-                      }
+                      key={application.id}
                       style={{
                         border:
                           "1px solid #e2e8f0",
-                        borderRadius:
-                          "22px",
-                        overflow:
-                          "hidden",
-                        background:
-                          "#ffffff",
+                        borderRadius: "22px",
+                        overflow: "hidden",
+                        background: "#ffffff",
                         boxShadow:
                           "0 8px 25px rgba(15,23,42,.05)",
                       }}
                     >
                       <div
                         style={{
-                          padding:
-                            "22px",
+                          padding: "22px",
                           background:
                             "linear-gradient(90deg,#ffffff,#f8fbff)",
                           borderBottom:
@@ -1540,50 +1384,33 @@ export default function CompanyDashboard() {
                       >
                         <div
                           style={{
-                            display:
-                              "flex",
+                            display: "flex",
                             justifyContent:
                               "space-between",
-                            gap:
-                              "20px",
-                            flexWrap:
-                              "wrap",
-                            alignItems:
-                              "center",
+                            gap: "20px",
+                            flexWrap: "wrap",
+                            alignItems: "center",
                           }}
                         >
                           <div
                             style={{
-                              display:
-                                "flex",
-                              gap:
-                                "15px",
-                              alignItems:
-                                "center",
+                              display: "flex",
+                              gap: "15px",
+                              alignItems: "center",
                             }}
                           >
                             <div
                               style={{
-                                width:
-                                  "52px",
-                                height:
-                                  "52px",
-                                borderRadius:
-                                  "50%",
-                                display:
-                                  "flex",
-                                alignItems:
-                                  "center",
-                                justifyContent:
-                                  "center",
-                                background:
-                                  "#eaf3ff",
-                                color:
-                                  "#0057B8",
-                                fontWeight:
-                                  "bold",
-                                fontSize:
-                                  "20px",
+                                width: "52px",
+                                height: "52px",
+                                borderRadius: "50%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                background: "#eaf3ff",
+                                color: "#0057B8",
+                                fontWeight: "bold",
+                                fontSize: "20px",
                               }}
                             >
                               #{index + 1}
@@ -1598,10 +1425,8 @@ export default function CompanyDashboard() {
                                     "21px",
                                 }}
                               >
-                                {
-                                  application.full_name ||
-                                  "Graduate"
-                                }
+                                {application.full_name ||
+                                  "Graduate"}
                               </h3>
 
                               <div
@@ -1613,10 +1438,8 @@ export default function CompanyDashboard() {
                                 }}
                               >
                                 📧{" "}
-                                {
-                                  application.email ||
-                                  "No email"
-                                }
+                                {application.email ||
+                                  "No email"}
                               </div>
 
                               <div
@@ -1630,12 +1453,10 @@ export default function CompanyDashboard() {
                                 }}
                               >
                                 💼 Applying for:{" "}
-                                {
-                                  application
-                                    .internship
-                                    ?.job_title ||
-                                  "Internship"
-                                }
+                                {application
+                                  .internship
+                                  ?.job_title ||
+                                  "Internship"}
                               </div>
                             </div>
                           </div>
@@ -1648,8 +1469,7 @@ export default function CompanyDashboard() {
                           >
                             <div
                               style={{
-                                display:
-                                  "flex",
+                                display: "flex",
                                 justifyContent:
                                   "space-between",
                                 marginBottom:
@@ -1672,8 +1492,7 @@ export default function CompanyDashboard() {
 
                             <div
                               style={{
-                                height:
-                                  "12px",
+                                height: "12px",
                                 borderRadius:
                                   "20px",
                                 background:
@@ -1686,8 +1505,7 @@ export default function CompanyDashboard() {
                                 style={{
                                   width:
                                     `${score}%`,
-                                  height:
-                                    "100%",
+                                  height: "100%",
                                   background:
                                     scoreColor,
                                   borderRadius:
@@ -1709,11 +1527,9 @@ export default function CompanyDashboard() {
                               }}
                             >
                               🤖{" "}
-                              {
-                                getMatchLabel(
-                                  score
-                                )
-                              }
+                              {getMatchLabel(
+                                score
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1721,18 +1537,15 @@ export default function CompanyDashboard() {
 
                       <div
                         style={{
-                          padding:
-                            "22px",
+                          padding: "22px",
                         }}
                       >
                         <div
                           style={{
-                            display:
-                              "grid",
+                            display: "grid",
                             gridTemplateColumns:
                               "repeat(auto-fit,minmax(220px,1fr))",
-                            gap:
-                              "12px",
+                            gap: "12px",
                             marginBottom:
                               "20px",
                           }}
@@ -1798,23 +1611,19 @@ export default function CompanyDashboard() {
 
                           <p
                             style={{
-                              marginBottom:
-                                0,
+                              marginBottom: 0,
                               lineHeight:
                                 "1.6",
                               color:
                                 "#475569",
                             }}
                           >
-                            {
-                              analysis.summary
-                            }
+                            {analysis.summary}
                           </p>
                         </div>
 
                         {analysis.strengths
-                          .length >
-                          0 && (
+                          .length > 0 && (
                           <AnalysisBox
                             title="✅ What Matches Well"
                             items={
@@ -1825,8 +1634,7 @@ export default function CompanyDashboard() {
                         )}
 
                         {analysis.improvements
-                          .length >
-                          0 && (
+                          .length > 0 && (
                           <AnalysisBox
                             title="⚠️ Why The Score Is Lower"
                             items={
@@ -1838,12 +1646,10 @@ export default function CompanyDashboard() {
 
                         {(analysis
                           .matchedSkills
-                          .length >
-                          0 ||
+                          .length > 0 ||
                           analysis
                             .missingSkills
-                            .length >
-                            0) && (
+                            .length > 0) && (
                           <div
                             style={{
                               display:
@@ -1876,16 +1682,11 @@ export default function CompanyDashboard() {
 
                         <div
                           style={{
-                            display:
-                              "flex",
-                            flexWrap:
-                              "wrap",
-                            gap:
-                              "10px",
-                            marginTop:
-                              "22px",
-                            paddingTop:
-                              "20px",
+                            display: "flex",
+                            flexWrap: "wrap",
+                            gap: "10px",
+                            marginTop: "22px",
+                            paddingTop: "20px",
                             borderTop:
                               "1px solid #e5e7eb",
                           }}
@@ -1983,12 +1784,9 @@ function StatCard({
   return (
     <div
       style={{
-        background:
-          "#ffffff",
-        borderRadius:
-          "18px",
-        padding:
-          "22px",
+        background: "#ffffff",
+        borderRadius: "18px",
+        padding: "22px",
         border:
           "1px solid #e5e7eb",
         boxShadow:
@@ -1997,8 +1795,7 @@ function StatCard({
     >
       <div
         style={{
-          fontSize:
-            "25px",
+          fontSize: "25px",
           marginBottom:
             "10px",
         }}
@@ -2008,10 +1805,8 @@ function StatCard({
 
       <div
         style={{
-          color:
-            "#64748b",
-          fontWeight:
-            "600",
+          color: "#64748b",
+          fontWeight: "600",
         }}
       >
         {title}
@@ -2019,14 +1814,10 @@ function StatCard({
 
       <div
         style={{
-          color:
-            "#0057B8",
-          fontSize:
-            "32px",
-          fontWeight:
-            "bold",
-          margin:
-            "5px 0",
+          color: "#0057B8",
+          fontSize: "32px",
+          fontWeight: "bold",
+          margin: "5px 0",
         }}
       >
         {value}
@@ -2034,10 +1825,8 @@ function StatCard({
 
       <div
         style={{
-          color:
-            "#94a3b8",
-          fontSize:
-            "13px",
+          color: "#94a3b8",
+          fontSize: "13px",
         }}
       >
         {subtitle}
@@ -2058,22 +1847,17 @@ function InfoCard({
   return (
     <div
       style={{
-        background:
-          "#f8fafc",
+        background: "#f8fafc",
         border:
           "1px solid #e5e7eb",
-        borderRadius:
-          "12px",
-        padding:
-          "14px",
+        borderRadius: "12px",
+        padding: "14px",
       }}
     >
       <div
         style={{
-          color:
-            "#64748b",
-          fontSize:
-            "13px",
+          color: "#64748b",
+          fontSize: "13px",
           marginBottom:
             "6px",
         }}
@@ -2083,8 +1867,7 @@ function InfoCard({
 
       <strong
         style={{
-          color:
-            "#1e293b",
+          color: "#1e293b",
         }}
       >
         {value ||
@@ -2103,54 +1886,46 @@ function AnalysisBox({
   items,
   type,
 }) {
-  const background =
-    type === "success"
-      ? "#f0fdf4"
-      : "#fffbeb";
-
-  const border =
-    type === "success"
-      ? "#bbf7d0"
-      : "#fde68a";
+  const isSuccess =
+    type === "success";
 
   return (
     <div
       style={{
-        background,
-        border:
-          `1px solid ${border}`,
-        borderRadius:
-          "14px",
-        padding:
-          "16px",
-        marginTop:
-          "15px",
+        marginTop: "15px",
+        padding: "16px",
+        borderRadius: "14px",
+        background: isSuccess
+          ? "#f0fdf4"
+          : "#fff7ed",
+        border: isSuccess
+          ? "1px solid #bbf7d0"
+          : "1px solid #fed7aa",
       }}
     >
-      <strong>
+      <strong
+        style={{
+          display: "block",
+          marginBottom: "10px",
+          color: isSuccess
+            ? "#166534"
+            : "#9a3412",
+        }}
+      >
         {title}
       </strong>
 
       <ul
         style={{
-          marginBottom:
-            0,
-          paddingLeft:
-            "20px",
-          lineHeight:
-            "1.8",
+          margin: 0,
+          paddingLeft: "20px",
+          color: "#475569",
+          lineHeight: "1.7",
         }}
       >
         {items.map(
-          (
-            item,
-            index
-          ) => (
-            <li
-              key={
-                index
-              }
-            >
+          (item, index) => (
+            <li key={index}>
               {item}
             </li>
           )
@@ -2172,28 +1947,28 @@ function SkillList({
   return (
     <div
       style={{
-        border:
-          "1px solid #e5e7eb",
-        borderRadius:
-          "14px",
-        padding:
-          "16px",
-        background:
-          "#ffffff",
+        border: "1px solid #e2e8f0",
+        borderRadius: "14px",
+        padding: "16px",
+        background: "#ffffff",
       }}
     >
-      <strong>
+      <strong
+        style={{
+          display: "block",
+          marginBottom: "12px",
+          color: "#334155",
+        }}
+      >
         {title}
       </strong>
 
-      {skills.length ===
-      0 ? (
+      {skills.length === 0 ? (
         <p
           style={{
-            color:
-              "#64748b",
-            marginBottom:
-              0,
+            margin: 0,
+            color: "#94a3b8",
+            fontSize: "14px",
           }}
         >
           {emptyText}
@@ -2201,35 +1976,28 @@ function SkillList({
       ) : (
         <div
           style={{
-            display:
-              "flex",
-            flexWrap:
-              "wrap",
-            gap:
-              "8px",
-            marginTop:
-              "12px",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "8px",
           }}
         >
           {skills.map(
-            (
-              skill
-            ) => (
+            (skill, index) => (
               <span
-                key={
-                  skill
-                }
+                key={`${skill}-${index}`}
                 style={{
                   background:
-                    "#f1f5f9",
-                  padding:
-                    "7px 10px",
-                  borderRadius:
-                    "20px",
-                  fontSize:
-                    "13px",
-                  fontWeight:
-                    "600",
+                    title.includes("Matched")
+                      ? "#dcfce7"
+                      : "#fee2e2",
+                  color:
+                    title.includes("Matched")
+                      ? "#166534"
+                      : "#991b1b",
+                  padding: "7px 10px",
+                  borderRadius: "20px",
+                  fontSize: "13px",
+                  fontWeight: "600",
                 }}
               >
                 {skill}
@@ -2255,37 +2023,39 @@ function EmptyState({
   return (
     <div
       style={{
-        textAlign:
-          "center",
-        padding:
-          "40px 20px",
-        color:
-          "#64748b",
+        textAlign: "center",
+        padding: "45px 20px",
+        borderRadius: "18px",
+        background: "#f8fafc",
+        border: "1px dashed #cbd5e1",
       }}
     >
       <div
         style={{
-          fontSize:
-            "45px",
-          marginBottom:
-            "10px",
+          fontSize: "48px",
+          marginBottom: "12px",
         }}
       >
         {icon}
       </div>
 
-      <p>
+      <p
+        style={{
+          color: "#64748b",
+          fontSize: "16px",
+          marginBottom:
+            buttonText
+              ? "20px"
+              : 0,
+        }}
+      >
         {text}
       </p>
 
-      {buttonText && (
+      {buttonText && onClick && (
         <button
-          onClick={
-            onClick
-          }
-          style={
-            primaryButtonStyle
-          }
+          onClick={onClick}
+          style={primaryButtonStyle}
         >
           {buttonText}
         </button>
@@ -2295,165 +2065,140 @@ function EmptyState({
 }
 
 // ===========================================================
-// STYLES
+// PAGE STYLES
 // ===========================================================
 
 const sectionStyle = {
-  background:
-    "#ffffff",
-  borderRadius:
-    "22px",
-  padding:
-    "25px",
-  marginBottom:
-    "25px",
+  background: "#ffffff",
+  borderRadius: "24px",
+  padding: "25px",
+  marginBottom: "25px",
+  border: "1px solid #e2e8f0",
   boxShadow:
-    "0 10px 30px rgba(15,23,42,.06)",
-  border:
-    "1px solid #e8eef5",
+    "0 10px 30px rgba(15,23,42,.05)",
 };
 
 const sectionTitleStyle = {
-  marginTop:
-    0,
-  color:
-    "#0f172a",
-  fontSize:
-    "24px",
+  marginTop: 0,
+  marginBottom: "20px",
+  color: "#0f172a",
+  fontSize: "24px",
 };
 
+// ===========================================================
+// MESSAGE STYLES
+// ===========================================================
+
 const successStyle = {
-  background:
-    "#ecfdf5",
-  color:
-    "#047857",
-  border:
-    "1px solid #a7f3d0",
-  padding:
-    "15px",
-  borderRadius:
-    "12px",
-  marginBottom:
-    "20px",
-  fontWeight:
-    "bold",
+  background: "#ecfdf5",
+  color: "#166534",
+  border: "1px solid #bbf7d0",
+  padding: "15px 18px",
+  borderRadius: "14px",
+  marginBottom: "20px",
+  fontWeight: "600",
 };
 
 const errorStyle = {
-  background:
-    "#fef2f2",
-  color:
-    "#b91c1c",
-  border:
-    "1px solid #fecaca",
-  padding:
-    "15px",
-  borderRadius:
-    "12px",
-  marginBottom:
-    "20px",
-  fontWeight:
-    "bold",
+  background: "#fef2f2",
+  color: "#b91c1c",
+  border: "1px solid #fecaca",
+  padding: "15px 18px",
+  borderRadius: "14px",
+  marginBottom: "20px",
+  fontWeight: "600",
 };
 
-const primaryButtonStyle = {
-  background:
-    "#0057B8",
-  color:
-    "#ffffff",
-  border:
-    "none",
-  padding:
-    "11px 17px",
-  borderRadius:
-    "9px",
-  fontWeight:
-    "bold",
-  cursor:
-    "pointer",
-};
+// ===========================================================
+// HEADER BUTTON
+// ===========================================================
 
 const headerButtonStyle = {
-  background:
-    "#ffffff",
-  color:
-    "#0057B8",
-  border:
-    "none",
-  padding:
-    "12px 16px",
-  borderRadius:
-    "10px",
-  fontWeight:
-    "bold",
-  cursor:
-    "pointer",
+  border: "1px solid rgba(255,255,255,.35)",
+  background: "rgba(255,255,255,.15)",
+  color: "#ffffff",
+  padding: "11px 16px",
+  borderRadius: "12px",
+  cursor: "pointer",
+  fontSize: "14px",
+  fontWeight: "bold",
+  backdropFilter: "blur(8px)",
 };
+
+// ===========================================================
+// PRIMARY BUTTON
+// ===========================================================
+
+const primaryButtonStyle = {
+  border: "none",
+  background:
+    "linear-gradient(135deg,#0057B8,#0077e6)",
+  color: "#ffffff",
+  padding: "12px 18px",
+  borderRadius: "12px",
+  cursor: "pointer",
+  fontWeight: "bold",
+  fontSize: "14px",
+  boxShadow:
+    "0 6px 15px rgba(0,87,184,.20)",
+};
+
+// ===========================================================
+// REVIEW CV BUTTON
+// ===========================================================
 
 const secondaryButtonStyle = {
-  background:
-    "#ffffff",
-  color:
-    "#0057B8",
-  border:
-    "2px solid #0057B8",
-  padding:
-    "10px 15px",
-  borderRadius:
-    "9px",
-  fontWeight:
-    "bold",
-  cursor:
-    "pointer",
+  border: "1px solid #93c5fd",
+  background: "#eff6ff",
+  color: "#0057B8",
+  padding: "11px 16px",
+  borderRadius: "11px",
+  cursor: "pointer",
+  fontWeight: "bold",
+  fontSize: "14px",
 };
+
+// ===========================================================
+// REVIEW APPLICATION BUTTON
+// ===========================================================
 
 const reviewButtonStyle = {
-  background:
-    "#2563eb",
-  color:
-    "#ffffff",
-  border:
-    "none",
-  padding:
-    "11px 16px",
-  borderRadius:
-    "9px",
-  fontWeight:
-    "bold",
-  cursor:
-    "pointer",
+  border: "none",
+  background: "#2563eb",
+  color: "#ffffff",
+  padding: "11px 16px",
+  borderRadius: "11px",
+  cursor: "pointer",
+  fontWeight: "bold",
+  fontSize: "14px",
 };
+
+// ===========================================================
+// SHORTLIST BUTTON
+// ===========================================================
 
 const shortlistButtonStyle = {
-  background:
-    "#16a34a",
-  color:
-    "#ffffff",
-  border:
-    "none",
-  padding:
-    "11px 16px",
-  borderRadius:
-    "9px",
-  fontWeight:
-    "bold",
-  cursor:
-    "pointer",
+  border: "none",
+  background: "#16a34a",
+  color: "#ffffff",
+  padding: "11px 16px",
+  borderRadius: "11px",
+  cursor: "pointer",
+  fontWeight: "bold",
+  fontSize: "14px",
 };
 
+// ===========================================================
+// REJECT BUTTON
+// ===========================================================
+
 const rejectButtonStyle = {
-  background:
-    "#dc2626",
-  color:
-    "#ffffff",
-  border:
-    "none",
-  padding:
-    "11px 16px",
-  borderRadius:
-    "9px",
-  fontWeight:
-    "bold",
-  cursor:
-    "pointer",
+  border: "none",
+  background: "#dc2626",
+  color: "#ffffff",
+  padding: "11px 16px",
+  borderRadius: "11px",
+  cursor: "pointer",
+  fontWeight: "bold",
+  fontSize: "14px",
 };
