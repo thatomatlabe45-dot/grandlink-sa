@@ -71,6 +71,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [authorised, setAuthorised] = useState(false);
   const [error, setError] = useState("");
+  const [openingDocument, setOpeningDocument] =
+    useState("");
 
   // ==========================================================
   // CHECK ADMIN
@@ -211,6 +213,7 @@ export default function AdminPage() {
   ) {
     try {
       setError("");
+      setOpeningDocument(documentName);
 
       // ------------------------------------------------------
       // CHECK PATH
@@ -221,6 +224,7 @@ export default function AdminPage() {
           `${documentName} is not available for this graduate.`
         );
 
+        setOpeningDocument("");
         return;
       }
 
@@ -249,9 +253,11 @@ export default function AdminPage() {
           "Document is already a URL."
         );
 
-        window.open(
-          documentPath,
-          "_blank"
+        // IMPORTANT:
+        // Do NOT use window.open().
+        // Safari/iPhone can block it as a popup.
+        window.location.assign(
+          documentPath
         );
 
         return;
@@ -289,6 +295,23 @@ export default function AdminPage() {
           ""
         );
 
+      // Remove full Supabase storage URL if present
+      if (
+        filePath.includes(
+          "/storage/v1/object/"
+        )
+      ) {
+        const parts =
+          filePath.split(
+            "/documents/"
+          );
+
+        if (parts.length > 1) {
+          filePath =
+            parts[1];
+        }
+      }
+
       // Remove query string
       filePath =
         filePath.split("?")[0];
@@ -307,6 +330,7 @@ export default function AdminPage() {
           `The ${documentName} file path is empty.`
         );
 
+        setOpeningDocument("");
         return;
       }
 
@@ -358,6 +382,7 @@ export default function AdminPage() {
           `File path:\n${filePath}`
         );
 
+        setOpeningDocument("");
         return;
       }
 
@@ -378,6 +403,7 @@ export default function AdminPage() {
           `❌ Supabase did not return a secure URL for the ${documentName}.`
         );
 
+        setOpeningDocument("");
         return;
       }
 
@@ -386,39 +412,27 @@ export default function AdminPage() {
       );
 
       console.log(
-        "Opening document..."
+        "Navigating to document..."
       );
 
-      // ------------------------------------------------------
-      // OPEN DOCUMENT
-      // ------------------------------------------------------
+      // ======================================================
+      // IMPORTANT FIX
+      // ======================================================
+      //
+      // We use location.assign() instead of window.open().
+      //
+      // window.open() after an async Supabase request can be
+      // blocked by Safari/iPhone as a popup.
+      //
+      // location.assign() navigates normally and does not rely
+      // on popup permission.
+      //
+      // ======================================================
 
-      const newWindow =
-        window.open(
-          signedData.signedUrl,
-          "_blank"
-        );
-
-      // ------------------------------------------------------
-      // MOBILE SAFARI POPUP CHECK
-      // ------------------------------------------------------
-
-      if (!newWindow) {
-        alert(
-          `The ${documentName} was found, but your browser blocked the new tab.\n\n` +
-          `Please allow pop-ups for GradLink SA and try again.`
-        );
-
-        return;
-      }
-
-      console.log(
-        "Document opened successfully."
+      window.location.assign(
+        signedData.signedUrl
       );
 
-      console.log(
-        "===================================="
-      );
     } catch (err) {
       console.error(
         "DOCUMENT OPEN ERROR:",
@@ -429,6 +443,8 @@ export default function AdminPage() {
         `❌ Something went wrong while opening ${documentName}.\n\n` +
         `${err?.message || "Unknown error."}`
       );
+
+      setOpeningDocument("");
     }
   }
 
@@ -737,32 +753,58 @@ export default function AdminPage() {
 
                   <button
                     type="button"
+                    disabled={
+                      openingDocument ===
+                      "CV"
+                    }
                     onClick={() =>
                       openDocument(
                         person.cv_url,
                         "CV"
                       )
                     }
-                    style={buttonStyle}
+                    style={{
+                      ...buttonStyle,
+                      opacity:
+                        openingDocument ===
+                        "CV"
+                          ? 0.6
+                          : 1,
+                    }}
                   >
-                    📄 View CV
+                    {openingDocument ===
+                    "CV"
+                      ? "⏳ Opening CV..."
+                      : "📄 View CV"}
                   </button>
 
                   {/* QUALIFICATION */}
 
                   <button
                     type="button"
+                    disabled={
+                      openingDocument ===
+                      "Qualification"
+                    }
                     onClick={() =>
                       openDocument(
                         person.qualification_url,
                         "Qualification"
                       )
                     }
-                    style={
-                      qualificationButtonStyle
-                    }
+                    style={{
+                      ...qualificationButtonStyle,
+                      opacity:
+                        openingDocument ===
+                        "Qualification"
+                          ? 0.6
+                          : 1,
+                    }}
                   >
-                    🎓 View Qualification
+                    {openingDocument ===
+                    "Qualification"
+                      ? "⏳ Opening..."
+                      : "🎓 View Qualification"}
                   </button>
 
                 </div>
