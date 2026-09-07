@@ -20,7 +20,7 @@ function calculateMatch(graduate) {
 
   if (graduate.field_of_study) {
     score += 25;
-    reasons.push("Field of study matches");
+    reasons.push("Field of study added");
   }
 
   if (graduate.institution) {
@@ -66,14 +66,14 @@ export default function AdminPage() {
     checkAdmin();
   }, []);
 
+  // ============================================================
+  // CHECK ADMIN
+  // ============================================================
+
   async function checkAdmin() {
     try {
       setLoading(true);
       setError("");
-
-      // ============================================
-      // CHECK LOGGED-IN USER
-      // ============================================
 
       const {
         data: { user },
@@ -85,10 +85,6 @@ export default function AdminPage() {
         return;
       }
 
-      // ============================================
-      // CHECK IF USER IS AN ADMIN
-      // ============================================
-
       const {
         data: adminData,
         error: adminError,
@@ -99,37 +95,21 @@ export default function AdminPage() {
         .maybeSingle();
 
       if (adminError) {
-        console.error(
-          "Admin check error:",
-          adminError
-        );
-
+        console.error("Admin check error:", adminError);
         router.replace("/");
         return;
       }
-
-      // ============================================
-      // NOT AN ADMIN
-      // ============================================
 
       if (!adminData) {
         router.replace("/");
         return;
       }
 
-      // ============================================
-      // USER IS ADMIN
-      // ============================================
-
       setAuthorised(true);
 
       await getGraduates();
-
     } catch (err) {
-      console.error(
-        "Admin access error:",
-        err
-      );
+      console.error("Admin access error:", err);
 
       setError(
         "Could not verify administrator access."
@@ -138,6 +118,10 @@ export default function AdminPage() {
       setLoading(false);
     }
   }
+
+  // ============================================================
+  // LOAD GRADUATES
+  // ============================================================
 
   async function getGraduates() {
     const {
@@ -166,81 +150,209 @@ export default function AdminPage() {
     setGraduates(data || []);
   }
 
-  async function openDocument(path) {
-    if (!path) {
-      alert("Document not available");
-      return;
-    }
+  // ============================================================
+  // OPEN DOCUMENT
+  // ============================================================
 
-    let filePath = path;
+  async function openDocument(path, documentName) {
+    try {
+      if (!path) {
+        alert(
+          `${documentName} is not available for this graduate.`
+        );
+        return;
+      }
 
-    // ============================================
-    // IF FULL SUPABASE STORAGE URL
-    // ============================================
-
-    if (path.includes("/documents/")) {
-      filePath = decodeURIComponent(
+      console.log(
+        `Opening ${documentName}:`,
         path
-          .split("/documents/")[1]
-          .split("?")[0]
-      );
-    }
-
-    // Remove beginning slash if present
-    filePath = filePath.replace(
-      /^\/+/,
-      ""
-    );
-
-    // Remove documents/ if present
-    filePath = filePath.replace(
-      /^documents\//,
-      ""
-    );
-
-    const {
-      data,
-      error,
-    } = await supabase.storage
-      .from("documents")
-      .createSignedUrl(
-        filePath,
-        300
       );
 
-    if (error) {
+      // --------------------------------------------------------
+      // IF THIS IS ALREADY A SIGNED URL
+      // --------------------------------------------------------
+
+      if (
+        path.includes("token=") ||
+        path.includes("sign/")
+      ) {
+        window.open(
+          path,
+          "_blank",
+          "noopener,noreferrer"
+        );
+        return;
+      }
+
+      // --------------------------------------------------------
+      // CLEAN THE PATH
+      // --------------------------------------------------------
+
+      let filePath = path;
+
+      // Decode URL characters safely
+      try {
+        filePath = decodeURIComponent(
+          filePath
+        );
+      } catch (e) {
+        console.log(
+          "Could not decode path:",
+          e
+        );
+      }
+
+      // --------------------------------------------------------
+      // FULL SUPABASE STORAGE URL
+      //
+      // Example:
+      // https://xxxxx.supabase.co/storage/v1/object/public/documents/cv/file.pdf
+      //
+      // or:
+      // https://xxxxx.supabase.co/storage/v1/object/sign/documents/cv/file.pdf
+      // --------------------------------------------------------
+
+      if (
+        filePath.includes("/storage/v1/object/")
+      ) {
+        const marker =
+          "/storage/v1/object/";
+
+        const storagePart =
+          filePath.split(marker)[1];
+
+        if (storagePart) {
+          const parts =
+            storagePart.split("/");
+
+          // Remove public/sign/authenticated/private
+          if (
+            parts[0] === "public" ||
+            parts[0] === "sign" ||
+            parts[0] === "authenticated"
+          ) {
+            parts.shift();
+          }
+
+          if (
+            parts[0] === "documents"
+          ) {
+            parts.shift();
+          }
+
+          filePath = parts.join("/");
+        }
+      }
+
+      // --------------------------------------------------------
+      // REMOVE DOCUMENTS PREFIX
+      // --------------------------------------------------------
+
+      filePath = filePath.replace(
+        /^\/+/,
+        ""
+      );
+
+      filePath = filePath.replace(
+        /^documents\//i,
+        ""
+      );
+
+      // --------------------------------------------------------
+      // REMOVE QUERY PARAMETERS
+      // --------------------------------------------------------
+
+      filePath =
+        filePath.split("?")[0];
+
+      // --------------------------------------------------------
+      // REMOVE HASH
+      // --------------------------------------------------------
+
+      filePath =
+        filePath.split("#")[0];
+
+      if (!filePath) {
+        alert(
+          `Could not determine the ${documentName} file path.`
+        );
+        return;
+      }
+
+      console.log(
+        `Creating signed URL for ${documentName}:`,
+        filePath
+      );
+
+      // --------------------------------------------------------
+      // CREATE SIGNED URL
+      // --------------------------------------------------------
+
+      const {
+        data,
+        error,
+      } = await supabase.storage
+        .from("documents")
+        .createSignedUrl(
+          filePath,
+          3600
+        );
+
+      if (error) {
+        console.error(
+          `${documentName} storage error:`,
+          error
+        );
+
+        alert(
+          `Could not open ${documentName}.\n\n${error.message}`
+        );
+
+        return;
+      }
+
+      if (!data?.signedUrl) {
+        alert(
+          `Could not create a secure link for the ${documentName}.`
+        );
+
+        return;
+      }
+
+      console.log(
+        `${documentName} signed URL created successfully.`
+      );
+
+      // --------------------------------------------------------
+      // OPEN FILE
+      // --------------------------------------------------------
+
+      window.open(
+        data.signedUrl,
+        "_blank",
+        "noopener,noreferrer"
+      );
+    } catch (err) {
       console.error(
-        "Document error:",
-        error
+        `Unexpected ${documentName} error:`,
+        err
       );
 
-      alert(error.message);
-      return;
-    }
-
-    if (!data?.signedUrl) {
       alert(
-        "Could not create a secure document link."
+        `Something went wrong while opening the ${documentName}.`
       );
-
-      return;
     }
-
-    window.open(
-      data.signedUrl,
-      "_blank"
-    );
   }
 
-  // ============================================
+  // ============================================================
   // FILTER GRADUATES
-  // ============================================
+  // ============================================================
 
   const filteredGraduates =
     graduates.filter((person) =>
-      `${person.full_name || ""} 
-       ${person.qualification || ""} 
-       ${person.field_of_study || ""} 
+      `${person.full_name || ""}
+       ${person.qualification || ""}
+       ${person.field_of_study || ""}
        ${person.province || ""}`
         .toLowerCase()
         .includes(
@@ -248,9 +360,9 @@ export default function AdminPage() {
         )
     );
 
-  // ============================================
+  // ============================================================
   // LOADING
-  // ============================================
+  // ============================================================
 
   if (loading) {
     return (
@@ -289,20 +401,24 @@ export default function AdminPage() {
     );
   }
 
-  // ============================================
+  // ============================================================
   // BLOCK PAGE UNTIL ADMIN IS VERIFIED
-  // ============================================
+  // ============================================================
 
   if (!authorised) {
     return null;
   }
 
-  // ============================================
+  // ============================================================
   // ADMIN PAGE
-  // ============================================
+  // ============================================================
 
   return (
     <main style={pageStyle}>
+
+      {/* ======================================================
+          HEADER
+      ====================================================== */}
 
       <header style={headerStyle}>
         <div
@@ -347,6 +463,10 @@ export default function AdminPage() {
         </div>
       </header>
 
+      {/* ======================================================
+          CONTENT
+      ====================================================== */}
+
       <section style={containerStyle}>
 
         {error && (
@@ -354,6 +474,10 @@ export default function AdminPage() {
             ❌ {error}
           </div>
         )}
+
+        {/* ====================================================
+            STATS
+        ==================================================== */}
 
         <div style={statsCard}>
           <h2>
@@ -366,6 +490,10 @@ export default function AdminPage() {
           </strong>
         </div>
 
+        {/* ====================================================
+            SEARCH
+        ==================================================== */}
+
         <input
           type="search"
           placeholder="🔍 Search graduates..."
@@ -377,6 +505,10 @@ export default function AdminPage() {
           }
           style={searchStyle}
         />
+
+        {/* ====================================================
+            GRADUATES
+        ==================================================== */}
 
         {[...filteredGraduates]
           .sort(
@@ -394,6 +526,11 @@ export default function AdminPage() {
                 key={person.id}
                 style={cardStyle}
               >
+
+                {/* ==================================================
+                    NAME
+                ================================================== */}
+
                 <h3 style={nameStyle}>
                   👨‍🎓{" "}
                   {person.full_name ||
@@ -436,7 +573,12 @@ export default function AdminPage() {
                     "Not provided"}
                 </p>
 
+                {/* ==================================================
+                    AI SCORE
+                ================================================== */}
+
                 <div style={aiCardStyle}>
+
                   <strong>
                     🤖 Profile Score:{" "}
                     {match.score}% —{" "}
@@ -451,7 +593,12 @@ export default function AdminPage() {
                     {match.reason ||
                       "Profile information is incomplete."}
                   </p>
+
                 </div>
+
+                {/* ==================================================
+                    DOCUMENT BUTTONS
+                ================================================== */}
 
                 <div
                   style={{
@@ -461,10 +608,15 @@ export default function AdminPage() {
                     marginTop: "15px",
                   }}
                 >
+
+                  {/* VIEW CV */}
+
                   <button
+                    type="button"
                     onClick={() =>
                       openDocument(
-                        person.cv_url
+                        person.cv_url,
+                        "CV"
                       )
                     }
                     style={buttonStyle}
@@ -472,20 +624,66 @@ export default function AdminPage() {
                     📄 View CV
                   </button>
 
+                  {/* VIEW QUALIFICATION */}
+
                   <button
+                    type="button"
                     onClick={() =>
                       openDocument(
-                        person.qualification_url
+                        person.qualification_url,
+                        "qualification"
                       )
                     }
-                    style={buttonStyle}
+                    style={
+                      qualificationButtonStyle
+                    }
                   >
                     🎓 View Qualification
                   </button>
+
                 </div>
+
+                {/* ==================================================
+                    DOCUMENT STATUS
+                ================================================== */}
+
+                <div
+                  style={{
+                    marginTop: "12px",
+                    fontSize: "13px",
+                    color: "#64748b",
+                  }}
+                >
+                  {person.cv_url ? (
+                    <span>
+                      ✅ CV available
+                    </span>
+                  ) : (
+                    <span>
+                      ⚠️ No CV uploaded
+                    </span>
+                  )}
+
+                  {"  •  "}
+
+                  {person.qualification_url ? (
+                    <span>
+                      ✅ Qualification available
+                    </span>
+                  ) : (
+                    <span>
+                      ⚠️ No qualification uploaded
+                    </span>
+                  )}
+                </div>
+
               </div>
             );
           })}
+
+        {/* ====================================================
+            EMPTY
+        ==================================================== */}
 
         {filteredGraduates.length === 0 && (
           <div style={emptyStyle}>
@@ -498,7 +696,6 @@ export default function AdminPage() {
   );
 }
 
-
 // ===========================================================
 // STYLES
 // ===========================================================
@@ -506,10 +703,8 @@ export default function AdminPage() {
 const pageStyle = {
   minHeight: "100vh",
   background: "#f4f8ff",
-  fontFamily:
-    "Arial, sans-serif",
+  fontFamily: "Arial, sans-serif",
 };
-
 
 const headerStyle = {
   background:
@@ -520,13 +715,11 @@ const headerStyle = {
     "0 5px 15px rgba(0,0,0,0.1)",
 };
 
-
 const containerStyle = {
   maxWidth: "1000px",
   margin: "auto",
   padding: "25px",
 };
-
 
 const statsCard = {
   background: "white",
@@ -537,38 +730,31 @@ const statsCard = {
     "0 5px 20px rgba(0,0,0,0.05)",
 };
 
-
 const searchStyle = {
   width: "100%",
   padding: "15px",
   borderRadius: "10px",
-  border:
-    "1px solid #ddd",
+  border: "1px solid #ddd",
   marginBottom: "25px",
   fontSize: "16px",
-  boxSizing:
-    "border-box",
+  boxSizing: "border-box",
 };
-
 
 const cardStyle = {
   background: "white",
   padding: "25px",
   borderRadius: "18px",
   marginBottom: "20px",
-  border:
-    "1px solid #e5e7eb",
+  border: "1px solid #e5e7eb",
   boxShadow:
     "0 8px 25px rgba(0,0,0,0.06)",
 };
-
 
 const nameStyle = {
   color: "#0057b8",
   marginTop: 0,
   fontSize: "22px",
 };
-
 
 const aiCardStyle = {
   marginTop: "20px",
@@ -578,7 +764,6 @@ const aiCardStyle = {
   borderLeft:
     "5px solid #0057b8",
 };
-
 
 const buttonStyle = {
   background: "#0057b8",
@@ -590,6 +775,15 @@ const buttonStyle = {
   fontWeight: "bold",
 };
 
+const qualificationButtonStyle = {
+  background: "#087f5b",
+  color: "white",
+  border: "none",
+  padding: "12px 18px",
+  borderRadius: "8px",
+  cursor: "pointer",
+  fontWeight: "bold",
+};
 
 const homeButtonStyle = {
   background:
@@ -603,7 +797,6 @@ const homeButtonStyle = {
   fontWeight: "bold",
 };
 
-
 const errorStyle = {
   background: "#fef2f2",
   color: "#b91c1c",
@@ -613,7 +806,6 @@ const errorStyle = {
   borderRadius: "12px",
   marginBottom: "20px",
 };
-
 
 const emptyStyle = {
   textAlign: "center",
