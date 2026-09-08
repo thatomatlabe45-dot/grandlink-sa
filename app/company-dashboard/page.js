@@ -1131,6 +1131,15 @@ export default function CompanyDashboard() {
                 }
                 style={headerButtonStyle}
               >
+              
+              <button
+  onClick={() =>
+    router.push("/")
+  }
+  style={headerButtonStyle}
+>
+  🏠 Home
+</button>
                 ⚙️ Company Profile
               </button>
 
