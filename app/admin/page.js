@@ -79,8 +79,19 @@ export default function AdminPage() {
   // ==========================================================
 
   useEffect(() => {
-    checkAdmin();
-  }, []);
+  checkAdmin();
+
+  // Reset document button when returning from the PDF
+  const handlePageShow = () => {
+    setOpeningDocument("");
+  };
+
+  window.addEventListener("pageshow", handlePageShow);
+
+  return () => {
+    window.removeEventListener("pageshow", handlePageShow);
+  };
+}, []);
 
   async function checkAdmin() {
     try {
