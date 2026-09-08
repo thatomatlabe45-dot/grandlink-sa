@@ -1061,101 +1061,133 @@ export default function CompanyDashboard() {
       >
         {/* HEADER */}
 
-        <div
-          style={{
-            background:
-              "linear-gradient(135deg,#003f88,#0077e6)",
-            color: "#ffffff",
-            padding: "35px",
-            borderRadius: "24px",
-            boxShadow:
-              "0 15px 40px rgba(0,87,184,.20)",
-            marginBottom: "25px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: "20px",
-              flexWrap: "wrap",
-              alignItems: "center",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  opacity: 0.8,
-                  marginBottom: "8px",
-                }}
-              >
-                GRADLINK SA • RECRUITMENT PORTAL
-              </div>
+       {/* HEADER */}
 
-              <h1
-                style={{
-                  margin: "0 0 10px",
-                  fontSize: "32px",
-                }}
-              >
-                🏢 Company Dashboard
-              </h1>
-
-              <p
-                style={{
-                  margin: 0,
-                  opacity: 0.9,
-                  fontSize: "17px",
-                }}
-              >
-                Welcome back
-                {company?.company_name
-                  ? `, ${company.company_name}`
-                  : ""}
-                . Manage your internships and discover
-                your best candidates.
-              </p>
-            </div>
-
-           <div
+<div
   style={{
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "10px",
-    width: "100%",
+    background:
+      "linear-gradient(135deg,#003f88,#0077e6)",
+    color: "#ffffff",
+    padding: "25px",
+    borderRadius: "24px",
+    boxShadow:
+      "0 15px 40px rgba(0,87,184,.20)",
+    marginBottom: "25px",
   }}
 >
-              <button
-                onClick={() =>
-                  router.push("/company")
-                }
-                style={headerButtonStyle}
-              >
-              
-              <button
-  onClick={() =>
-    router.push("/")
-  }
-  style={headerButtonStyle}
->
-  🏠 Home
-</button>
-                ⚙️ Company Profile
-              </button>
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      gap: "25px",
+      flexWrap: "wrap",
+      alignItems: "center",
+    }}
+  >
+    {/* DASHBOARD TITLE */}
 
-              <button
-                onClick={() =>
-                  router.push("/internships")
-                }
-                style={headerButtonStyle}
-              >
-                ➕ Post Internship
-              </button>
-            </div>
-          </div>
-        </div>
+    <div
+      style={{
+        flex: "1 1 300px",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "14px",
+          opacity: 0.8,
+          marginBottom: "8px",
+          fontWeight: "600",
+          letterSpacing: "0.5px",
+        }}
+      >
+        GRADLINK SA • RECRUITMENT PORTAL
+      </div>
 
+      <h1
+        style={{
+          margin: "0 0 10px",
+          fontSize: "32px",
+          lineHeight: "1.2",
+        }}
+      >
+        🏢 Company Dashboard
+      </h1>
+
+      <p
+        style={{
+          margin: 0,
+          opacity: 0.9,
+          fontSize: "17px",
+          lineHeight: "1.5",
+        }}
+      >
+        Welcome back
+        {company?.company_name
+          ? `, ${company.company_name}`
+          : ""}
+        . Manage your internships and discover
+        your best candidates.
+      </p>
+    </div>
+
+    {/* NAVIGATION BUTTONS */}
+
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "10px",
+        width: "100%",
+        maxWidth: "230px",
+      }}
+    >
+      {/* HOME */}
+
+      <button
+        onClick={() =>
+          router.push("/")
+        }
+        style={{
+          ...headerButtonStyle,
+          width: "100%",
+          textAlign: "center",
+        }}
+      >
+        🏠 Home
+      </button>
+
+      {/* COMPANY PROFILE */}
+
+      <button
+        onClick={() =>
+          router.push("/company")
+        }
+        style={{
+          ...headerButtonStyle,
+          width: "100%",
+          textAlign: "center",
+        }}
+      >
+        ⚙️ Company Profile
+      </button>
+
+      {/* POST INTERNSHIP */}
+
+      <button
+        onClick={() =>
+          router.push("/internships")
+        }
+        style={{
+          ...headerButtonStyle,
+          width: "100%",
+          textAlign: "center",
+        }}
+      >
+        ➕ Post Internship
+      </button>
+    </div>
+  </div>
+</div>
         {/* MESSAGE */}
 
         {message && (
