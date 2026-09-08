@@ -1118,13 +1118,14 @@ export default function CompanyDashboard() {
               </p>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "10px",
-              }}
-            >
+           <div
+  style={{
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "10px",
+    width: "100%",
+  }}
+>
               <button
                 onClick={() =>
                   router.push("/company")
