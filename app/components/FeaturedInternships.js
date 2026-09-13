@@ -1,8 +1,23 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 export default function FeaturedInternships({ internships = [] }) {
+  const [profileType, setProfileType] = useState(null);
+
+  useEffect(() => {
+    const savedProfile = localStorage.getItem("gradlink_profile");
+
+    if (savedProfile) {
+      setProfileType(savedProfile.toLowerCase());
+    }
+  }, []);
+
+  // Graduate = can apply
+  // Company = can only view
+  const isGraduate = profileType === "graduate";
+
   return (
     <section
       style={{
@@ -101,7 +116,6 @@ export default function FeaturedInternships({ internships = [] }) {
                 }}
               >
                 {/* Company */}
-
                 <div
                   style={{
                     display: "flex",
@@ -150,6 +164,7 @@ export default function FeaturedInternships({ internships = [] }) {
                   </div>
                 </div>
 
+                {/* Job title */}
                 <h2
                   style={{
                     color: "#0057b8",
@@ -159,6 +174,7 @@ export default function FeaturedInternships({ internships = [] }) {
                   {job.job_title}
                 </h2>
 
+                {/* Badges */}
                 <div
                   style={{
                     display: "flex",
@@ -182,6 +198,7 @@ export default function FeaturedInternships({ internships = [] }) {
                   )}
                 </div>
 
+                {/* Description */}
                 <p
                   style={{
                     color: "#666",
@@ -189,10 +206,12 @@ export default function FeaturedInternships({ internships = [] }) {
                     minHeight: "70px",
                   }}
                 >
-                  {job.description?.slice(0, 120) || "No description available."}
+                  {job.description?.slice(0, 120) ||
+                    "No description available."}
                   ...
                 </p>
 
+                {/* Buttons */}
                 <div
                   style={{
                     display: "flex",
@@ -200,31 +219,33 @@ export default function FeaturedInternships({ internships = [] }) {
                     marginTop: "25px",
                   }}
                 >
+                  {/* View Details */}
                   <Link
-                    href="/jobs"
+                    href={`/jobs/${job.id}`}
                     style={{
                       flex: 1,
+                      textDecoration: "none",
                     }}
                   >
-                    <button
-                      style={primaryButton}
-                    >
+                    <button style={primaryButton}>
                       View Details
                     </button>
                   </Link>
 
-                  <Link
-                    href="/jobs"
-                    style={{
-                      flex: 1,
-                    }}
-                  >
-                    <button
-                      style={secondaryButton}
+                  {/* Apply - GRADUATES ONLY */}
+                  {isGraduate && (
+                    <Link
+                      href={`/jobs/${job.id}`}
+                      style={{
+                        flex: 1,
+                        textDecoration: "none",
+                      }}
                     >
-                      Apply
-                    </button>
-                  </Link>
+                      <button style={secondaryButton}>
+                        Apply Now
+                      </button>
+                    </Link>
+                  )}
                 </div>
               </div>
             ))}
