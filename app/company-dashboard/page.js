@@ -1327,7 +1327,7 @@ export default function CompanyDashboard() {
 <button
   onClick={() =>
     router.push(
-      `/company/applicants/${internship.id}`
+      `/company/internships/${internship.id}/applicants`
     )
   }
   style={{
