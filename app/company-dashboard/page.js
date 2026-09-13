@@ -1309,20 +1309,45 @@ export default function CompanyDashboard() {
                       </p>
 
                       <div
-                        style={{
-                          marginTop: "15px",
-                          padding: "10px 14px",
-                          background: "#eaf3ff",
-                          color: "#0057B8",
-                          borderRadius: "10px",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        👨‍🎓 {applicantCount} Applicant
-                        {applicantCount === 1
-                          ? ""
-                          : "s"}
-                      </div>
+  style={{
+    marginTop: "15px",
+    padding: "10px 14px",
+    background: "#eaf3ff",
+    color: "#0057B8",
+    borderRadius: "10px",
+    fontWeight: "bold",
+  }}
+>
+  👨‍🎓 {applicantCount} Applicant
+  {applicantCount === 1
+    ? ""
+    : "s"}
+</div>
+
+<button
+  onClick={() =>
+    router.push(
+      `/company/applicants/${internship.id}`
+    )
+  }
+  style={{
+    width: "100%",
+    marginTop: "12px",
+    border: "none",
+    background:
+      "linear-gradient(135deg,#0057B8,#0077e6)",
+    color: "#ffffff",
+    padding: "12px 16px",
+    borderRadius: "11px",
+    cursor: "pointer",
+    fontWeight: "bold",
+    fontSize: "14px",
+    boxShadow:
+      "0 6px 15px rgba(0,87,184,.18)",
+  }}
+>
+  👥 View Applicants
+</button>
                     </div>
                   );
                 }
