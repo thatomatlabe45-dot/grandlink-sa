@@ -329,9 +329,10 @@ export default function ApplicationDetailsPage() {
     params?.id;
 
   const applicationId =
-    params?.applicationId ||
-    params?.applicationid ||
-    params?.application_id;
+  params?.applicationID ||
+  params?.applicationId ||
+  params?.applicationid ||
+  params?.application_id;
 
   const [internship, setInternship] =
     useState(null);
