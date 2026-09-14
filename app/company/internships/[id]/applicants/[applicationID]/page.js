@@ -187,12 +187,16 @@ function calculateMatch(application, internship) {
   ) {
     fieldScore = 30;
   } else {
-    const applicantWords = applicantField.split(" ");
-    const requiredWords = requiredField.split(" ");
+    const applicantWords =
+      applicantField.split(" ");
 
-    const overlap = applicantWords.filter((word) =>
-      requiredWords.includes(word)
-    );
+    const requiredWords =
+      requiredField.split(" ");
+
+    const overlap =
+      applicantWords.filter((word) =>
+        requiredWords.includes(word)
+      );
 
     if (overlap.length > 0) {
       fieldScore = 20;
@@ -212,17 +216,20 @@ function calculateMatch(application, internship) {
     skillsScore = 30;
   } else {
     internshipSkills.forEach((requiredSkill) => {
-      const required = normalizeText(requiredSkill);
+      const required =
+        normalizeText(requiredSkill);
 
-      const found = applicantSkills.some((skill) => {
-        const applicant = normalizeText(skill);
+      const found =
+        applicantSkills.some((skill) => {
+          const applicant =
+            normalizeText(skill);
 
-        return (
-          applicant === required ||
-          applicant.includes(required) ||
-          required.includes(applicant)
-        );
-      });
+          return (
+            applicant === required ||
+            applicant.includes(required) ||
+            required.includes(applicant)
+          );
+        });
 
       if (found) {
         matchedSkills.push(requiredSkill);
@@ -232,7 +239,9 @@ function calculateMatch(application, internship) {
     });
 
     skillsScore =
-      (matchedSkills.length / internshipSkills.length) * 30;
+      (matchedSkills.length /
+        internshipSkills.length) *
+      30;
   }
 
   const score = Math.round(
@@ -281,7 +290,9 @@ function calculateMatch(application, internship) {
   if (matchedSkills.length > 0) {
     strengths.push(
       `Matches ${matchedSkills.length} required skill${
-        matchedSkills.length === 1 ? "" : "s"
+        matchedSkills.length === 1
+          ? ""
+          : "s"
       }.`
     );
   }
@@ -289,7 +300,9 @@ function calculateMatch(application, internship) {
   if (missingSkills.length > 0) {
     improvements.push(
       `Missing ${missingSkills.length} required skill${
-        missingSkills.length === 1 ? "" : "s"
+        missingSkills.length === 1
+          ? ""
+          : "s"
       }.`
     );
   }
@@ -312,21 +325,42 @@ export default function ApplicationDetailsPage() {
   const params = useParams();
   const router = useRouter();
 
-  const internshipId = params?.id;
-  const applicationId = params?.applicationId;
+  const internshipId =
+    params?.id;
 
-  const [internship, setInternship] = useState(null);
-  const [application, setApplication] = useState(null);
+  const applicationId =
+    params?.applicationId ||
+    params?.applicationid ||
+    params?.application_id;
 
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [internship, setInternship] =
+    useState(null);
+
+  const [application, setApplication] =
+    useState(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [errorMessage, setErrorMessage] =
+    useState("");
 
   // ==========================================================
   // LOAD APPLICATION
   // ==========================================================
 
   useEffect(() => {
-    if (!internshipId || !applicationId) return;
+    if (!internshipId || !applicationId) {
+      setLoading(false);
+
+      setErrorMessage(
+        "The application could not be identified. Please return to the applicant list and try again."
+      );
+
+      return;
+    }
+
+    let cancelled = false;
 
     async function loadApplication() {
       setLoading(true);
@@ -338,11 +372,18 @@ export default function ApplicationDetailsPage() {
         // ----------------------------------------------------
 
         const {
-          data: { user },
+          data: {
+            user,
+          },
           error: userError,
-        } = await supabase.auth.getUser();
+        } =
+          await supabase.auth.getUser();
 
-        if (userError || !user) {
+        if (userError) {
+          throw userError;
+        }
+
+        if (!user) {
           router.push("/login");
           return;
         }
@@ -354,22 +395,21 @@ export default function ApplicationDetailsPage() {
         const {
           data: company,
           error: companyError,
-        } = await supabase
-          .from("companies")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
+        } =
+          await supabase
+            .from("companies")
+            .select("*")
+            .eq("user_id", user.id)
+            .maybeSingle();
 
         if (companyError) {
           throw companyError;
         }
 
         if (!company) {
-          setErrorMessage(
+          throw new Error(
             "Company profile could not be found."
           );
-          setLoading(false);
-          return;
         }
 
         // ----------------------------------------------------
@@ -379,22 +419,21 @@ export default function ApplicationDetailsPage() {
         const {
           data: internshipData,
           error: internshipError,
-        } = await supabase
-          .from("internships")
-          .select("*")
-          .eq("id", internshipId)
-          .maybeSingle();
+        } =
+          await supabase
+            .from("internships")
+            .select("*")
+            .eq("id", internshipId)
+            .maybeSingle();
 
         if (internshipError) {
           throw internshipError;
         }
 
         if (!internshipData) {
-          setErrorMessage(
+          throw new Error(
             "This internship could not be found."
           );
-          setLoading(false);
-          return;
         }
 
         // ----------------------------------------------------
@@ -405,12 +444,12 @@ export default function ApplicationDetailsPage() {
           internshipData.company_name !==
           company.company_name
         ) {
-          setErrorMessage(
+          throw new Error(
             "You do not have permission to view this application."
           );
-          setLoading(false);
-          return;
         }
+
+        if (cancelled) return;
 
         setInternship(internshipData);
 
@@ -421,121 +460,203 @@ export default function ApplicationDetailsPage() {
         const {
           data: applicationData,
           error: applicationError,
-        } = await supabase
-          .from("applications")
-          .select("*")
-          .eq("id", applicationId)
-          .eq("internship_id", internshipId)
-          .maybeSingle();
+        } =
+          await supabase
+            .from("applications")
+            .select("*")
+            .eq("id", applicationId)
+            .eq("internship_id", internshipId)
+            .maybeSingle();
 
         if (applicationError) {
           throw applicationError;
         }
 
         if (!applicationData) {
-          setErrorMessage(
+          throw new Error(
             "This application could not be found."
           );
-          setLoading(false);
-          return;
         }
 
         // ----------------------------------------------------
-        // GET GRADUATE
+        // START WITH APPLICATION DATA
         // ----------------------------------------------------
+        //
+        // IMPORTANT:
+        // The application already stores the applicant
+        // information. Therefore the page does NOT depend
+        // on the graduates table to finish loading.
+        //
 
-        let graduate = null;
+        let combined = {
+          ...applicationData,
+        };
+
+        // ----------------------------------------------------
+        // OPTIONAL GRADUATE PROFILE
+        // ----------------------------------------------------
 
         if (applicationData.graduate_id) {
-          const {
-            data: graduateData,
-            error: graduateError,
-          } = await supabase
-            .from("graduates")
-            .select("*")
-            .eq("id", applicationData.graduate_id)
-            .maybeSingle();
+          try {
+            const {
+              data: graduateData,
+              error: graduateError,
+            } =
+              await supabase
+                .from("graduates")
+                .select("*")
+                .eq(
+                  "id",
+                  applicationData.graduate_id
+                )
+                .maybeSingle();
 
-          if (graduateError) {
-            console.error(
-              "Graduate profile error:",
+            if (
+              !graduateError &&
+              graduateData
+            ) {
+              combined = {
+                ...combined,
+                ...graduateData,
+
+                // Preserve application values
+                // when they exist.
+                full_name:
+                  applicationData.full_name ||
+                  graduateData.full_name,
+
+                email:
+                  applicationData.email ||
+                  graduateData.email,
+
+                phone:
+                  applicationData.phone ||
+                  graduateData.phone,
+
+                qualification:
+                  applicationData.qualification ||
+                  graduateData.qualification,
+
+                field_of_study:
+                  applicationData.field_of_study ||
+                  graduateData.field_of_study,
+
+                skills:
+                  applicationData.skills ||
+                  graduateData.skills,
+
+                career_goals:
+                  applicationData.career_goals ||
+                  graduateData.career_goals,
+              };
+            }
+          } catch (graduateError) {
+            console.log(
+              "Graduate profile could not be loaded. Using application data.",
               graduateError
             );
-          } else {
-            graduate = graduateData;
           }
         }
-
-        // ----------------------------------------------------
-        // COMBINE
-        // ----------------------------------------------------
-
-        const combined = {
-          ...applicationData,
-          ...(graduate || {}),
-        };
 
         // ----------------------------------------------------
         // AI MATCH
         // ----------------------------------------------------
 
-        const match = calculateMatch(
-          combined,
-          internshipData
-        );
+        const match =
+          calculateMatch(
+            combined,
+            internshipData
+          );
 
         const finalApplication = {
           ...combined,
-          matchScore: match.score,
-          matchLabel: match.label,
-          matchedSkills: match.matchedSkills,
-          missingSkills: match.missingSkills,
-          strengths: match.strengths,
-          improvements: match.improvements,
+
+          matchScore:
+            match.score,
+
+          matchLabel:
+            match.label,
+
+          matchedSkills:
+            match.matchedSkills,
+
+          missingSkills:
+            match.missingSkills,
+
+          strengths:
+            match.strengths,
+
+          improvements:
+            match.improvements,
         };
 
-        setApplication(finalApplication);
+        if (cancelled) return;
+
+        setApplication(
+          finalApplication
+        );
       } catch (error) {
         console.error(
           "Application details error:",
           error
         );
 
-        setErrorMessage(
-          error?.message ||
-            "Could not load this application."
-        );
+        if (!cancelled) {
+          setErrorMessage(
+            error?.message ||
+              "Could not load this application."
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
     loadApplication();
-  }, [internshipId, applicationId, router]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    internshipId,
+    applicationId,
+    router,
+  ]);
 
   // ==========================================================
   // UPDATE STATUS
   // ==========================================================
 
   async function updateStatus(status) {
-    if (!application?.id) return;
+    if (!application?.id) {
+      return;
+    }
 
     try {
-      const { error } = await supabase
+      const {
+        error,
+      } = await supabase
         .from("applications")
         .update({
           status,
         })
-        .eq("id", application.id);
+        .eq(
+          "id",
+          application.id
+        );
 
       if (error) {
         throw error;
       }
 
-      setApplication((current) => ({
-        ...current,
-        status,
-      }));
+      setApplication(
+        (current) => ({
+          ...current,
+          status,
+        })
+      );
     } catch (error) {
       console.error(
         "Status update error:",
@@ -553,7 +674,10 @@ export default function ApplicationDetailsPage() {
   // OPEN DOCUMENT
   // ==========================================================
 
-  async function openDocument(url, label) {
+  async function openDocument(
+    url,
+    label
+  ) {
     if (!url) {
       alert(
         `This applicant has not uploaded a ${label}.`
@@ -561,10 +685,11 @@ export default function ApplicationDetailsPage() {
       return;
     }
 
-    const newWindow = window.open(
-      "",
-      "_blank"
-    );
+    const newWindow =
+      window.open(
+        "",
+        "_blank"
+      );
 
     if (!newWindow) {
       alert(
@@ -574,14 +699,27 @@ export default function ApplicationDetailsPage() {
     }
 
     try {
-      const cleanPath = String(url)
-        .replace(/^.*\/documents\//, "")
-        .replace(/^\/+/, "");
+      const cleanPath =
+        String(url)
+          .replace(
+            /^.*\/documents\//,
+            ""
+          )
+          .replace(
+            /^\/+/,
+            ""
+          );
 
-      const { data, error } =
+      const {
+        data,
+        error,
+      } =
         await supabase.storage
           .from("documents")
-          .createSignedUrl(cleanPath, 600);
+          .createSignedUrl(
+            cleanPath,
+            600
+          );
 
       if (error) {
         throw error;
@@ -618,6 +756,15 @@ export default function ApplicationDetailsPage() {
     return (
       <main style={pageStyle}>
         <div style={loadingBox}>
+          <div
+            style={{
+              fontSize: "38px",
+              marginBottom: "15px",
+            }}
+          >
+            ⏳
+          </div>
+
           Loading application...
         </div>
       </main>
@@ -632,7 +779,11 @@ export default function ApplicationDetailsPage() {
     return (
       <main style={pageStyle}>
         <div style={errorBox}>
-          <div style={{ fontSize: "50px" }}>
+          <div
+            style={{
+              fontSize: "50px",
+            }}
+          >
             ⚠️
           </div>
 
@@ -669,11 +820,54 @@ export default function ApplicationDetailsPage() {
     );
   }
 
-  if (!application || !internship) {
-    return null;
+  // ==========================================================
+  // SAFETY
+  // ==========================================================
+
+  if (
+    !application ||
+    !internship
+  ) {
+    return (
+      <main style={pageStyle}>
+        <div style={errorBox}>
+          <div
+            style={{
+              fontSize: "50px",
+            }}
+          >
+            ⚠️
+          </div>
+
+          <h1>
+            Application unavailable
+          </h1>
+
+          <p
+            style={{
+              color: "#666",
+            }}
+          >
+            The application could not be displayed.
+          </p>
+
+          <button
+            onClick={() =>
+              router.push(
+                `/company/internships/${internshipId}/applicants`
+              )
+            }
+            style={primaryButton}
+          >
+            ← Back to Applicants
+          </button>
+        </div>
+      </main>
+    );
   }
 
-  const score = application.matchScore || 0;
+  const score =
+    application.matchScore || 0;
 
   // ==========================================================
   // PAGE
@@ -683,9 +877,7 @@ export default function ApplicationDetailsPage() {
     <main style={pageStyle}>
       <div style={containerStyle}>
 
-        {/* ==================================================
-            HEADER
-        ================================================== */}
+        {/* HEADER */}
 
         <div style={headerStyle}>
           <button
@@ -702,7 +894,8 @@ export default function ApplicationDetailsPage() {
           <div
             style={{
               display: "flex",
-              justifyContent: "space-between",
+              justifyContent:
+                "space-between",
               gap: "25px",
               flexWrap: "wrap",
               alignItems: "center",
@@ -721,7 +914,8 @@ export default function ApplicationDetailsPage() {
 
               <h1
                 style={{
-                  margin: "0 0 8px",
+                  margin:
+                    "0 0 8px",
                   fontSize: "32px",
                 }}
               >
@@ -750,7 +944,8 @@ export default function ApplicationDetailsPage() {
                 border:
                   "1px solid rgba(255,255,255,0.3)",
                 borderRadius: "18px",
-                padding: "18px 25px",
+                padding:
+                  "18px 25px",
                 textAlign: "center",
                 minWidth: "140px",
               }}
@@ -776,9 +971,7 @@ export default function ApplicationDetailsPage() {
           </div>
         </div>
 
-        {/* ==================================================
-            STATUS
-        ================================================== */}
+        {/* STATUS */}
 
         <div style={sectionStyle}>
           <div style={sectionHeader}>
@@ -787,9 +980,11 @@ export default function ApplicationDetailsPage() {
                 Application Status
               </h2>
 
-              <p style={sectionSubtitle}>
-                Decide how you want to proceed with
-                this applicant.
+              <p
+                style={sectionSubtitle}
+              >
+                Decide how you want to
+                proceed with this applicant.
               </p>
             </div>
 
@@ -810,36 +1005,46 @@ export default function ApplicationDetailsPage() {
           >
             <button
               onClick={() =>
-                updateStatus("shortlisted")
+                updateStatus(
+                  "shortlisted"
+                )
               }
-              style={statusButton("#16803c")}
+              style={statusButton(
+                "#16803c"
+              )}
             >
               ⭐ Shortlist
             </button>
 
             <button
               onClick={() =>
-                updateStatus("rejected")
+                updateStatus(
+                  "rejected"
+                )
               }
-              style={statusButton("#c62828")}
+              style={statusButton(
+                "#c62828"
+              )}
             >
               ✕ Reject
             </button>
 
             <button
               onClick={() =>
-                updateStatus("pending")
+                updateStatus(
+                  "pending"
+                )
               }
-              style={statusButton("#777")}
+              style={statusButton(
+                "#777"
+              )}
             >
               ↺ Reset to Pending
             </button>
           </div>
         </div>
 
-        {/* ==================================================
-            PERSONAL INFORMATION
-        ================================================== */}
+        {/* PERSONAL INFORMATION */}
 
         <div style={sectionStyle}>
           <h2 style={sectionTitle}>
@@ -912,9 +1117,7 @@ export default function ApplicationDetailsPage() {
           </div>
         </div>
 
-        {/* ==================================================
-            SKILLS
-        ================================================== */}
+        {/* SKILLS */}
 
         <div style={sectionStyle}>
           <h2 style={sectionTitle}>
@@ -933,14 +1136,16 @@ export default function ApplicationDetailsPage() {
             >
               {getSkillsArray(
                 application.skills
-              ).map((skill, index) => (
-                <span
-                  key={index}
-                  style={skillBadge}
-                >
-                  {skill}
-                </span>
-              ))}
+              ).map(
+                (skill, index) => (
+                  <span
+                    key={index}
+                    style={skillBadge}
+                  >
+                    {skill}
+                  </span>
+                )
+              )}
             </div>
           ) : (
             <p style={mutedText}>
@@ -949,9 +1154,7 @@ export default function ApplicationDetailsPage() {
           )}
         </div>
 
-        {/* ==================================================
-            CAREER GOALS
-        ================================================== */}
+        {/* CAREER GOALS */}
 
         <div style={sectionStyle}>
           <h2 style={sectionTitle}>
@@ -964,9 +1167,7 @@ export default function ApplicationDetailsPage() {
           </div>
         </div>
 
-        {/* ==================================================
-            AI MATCH ANALYSIS
-        ================================================== */}
+        {/* AI MATCH */}
 
         <div style={sectionStyle}>
           <div style={sectionHeader}>
@@ -975,9 +1176,11 @@ export default function ApplicationDetailsPage() {
                 🤖 AI Match Analysis
               </h2>
 
-              <p style={sectionSubtitle}>
-                Compatibility with this specific
-                internship.
+              <p
+                style={sectionSubtitle}
+              >
+                Compatibility with this
+                specific internship.
               </p>
             </div>
 
@@ -999,19 +1202,20 @@ export default function ApplicationDetailsPage() {
             </div>
           </div>
 
-          {/* MATCH BREAKDOWN */}
-
           <div style={gridStyle}>
             <div
               style={{
                 ...analysisBox,
-                background: "#f4fbf6",
-                borderColor: "#ccebd7",
+                background:
+                  "#f4fbf6",
+                borderColor:
+                  "#ccebd7",
               }}
             >
               <strong
                 style={{
-                  color: "#16803c",
+                  color:
+                    "#16803c",
                 }}
               >
                 Qualification
@@ -1037,13 +1241,16 @@ export default function ApplicationDetailsPage() {
             <div
               style={{
                 ...analysisBox,
-                background: "#f4f8ff",
-                borderColor: "#c9dcf5",
+                background:
+                  "#f4f8ff",
+                borderColor:
+                  "#c9dcf5",
               }}
             >
               <strong
                 style={{
-                  color: "#0057B8",
+                  color:
+                    "#0057B8",
                 }}
               >
                 Field of Study
@@ -1067,23 +1274,25 @@ export default function ApplicationDetailsPage() {
             </div>
           </div>
 
-          {/* STRENGTHS */}
-
           {application.strengths?.length >
             0 && (
             <div
               style={{
-                background: "#f4fbf6",
+                background:
+                  "#f4fbf6",
                 border:
                   "1px solid #ccebd7",
-                borderRadius: "12px",
+                borderRadius:
+                  "12px",
                 padding: "18px",
-                marginTop: "20px",
+                marginTop:
+                  "20px",
               }}
             >
               <h3
                 style={{
-                  color: "#16803c",
+                  color:
+                    "#16803c",
                   marginTop: 0,
                 }}
               >
@@ -1093,13 +1302,19 @@ export default function ApplicationDetailsPage() {
               <ul
                 style={{
                   color: "#444",
-                  lineHeight: "1.8",
+                  lineHeight:
+                    "1.8",
                   marginBottom: 0,
                 }}
               >
                 {application.strengths.map(
-                  (item, index) => (
-                    <li key={index}>
+                  (
+                    item,
+                    index
+                  ) => (
+                    <li
+                      key={index}
+                    >
                       {item}
                     </li>
                   )
@@ -1108,18 +1323,18 @@ export default function ApplicationDetailsPage() {
             </div>
           )}
 
-          {/* MATCHED SKILLS */}
-
           {application.matchedSkills?.length >
             0 && (
             <div
               style={{
-                marginTop: "20px",
+                marginTop:
+                  "20px",
               }}
             >
               <h3
                 style={{
-                  color: "#16803c",
+                  color:
+                    "#16803c",
                 }}
               >
                 ✓ Matched Skills
@@ -1128,12 +1343,16 @@ export default function ApplicationDetailsPage() {
               <div
                 style={{
                   display: "flex",
-                  flexWrap: "wrap",
+                  flexWrap:
+                    "wrap",
                   gap: "8px",
                 }}
               >
                 {application.matchedSkills.map(
-                  (skill, index) => (
+                  (
+                    skill,
+                    index
+                  ) => (
                     <span
                       key={index}
                       style={{
@@ -1161,23 +1380,25 @@ export default function ApplicationDetailsPage() {
             </div>
           )}
 
-          {/* MISSING SKILLS */}
-
           {application.missingSkills?.length >
             0 && (
             <div
               style={{
-                background: "#fffaf0",
+                background:
+                  "#fffaf0",
                 border:
                   "1px solid #f0dfb2",
-                borderRadius: "12px",
+                borderRadius:
+                  "12px",
                 padding: "18px",
-                marginTop: "20px",
+                marginTop:
+                  "20px",
               }}
             >
               <h3
                 style={{
-                  color: "#9a6700",
+                  color:
+                    "#9a6700",
                   marginTop: 0,
                 }}
               >
@@ -1187,17 +1408,23 @@ export default function ApplicationDetailsPage() {
               <div
                 style={{
                   display: "flex",
-                  flexWrap: "wrap",
+                  flexWrap:
+                    "wrap",
                   gap: "8px",
                 }}
               >
                 {application.missingSkills.map(
-                  (skill, index) => (
+                  (
+                    skill,
+                    index
+                  ) => (
                     <span
                       key={index}
                       style={{
-                        background: "#fff",
-                        color: "#7a5700",
+                        background:
+                          "#fff",
+                        color:
+                          "#7a5700",
                         border:
                           "1px solid #e1c878",
                         padding:
@@ -1216,18 +1443,18 @@ export default function ApplicationDetailsPage() {
             </div>
           )}
 
-          {/* IMPROVEMENTS */}
-
           {application.improvements?.length >
             0 && (
             <div
               style={{
-                marginTop: "20px",
+                marginTop:
+                  "20px",
               }}
             >
               <h3
                 style={{
-                  color: "#9a6700",
+                  color:
+                    "#9a6700",
                 }}
               >
                 💡 Considerations
@@ -1236,12 +1463,18 @@ export default function ApplicationDetailsPage() {
               <ul
                 style={{
                   color: "#555",
-                  lineHeight: "1.7",
+                  lineHeight:
+                    "1.7",
                 }}
               >
                 {application.improvements.map(
-                  (item, index) => (
-                    <li key={index}>
+                  (
+                    item,
+                    index
+                  ) => (
+                    <li
+                      key={index}
+                    >
                       {item}
                     </li>
                   )
@@ -1251,16 +1484,16 @@ export default function ApplicationDetailsPage() {
           )}
         </div>
 
-        {/* ==================================================
-            DOCUMENTS
-        ================================================== */}
+        {/* DOCUMENTS */}
 
         <div style={sectionStyle}>
           <h2 style={sectionTitle}>
             📄 Applicant Documents
           </h2>
 
-          <p style={sectionSubtitle}>
+          <p
+            style={sectionSubtitle}
+          >
             Documents are opened through secure
             temporary links.
           </p>
@@ -1302,9 +1535,7 @@ export default function ApplicationDetailsPage() {
           </div>
         </div>
 
-        {/* ==================================================
-            INTERNSHIP
-        ================================================== */}
+        {/* INTERNSHIP */}
 
         <div style={sectionStyle}>
           <h2 style={sectionTitle}>
@@ -1362,16 +1593,15 @@ export default function ApplicationDetailsPage() {
           </div>
         </div>
 
-        {/* ==================================================
-            BOTTOM ACTIONS
-        ================================================== */}
+        {/* BOTTOM ACTIONS */}
 
         <div
           style={{
             background:
               "linear-gradient(135deg, #0057B8, #0077d9)",
             color: "#fff",
-            borderRadius: "18px",
+            borderRadius:
+              "18px",
             padding: "28px",
             textAlign: "center",
             marginTop: "25px",
@@ -1388,7 +1618,8 @@ export default function ApplicationDetailsPage() {
           <p
             style={{
               opacity: 0.9,
-              marginBottom: "22px",
+              marginBottom:
+                "22px",
             }}
           >
             Update the applicant's status or return
@@ -1398,25 +1629,34 @@ export default function ApplicationDetailsPage() {
           <div
             style={{
               display: "flex",
-              justifyContent: "center",
+              justifyContent:
+                "center",
               flexWrap: "wrap",
               gap: "10px",
             }}
           >
             <button
               onClick={() =>
-                updateStatus("shortlisted")
+                updateStatus(
+                  "shortlisted"
+                )
               }
-              style={bottomButton("#16803c")}
+              style={bottomButton(
+                "#16803c"
+              )}
             >
               ⭐ Shortlist Applicant
             </button>
 
             <button
               onClick={() =>
-                updateStatus("rejected")
+                updateStatus(
+                  "rejected"
+                )
               }
-              style={bottomButton("#c62828")}
+              style={bottomButton(
+                "#c62828"
+              )}
             >
               ✕ Reject Applicant
             </button>
@@ -1427,7 +1667,10 @@ export default function ApplicationDetailsPage() {
                   `/company/internships/${internshipId}/applicants`
                 )
               }
-              style={bottomButton("#fff", "#0057B8")}
+              style={bottomButton(
+                "#fff",
+                "#0057B8"
+              )}
             >
               ← Back to Applicants
             </button>
@@ -1442,12 +1685,17 @@ export default function ApplicationDetailsPage() {
 // INFO
 // ============================================================
 
-function Info({ label, value }) {
+function Info({
+  label,
+  value,
+}) {
   return (
     <div
       style={{
-        background: "#f7f9fc",
-        borderRadius: "12px",
+        background:
+          "#f7f9fc",
+        borderRadius:
+          "12px",
         padding: "16px",
       }}
     >
@@ -1455,9 +1703,12 @@ function Info({ label, value }) {
         style={{
           fontSize: "12px",
           color: "#777",
-          marginBottom: "7px",
-          textTransform: "uppercase",
-          letterSpacing: "0.5px",
+          marginBottom:
+            "7px",
+          textTransform:
+            "uppercase",
+          letterSpacing:
+            "0.5px",
         }}
       >
         {label}
@@ -1466,9 +1717,12 @@ function Info({ label, value }) {
       <div
         style={{
           color: "#222",
-          fontWeight: "600",
-          lineHeight: "1.5",
-          wordBreak: "break-word",
+          fontWeight:
+            "600",
+          lineHeight:
+            "1.5",
+          wordBreak:
+            "break-word",
         }}
       >
         {value}
@@ -1481,36 +1735,65 @@ function Info({ label, value }) {
 // STATUS BADGE
 // ============================================================
 
-function StatusBadge({ status }) {
-  const normalized = String(
-    status || "pending"
-  ).toLowerCase();
+function StatusBadge({
+  status,
+}) {
+  const normalized =
+    String(
+      status ||
+        "pending"
+    ).toLowerCase();
 
-  let background = "#f1f3f5";
-  let color = "#666";
-  let text = "Pending";
+  let background =
+    "#f1f3f5";
 
-  if (normalized === "shortlisted") {
-    background = "#e8f7ee";
-    color = "#16803c";
-    text = "⭐ Shortlisted";
+  let color =
+    "#666";
+
+  let text =
+    "Pending";
+
+  if (
+    normalized ===
+    "shortlisted"
+  ) {
+    background =
+      "#e8f7ee";
+
+    color =
+      "#16803c";
+
+    text =
+      "⭐ Shortlisted";
   }
 
-  if (normalized === "rejected") {
-    background = "#fff0f0";
-    color = "#c62828";
-    text = "✕ Rejected";
+  if (
+    normalized ===
+    "rejected"
+  ) {
+    background =
+      "#fff0f0";
+
+    color =
+      "#c62828";
+
+    text =
+      "✕ Rejected";
   }
 
   return (
     <span
       style={{
-        display: "inline-block",
+        display:
+          "inline-block",
         background,
         color,
-        padding: "9px 14px",
-        borderRadius: "20px",
-        fontWeight: "700",
+        padding:
+          "9px 14px",
+        borderRadius:
+          "20px",
+        fontWeight:
+          "700",
       }}
     >
       {text}
@@ -1522,11 +1805,17 @@ function StatusBadge({ status }) {
 // DATE
 // ============================================================
 
-function formatDate(value) {
-  if (!value) return "Not provided";
+function formatDate(
+  value
+) {
+  if (!value) {
+    return "Not provided";
+  }
 
   try {
-    return new Date(value).toLocaleDateString(
+    return new Date(
+      value
+    ).toLocaleDateString(
       "en-ZA",
       {
         day: "numeric",
@@ -1545,152 +1834,239 @@ function formatDate(value) {
 
 const pageStyle = {
   minHeight: "100vh",
-  background: "#f4f8fc",
-  padding: "30px 20px 60px",
+  background:
+    "#f4f8fc",
+  padding:
+    "30px 20px 60px",
 };
 
 const containerStyle = {
-  maxWidth: "1100px",
-  margin: "0 auto",
+  maxWidth:
+    "1100px",
+  margin:
+    "0 auto",
 };
 
 const loadingBox = {
-  background: "#fff",
-  borderRadius: "18px",
-  padding: "50px",
-  textAlign: "center",
-  color: "#0057B8",
-  fontSize: "22px",
-  fontWeight: "700",
+  background:
+    "#fff",
+  borderRadius:
+    "18px",
+  padding:
+    "50px",
+  textAlign:
+    "center",
+  color:
+    "#0057B8",
+  fontSize:
+    "22px",
+  fontWeight:
+    "700",
+  boxShadow:
+    "0 8px 30px rgba(0,0,0,0.06)",
 };
 
 const errorBox = {
-  maxWidth: "800px",
-  margin: "30px auto",
-  background: "#fff",
-  borderRadius: "18px",
-  padding: "40px",
-  textAlign: "center",
-  boxShadow: "0 8px 30px rgba(0,0,0,0.08)",
+  maxWidth:
+    "800px",
+  margin:
+    "30px auto",
+  background:
+    "#fff",
+  borderRadius:
+    "18px",
+  padding:
+    "40px",
+  textAlign:
+    "center",
+  boxShadow:
+    "0 8px 30px rgba(0,0,0,0.08)",
 };
 
 const headerStyle = {
   background:
     "linear-gradient(135deg, #0057B8, #0077d9)",
-  color: "#fff",
-  borderRadius: "20px",
-  padding: "30px",
-  marginBottom: "22px",
+  color:
+    "#fff",
+  borderRadius:
+    "20px",
+  padding:
+    "30px",
+  marginBottom:
+    "22px",
   boxShadow:
     "0 10px 30px rgba(0,87,184,0.18)",
 };
 
 const backButton = {
-  background: "rgba(255,255,255,0.15)",
-  color: "#fff",
+  background:
+    "rgba(255,255,255,0.15)",
+  color:
+    "#fff",
   border:
     "1px solid rgba(255,255,255,0.35)",
-  borderRadius: "9px",
-  padding: "9px 14px",
-  cursor: "pointer",
-  marginBottom: "22px",
+  borderRadius:
+    "9px",
+  padding:
+    "9px 14px",
+  cursor:
+    "pointer",
+  marginBottom:
+    "22px",
 };
 
 const sectionStyle = {
-  background: "#fff",
-  borderRadius: "18px",
-  padding: "25px",
-  marginBottom: "20px",
+  background:
+    "#fff",
+  borderRadius:
+    "18px",
+  padding:
+    "25px",
+  marginBottom:
+    "20px",
   boxShadow:
     "0 6px 24px rgba(0,0,0,0.06)",
 };
 
 const sectionHeader = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: "15px",
-  flexWrap: "wrap",
-  marginBottom: "20px",
+  display:
+    "flex",
+  justifyContent:
+    "space-between",
+  alignItems:
+    "center",
+  gap:
+    "15px",
+  flexWrap:
+    "wrap",
+  marginBottom:
+    "20px",
 };
 
 const sectionTitle = {
-  color: "#0057B8",
-  marginTop: 0,
-  marginBottom: "7px",
+  color:
+    "#0057B8",
+  marginTop:
+    0,
+  marginBottom:
+    "7px",
 };
 
 const sectionSubtitle = {
-  color: "#666",
-  marginTop: 0,
-  lineHeight: "1.5",
+  color:
+    "#666",
+  marginTop:
+    0,
+  lineHeight:
+    "1.5",
 };
 
 const gridStyle = {
-  display: "grid",
+  display:
+    "grid",
   gridTemplateColumns:
     "repeat(auto-fit,minmax(220px,1fr))",
-  gap: "15px",
+  gap:
+    "15px",
 };
 
 const analysisBox = {
-  border: "1px solid",
-  borderRadius: "12px",
-  padding: "18px",
+  border:
+    "1px solid",
+  borderRadius:
+    "12px",
+  padding:
+    "18px",
 };
 
 const skillBadge = {
-  background: "#eef5ff",
-  color: "#0057B8",
-  border: "1px solid #c9dcf5",
-  padding: "8px 13px",
-  borderRadius: "20px",
-  fontSize: "14px",
-  fontWeight: "600",
+  background:
+    "#eef5ff",
+  color:
+    "#0057B8",
+  border:
+    "1px solid #c9dcf5",
+  padding:
+    "8px 13px",
+  borderRadius:
+    "20px",
+  fontSize:
+    "14px",
+  fontWeight:
+    "600",
 };
 
 const textBox = {
-  background: "#f7f9fc",
-  borderRadius: "12px",
-  padding: "18px",
-  color: "#444",
-  lineHeight: "1.8",
-  whiteSpace: "pre-wrap",
+  background:
+    "#f7f9fc",
+  borderRadius:
+    "12px",
+  padding:
+    "18px",
+  color:
+    "#444",
+  lineHeight:
+    "1.8",
+  whiteSpace:
+    "pre-wrap",
 };
 
 const mutedText = {
-  color: "#777",
+  color:
+    "#777",
 };
 
 const primaryButton = {
-  background: "#0057B8",
-  color: "#fff",
-  border: "none",
-  borderRadius: "10px",
-  padding: "12px 18px",
-  fontWeight: "700",
-  cursor: "pointer",
+  background:
+    "#0057B8",
+  color:
+    "#fff",
+  border:
+    "none",
+  borderRadius:
+    "10px",
+  padding:
+    "12px 18px",
+  fontWeight:
+    "700",
+  cursor:
+    "pointer",
 };
 
 const documentButton = {
-  background: "#0057B8",
-  color: "#fff",
-  border: "none",
-  borderRadius: "10px",
-  padding: "13px 18px",
-  fontWeight: "700",
-  cursor: "pointer",
+  background:
+    "#0057B8",
+  color:
+    "#fff",
+  border:
+    "none",
+  borderRadius:
+    "10px",
+  padding:
+    "13px 18px",
+  fontWeight:
+    "700",
+  cursor:
+    "pointer",
 };
 
-function statusButton(background) {
+function statusButton(
+  background
+) {
   return {
     background,
-    color: "#fff",
-    border: "none",
-    borderRadius: "9px",
-    padding: "11px 16px",
-    fontWeight: "700",
-    cursor: "pointer",
+    color:
+      "#fff",
+    border:
+      "none",
+    borderRadius:
+      "9px",
+    padding:
+      "11px 16px",
+    fontWeight:
+      "700",
+    cursor:
+      "pointer",
   };
 }
 
@@ -1702,12 +2078,17 @@ function bottomButton(
     background,
     color,
     border:
-      background === "#fff"
+      background ===
+      "#fff"
         ? "none"
         : "1px solid rgba(255,255,255,0.2)",
-    borderRadius: "10px",
-    padding: "12px 17px",
-    fontWeight: "700",
-    cursor: "pointer",
+    borderRadius:
+      "10px",
+    padding:
+      "12px 17px",
+    fontWeight:
+      "700",
+    cursor:
+      "pointer",
   };
 }
