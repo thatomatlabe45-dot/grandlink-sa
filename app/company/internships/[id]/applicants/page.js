@@ -33,17 +33,11 @@ function getQualificationLevel(value) {
     return 6;
   }
 
-  if (
-    text.includes("honours") ||
-    text.includes("honors")
-  ) {
+  if (text.includes("honours") || text.includes("honors")) {
     return 5;
   }
 
-  if (
-    text.includes("degree") ||
-    text.includes("bachelor")
-  ) {
+  if (text.includes("degree") || text.includes("bachelor")) {
     return 4;
   }
 
@@ -78,9 +72,15 @@ function getQualificationLevel(value) {
 // QUALIFICATION MATCH
 // ============================================================
 
-function qualificationMatches(applicantQualification, requiredQualification) {
-  const applicantLevel = getQualificationLevel(applicantQualification);
-  const requiredLevel = getQualificationLevel(requiredQualification);
+function qualificationMatches(
+  applicantQualification,
+  requiredQualification
+) {
+  const applicantLevel =
+    getQualificationLevel(applicantQualification);
+
+  const requiredLevel =
+    getQualificationLevel(requiredQualification);
 
   if (!requiredQualification || requiredLevel === 0) {
     return true;
@@ -174,9 +174,7 @@ function calculateMatch(application, internship) {
     fieldScore = 35;
   } else if (!applicantField) {
     fieldScore = 0;
-  } else if (
-    applicantField === requiredField
-  ) {
+  } else if (applicantField === requiredField) {
     fieldScore = 35;
   } else if (
     applicantField.includes(requiredField) ||
@@ -201,6 +199,7 @@ function calculateMatch(application, internship) {
   // ----------------------------------------------------------
 
   let skillsScore = 0;
+
   const matchedSkills = [];
   const missingSkills = [];
 
@@ -251,17 +250,27 @@ function calculateMatch(application, internship) {
   const improvements = [];
 
   if (qualificationScore === 35) {
-    strengths.push("Meets or exceeds the required qualification.");
+    strengths.push(
+      "Meets or exceeds the required qualification."
+    );
   } else {
-    improvements.push("Qualification does not meet the internship requirement.");
+    improvements.push(
+      "Qualification does not meet the internship requirement."
+    );
   }
 
   if (fieldScore >= 30) {
-    strengths.push("Field of study closely matches the internship.");
+    strengths.push(
+      "Field of study closely matches the internship."
+    );
   } else if (fieldScore > 0) {
-    strengths.push("Some relevance to the required field of study.");
+    strengths.push(
+      "Some relevance to the required field of study."
+    );
   } else {
-    improvements.push("Field of study does not closely match.");
+    improvements.push(
+      "Field of study does not closely match."
+    );
   }
 
   if (matchedSkills.length > 0) {
@@ -426,7 +435,10 @@ export default function ApplicantsPage() {
         const graduateIds = [
           ...new Set(
             (applicationData || [])
-              .map((application) => application.graduate_id)
+              .map(
+                (application) =>
+                  application.graduate_id
+              )
               .filter(Boolean)
           ),
         ];
@@ -519,9 +531,7 @@ export default function ApplicantsPage() {
 
   async function updateStatus(applicationId, status) {
     try {
-      const {
-        error,
-      } = await supabase
+      const { error } = await supabase
         .from("applications")
         .update({
           status,
@@ -566,7 +576,22 @@ export default function ApplicantsPage() {
       application.resume_url;
 
     if (!cvUrl) {
-      alert("This applicant has not uploaded a CV.");
+      alert(
+        "This applicant has not uploaded a CV."
+      );
+      return;
+    }
+
+    // Open window immediately to avoid Safari popup blocking
+    const newWindow = window.open(
+      "",
+      "_blank"
+    );
+
+    if (!newWindow) {
+      alert(
+        "Please allow pop-ups in your browser to review the CV."
+      );
       return;
     }
 
@@ -590,16 +615,15 @@ export default function ApplicantsPage() {
         );
       }
 
-      window.open(
-        data.signedUrl,
-        "_blank",
-        "noopener,noreferrer"
-      );
+      newWindow.location.href =
+        data.signedUrl;
     } catch (error) {
       console.error(
         "CV review error:",
         error
       );
+
+      newWindow.close();
 
       alert(
         error?.message ||
@@ -675,7 +699,9 @@ export default function ApplicantsPage() {
 
           <button
             onClick={() =>
-              router.push("/company-dashboard")
+              router.push(
+                "/company-dashboard"
+              )
             }
             style={{
               marginTop: "20px",
@@ -713,9 +739,7 @@ export default function ApplicantsPage() {
           margin: "0 auto",
         }}
       >
-        {/* ==================================================
-            HEADER
-        ================================================== */}
+        {/* HEADER */}
 
         <div
           style={{
@@ -731,12 +755,16 @@ export default function ApplicantsPage() {
         >
           <button
             onClick={() =>
-              router.push("/company-dashboard")
+              router.push(
+                "/company-dashboard"
+              )
             }
             style={{
-              background: "rgba(255,255,255,0.15)",
+              background:
+                "rgba(255,255,255,0.15)",
               color: "#fff",
-              border: "1px solid rgba(255,255,255,0.35)",
+              border:
+                "1px solid rgba(255,255,255,0.35)",
               borderRadius: "8px",
               padding: "9px 14px",
               cursor: "pointer",
@@ -772,14 +800,12 @@ export default function ApplicantsPage() {
               opacity: 0.9,
             }}
           >
-            Review and manage graduates who applied
-            for this internship.
+            Review and manage graduates who
+            applied for this internship.
           </p>
         </div>
 
-        {/* ==================================================
-            SUMMARY
-        ================================================== */}
+        {/* SUMMARY */}
 
         <div
           style={{
@@ -791,7 +817,9 @@ export default function ApplicantsPage() {
           }}
         >
           <div style={summaryCard}>
-            <div style={summaryIcon}>👥</div>
+            <div style={summaryIcon}>
+              👥
+            </div>
 
             <div>
               <div style={summaryNumber}>
@@ -805,7 +833,9 @@ export default function ApplicantsPage() {
           </div>
 
           <div style={summaryCard}>
-            <div style={summaryIcon}>⭐</div>
+            <div style={summaryIcon}>
+              ⭐
+            </div>
 
             <div>
               <div style={summaryNumber}>
@@ -824,7 +854,9 @@ export default function ApplicantsPage() {
           </div>
 
           <div style={summaryCard}>
-            <div style={summaryIcon}>📋</div>
+            <div style={summaryIcon}>
+              📋
+            </div>
 
             <div>
               <div style={summaryNumber}>
@@ -844,9 +876,7 @@ export default function ApplicantsPage() {
           </div>
         </div>
 
-        {/* ==================================================
-            INTERNSHIP DETAILS
-        ================================================== */}
+        {/* INTERNSHIP DETAILS */}
 
         <div
           style={{
@@ -886,16 +916,14 @@ export default function ApplicantsPage() {
             <Detail
               label="Province"
               value={
-                internship?.province ||
-                "—"
+                internship?.province || "—"
               }
             />
 
             <Detail
               label="Location"
               value={
-                internship?.location ||
-                "—"
+                internship?.location || "—"
               }
             />
 
@@ -941,9 +969,7 @@ export default function ApplicantsPage() {
           </div>
         </div>
 
-        {/* ==================================================
-            APPLICANTS
-        ================================================== */}
+        {/* APPLICANTS */}
 
         {applications.length === 0 ? (
           <div
@@ -1001,6 +1027,7 @@ export default function ApplicantsPage() {
                   }
                   application={application}
                   index={index}
+                  internshipId={internshipId}
                   onStatusChange={
                     updateStatus
                   }
@@ -1022,6 +1049,7 @@ export default function ApplicantsPage() {
 function ApplicantCard({
   application,
   index,
+  internshipId,
   onStatusChange,
   onReviewCV,
 }) {
@@ -1041,9 +1069,7 @@ function ApplicantCard({
             : "1px solid #e5eaf0",
       }}
     >
-      {/* ==================================================
-          TOP
-      ================================================== */}
+      {/* TOP */}
 
       <div
         style={{
@@ -1137,9 +1163,7 @@ function ApplicantCard({
         </div>
       </div>
 
-      {/* ==================================================
-          DETAILS
-      ================================================== */}
+      {/* DETAILS */}
 
       <div
         style={{
@@ -1183,9 +1207,7 @@ function ApplicantCard({
         />
       </div>
 
-      {/* ==================================================
-          STRENGTHS
-      ================================================== */}
+      {/* STRENGTHS */}
 
       {application.strengths?.length > 0 && (
         <div
@@ -1221,9 +1243,7 @@ function ApplicantCard({
         </div>
       )}
 
-      {/* ==================================================
-          MISSING SKILLS
-      ================================================== */}
+      {/* MISSING SKILLS */}
 
       {application.missingSkills?.length >
         0 && (
@@ -1273,20 +1293,29 @@ function ApplicantCard({
         </div>
       )}
 
-      {/* ==================================================
-          ACTIONS
-      ================================================== */}
+      {/* ACTIONS */}
 
       <div
         style={{
           display: "flex",
           flexWrap: "wrap",
           gap: "10px",
-          paddingTop: "5px",
+          paddingTop: "15px",
           borderTop:
             "1px solid #edf0f4",
         }}
       >
+        <Link
+          href={`/company/internships/${internshipId}/applicants/${application.id}`}
+          style={{
+            ...actionButton("#0057B8"),
+            textDecoration: "none",
+            display: "inline-block",
+          }}
+        >
+          👤 View Full Application
+        </Link>
+
         <button
           onClick={() =>
             onStatusChange(
@@ -1327,7 +1356,7 @@ function ApplicantCard({
           onClick={() =>
             onReviewCV(application)
           }
-          style={actionButton("#0057B8")}
+          style={actionButton("#174ea6")}
         >
           📄 Review CV
         </button>
