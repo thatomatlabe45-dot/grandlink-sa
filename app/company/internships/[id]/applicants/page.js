@@ -478,9 +478,9 @@ export default function ApplicantsPage() {
           );
 
           const combined = {
-            ...application,
-            ...(graduate || {}),
-          };
+  ...(graduate || {}),
+  ...application,
+};
 
           const match = calculateMatch(
             combined,
