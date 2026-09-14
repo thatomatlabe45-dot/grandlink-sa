@@ -170,7 +170,7 @@ function calculateMatch(application, internship) {
   }
 
   // ----------------------------------------------------------
-  // FIELD OF STUDY - 35%
+  // FIELD - 35%
   // ----------------------------------------------------------
 
   let fieldScore = 0;
@@ -232,12 +232,10 @@ function calculateMatch(application, internship) {
     });
 
     skillsScore =
-      (matchedSkills.length /
-        internshipSkills.length) *
-      30;
+      (matchedSkills.length / internshipSkills.length) * 30;
   }
 
-  const totalScore = Math.round(
+  const score = Math.round(
     qualificationScore +
       fieldScore +
       skillsScore
@@ -245,11 +243,11 @@ function calculateMatch(application, internship) {
 
   let label = "Weak";
 
-  if (totalScore >= 85) {
+  if (score >= 85) {
     label = "Strong";
-  } else if (totalScore >= 70) {
+  } else if (score >= 70) {
     label = "Good";
-  } else if (totalScore >= 40) {
+  } else if (score >= 40) {
     label = "Possible";
   }
 
@@ -297,25 +295,13 @@ function calculateMatch(application, internship) {
   }
 
   return {
-    score: totalScore,
+    score,
     label,
     matchedSkills,
     missingSkills,
     strengths,
     improvements,
   };
-}
-
-// ============================================================
-// DOCUMENT PATH
-// ============================================================
-
-function cleanDocumentPath(url) {
-  if (!url) return "";
-
-  return String(url)
-    .replace(/^.*\/documents\//, "")
-    .replace(/^\/+/, "");
 }
 
 // ============================================================
@@ -329,8 +315,8 @@ export default function ApplicationDetailsPage() {
   const internshipId = params?.id;
   const applicationId = params?.applicationId;
 
-  const [application, setApplication] = useState(null);
   const [internship, setInternship] = useState(null);
+  const [application, setApplication] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -340,9 +326,7 @@ export default function ApplicationDetailsPage() {
   // ==========================================================
 
   useEffect(() => {
-    if (!internshipId || !applicationId) {
-      return;
-    }
+    if (!internshipId || !applicationId) return;
 
     async function loadApplication() {
       setLoading(true);
@@ -350,7 +334,7 @@ export default function ApplicationDetailsPage() {
 
       try {
         // ----------------------------------------------------
-        // GET LOGGED-IN USER
+        // GET USER
         // ----------------------------------------------------
 
         const {
@@ -424,7 +408,6 @@ export default function ApplicationDetailsPage() {
           setErrorMessage(
             "You do not have permission to view this application."
           );
-
           setLoading(false);
           return;
         }
@@ -458,7 +441,7 @@ export default function ApplicationDetailsPage() {
         }
 
         // ----------------------------------------------------
-        // GET GRADUATE PROFILE
+        // GET GRADUATE
         // ----------------------------------------------------
 
         let graduate = null;
@@ -484,32 +467,34 @@ export default function ApplicationDetailsPage() {
         }
 
         // ----------------------------------------------------
-        // COMBINE APPLICATION + PROFILE
+        // COMBINE
         // ----------------------------------------------------
 
-        const combinedApplication = {
+        const combined = {
           ...applicationData,
           ...(graduate || {}),
         };
 
         // ----------------------------------------------------
-        // CALCULATE AI MATCH
+        // AI MATCH
         // ----------------------------------------------------
 
         const match = calculateMatch(
-          combinedApplication,
+          combined,
           internshipData
         );
 
-        setApplication({
-          ...combinedApplication,
+        const finalApplication = {
+          ...combined,
           matchScore: match.score,
           matchLabel: match.label,
           matchedSkills: match.matchedSkills,
           missingSkills: match.missingSkills,
           strengths: match.strengths,
           improvements: match.improvements,
-        });
+        };
+
+        setApplication(finalApplication);
       } catch (error) {
         console.error(
           "Application details error:",
@@ -526,11 +511,7 @@ export default function ApplicationDetailsPage() {
     }
 
     loadApplication();
-  }, [
-    internshipId,
-    applicationId,
-    router,
-  ]);
+  }, [internshipId, applicationId, router]);
 
   // ==========================================================
   // UPDATE STATUS
@@ -572,29 +553,35 @@ export default function ApplicationDetailsPage() {
   // OPEN DOCUMENT
   // ==========================================================
 
-  async function openDocument(url, documentName) {
+  async function openDocument(url, label) {
     if (!url) {
       alert(
-        `No ${documentName} has been uploaded by this applicant.`
+        `This applicant has not uploaded a ${label}.`
+      );
+      return;
+    }
+
+    const newWindow = window.open(
+      "",
+      "_blank"
+    );
+
+    if (!newWindow) {
+      alert(
+        "Please allow pop-ups in your browser to review documents."
       );
       return;
     }
 
     try {
-      const path = cleanDocumentPath(url);
+      const cleanPath = String(url)
+        .replace(/^.*\/documents\//, "")
+        .replace(/^\/+/, "");
 
-      if (!path) {
-        throw new Error(
-          `Could not find the ${documentName} file.`
-        );
-      }
-
-      const {
-        data,
-        error,
-      } = await supabase.storage
-        .from("documents")
-        .createSignedUrl(path, 600);
+      const { data, error } =
+        await supabase.storage
+          .from("documents")
+          .createSignedUrl(cleanPath, 600);
 
       if (error) {
         throw error;
@@ -602,24 +589,23 @@ export default function ApplicationDetailsPage() {
 
       if (!data?.signedUrl) {
         throw new Error(
-          `Could not create a secure ${documentName} link.`
+          `Could not create a secure ${label} link.`
         );
       }
 
-      window.open(
-        data.signedUrl,
-        "_blank",
-        "noopener,noreferrer"
-      );
+      newWindow.location.href =
+        data.signedUrl;
     } catch (error) {
       console.error(
-        `${documentName} error:`,
+        `${label} review error:`,
         error
       );
 
+      newWindow.close();
+
       alert(
         error?.message ||
-          `Could not open the ${documentName}.`
+          `Could not open the ${label}.`
       );
     }
   }
@@ -630,20 +616,10 @@ export default function ApplicationDetailsPage() {
 
   if (loading) {
     return (
-      <main
-        style={{
-          minHeight: "100vh",
-          background: "#f4f8fc",
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          color: "#0057B8",
-          fontSize: "22px",
-          fontWeight: "bold",
-          padding: "20px",
-        }}
-      >
-        Loading application...
+      <main style={pageStyle}>
+        <div style={loadingBox}>
+          Loading application...
+        </div>
       </main>
     );
   }
@@ -654,28 +630,16 @@ export default function ApplicationDetailsPage() {
 
   if (errorMessage) {
     return (
-      <main
-        style={{
-          minHeight: "100vh",
-          background: "#f4f8fc",
-          padding: "40px 20px",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: "850px",
-            margin: "0 auto",
-            background: "#fff",
-            borderRadius: "18px",
-            padding: "35px",
-            boxShadow:
-              "0 8px 30px rgba(0,0,0,0.08)",
-          }}
-        >
+      <main style={pageStyle}>
+        <div style={errorBox}>
+          <div style={{ fontSize: "50px" }}>
+            ⚠️
+          </div>
+
           <h1
             style={{
               color: "#c62828",
-              marginTop: 0,
+              marginBottom: "10px",
             }}
           >
             Unable to load application
@@ -705,438 +669,615 @@ export default function ApplicationDetailsPage() {
     );
   }
 
+  if (!application || !internship) {
+    return null;
+  }
+
+  const score = application.matchScore || 0;
+
   // ==========================================================
   // PAGE
   // ==========================================================
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#f4f8fc",
-        padding: "30px 20px 60px",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "1100px",
-          margin: "0 auto",
-        }}
-      >
+    <main style={pageStyle}>
+      <div style={containerStyle}>
+
         {/* ==================================================
             HEADER
         ================================================== */}
 
-        <div
-          style={{
-            background:
-              "linear-gradient(135deg, #0057B8, #0077d9)",
-            color: "#fff",
-            borderRadius: "20px",
-            padding: "30px",
-            marginBottom: "25px",
-            boxShadow:
-              "0 10px 30px rgba(0,87,184,0.18)",
-          }}
-        >
+        <div style={headerStyle}>
           <button
             onClick={() =>
               router.push(
                 `/company/internships/${internshipId}/applicants`
               )
             }
-            style={{
-              background:
-                "rgba(255,255,255,0.15)",
-              color: "#fff",
-              border:
-                "1px solid rgba(255,255,255,0.35)",
-              borderRadius: "9px",
-              padding: "9px 14px",
-              cursor: "pointer",
-              marginBottom: "20px",
-            }}
+            style={backButton}
           >
             ← Back to Applicants
           </button>
 
           <div
             style={{
-              fontSize: "14px",
-              opacity: 0.85,
-              marginBottom: "7px",
+              display: "flex",
+              justifyContent: "space-between",
+              gap: "25px",
+              flexWrap: "wrap",
+              alignItems: "center",
             }}
           >
-            APPLICATION REVIEW
-          </div>
+            <div>
+              <div
+                style={{
+                  fontSize: "14px",
+                  opacity: 0.85,
+                  marginBottom: "8px",
+                }}
+              >
+                APPLICATION REVIEW
+              </div>
 
-          <h1
-            style={{
-              margin: "0 0 8px",
-              fontSize: "32px",
-            }}
-          >
-            {application?.full_name ||
-              "Graduate Applicant"}
-          </h1>
+              <h1
+                style={{
+                  margin: "0 0 8px",
+                  fontSize: "32px",
+                }}
+              >
+                {application.full_name ||
+                  "Graduate Applicant"}
+              </h1>
 
-          <p
-            style={{
-              margin: 0,
-              fontSize: "17px",
-              opacity: 0.92,
-            }}
-          >
-            {internship?.job_title ||
-              "Internship Application"}
-          </p>
-        </div>
-
-        {/* ==================================================
-            PROFILE + MATCH
-        ================================================== */}
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "minmax(0, 1.7fr) minmax(250px, 0.8fr)",
-            gap: "20px",
-            marginBottom: "20px",
-          }}
-        >
-          {/* PROFILE */}
-
-          <section style={cardStyle}>
-            <h2 style={sectionTitle}>
-              👤 Applicant Profile
-            </h2>
-
-            <div style={infoGrid}>
-              <Info
-                label="Full Name"
-                value={
-                  application?.full_name ||
-                  "Not provided"
-                }
-              />
-
-              <Info
-                label="Email"
-                value={
-                  application?.email ||
-                  "Not provided"
-                }
-              />
-
-              <Info
-                label="Phone"
-                value={
-                  application?.phone ||
-                  "Not provided"
-                }
-              />
-
-              <Info
-                label="Province"
-                value={
-                  application?.province ||
-                  "Not provided"
-                }
-              />
-
-              <Info
-                label="Institution"
-                value={
-                  application?.institution ||
-                  "Not provided"
-                }
-              />
-
-              <Info
-                label="Qualification"
-                value={
-                  application?.qualification ||
-                  "Not provided"
-                }
-              />
-
-              <Info
-                label="Field of Study"
-                value={
-                  application?.field_of_study ||
-                  "Not provided"
-                }
-              />
-
-              <Info
-                label="Application Status"
-                value={
-                  application?.status ||
-                  "pending"
-                }
-              />
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "17px",
+                  opacity: 0.9,
+                }}
+              >
+                Applied for:{" "}
+                <strong>
+                  {internship.job_title}
+                </strong>
+              </p>
             </div>
-          </section>
-
-          {/* MATCH */}
-
-          <section style={cardStyle}>
-            <h2 style={sectionTitle}>
-              🤖 GradLink Match
-            </h2>
 
             <div
               style={{
+                background:
+                  "rgba(255,255,255,0.16)",
+                border:
+                  "1px solid rgba(255,255,255,0.3)",
+                borderRadius: "18px",
+                padding: "18px 25px",
                 textAlign: "center",
-                padding: "15px 0 20px",
+                minWidth: "140px",
               }}
             >
               <div
                 style={{
-                  fontSize: "55px",
+                  fontSize: "38px",
                   fontWeight: "800",
-                  color:
-                    application?.matchScore >= 85
-                      ? "#16803c"
-                      : application?.matchScore >= 70
-                      ? "#0057B8"
-                      : application?.matchScore >= 40
-                      ? "#a66a00"
-                      : "#c62828",
                 }}
               >
-                {application?.matchScore || 0}%
+                {score}%
               </div>
 
               <div
                 style={{
-                  fontSize: "18px",
-                  fontWeight: "bold",
-                  color: "#555",
+                  fontWeight: "700",
                 }}
               >
-                {application?.matchLabel}
+                {application.matchLabel}
+                {" Match"}
               </div>
             </div>
-
-            <div
-              style={{
-                background: "#f7f9fc",
-                borderRadius: "10px",
-                padding: "13px",
-                marginBottom: "10px",
-              }}
-            >
-              <strong>Internship:</strong>
-              <br />
-              {internship?.job_title || "—"}
-            </div>
-
-            <div
-              style={{
-                background: "#f7f9fc",
-                borderRadius: "10px",
-                padding: "13px",
-              }}
-            >
-              <strong>Required Qualification:</strong>
-              <br />
-              {internship?.qualification ||
-                "Any"}
-            </div>
-          </section>
+          </div>
         </div>
 
         {/* ==================================================
-            CAREER INFORMATION
+            STATUS
         ================================================== */}
 
-        <section style={cardStyle}>
-          <h2 style={sectionTitle}>
-            🎓 Career & Skills
-          </h2>
+        <div style={sectionStyle}>
+          <div style={sectionHeader}>
+            <div>
+              <h2 style={sectionTitle}>
+                Application Status
+              </h2>
 
-          <div style={infoGrid}>
-            <Info
-              label="Skills"
-              value={
-                application?.skills ||
-                "Not provided"
-              }
-              full
-            />
+              <p style={sectionSubtitle}>
+                Decide how you want to proceed with
+                this applicant.
+              </p>
+            </div>
 
-            <Info
-              label="Career Goals"
-              value={
-                application?.career_goals ||
-                "Not provided"
+            <StatusBadge
+              status={
+                application.status ||
+                "pending"
               }
-              full
             />
           </div>
-        </section>
+
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "10px",
+            }}
+          >
+            <button
+              onClick={() =>
+                updateStatus("shortlisted")
+              }
+              style={statusButton("#16803c")}
+            >
+              ⭐ Shortlist
+            </button>
+
+            <button
+              onClick={() =>
+                updateStatus("rejected")
+              }
+              style={statusButton("#c62828")}
+            >
+              ✕ Reject
+            </button>
+
+            <button
+              onClick={() =>
+                updateStatus("pending")
+              }
+              style={statusButton("#777")}
+            >
+              ↺ Reset to Pending
+            </button>
+          </div>
+        </div>
 
         {/* ==================================================
-            MATCHED SKILLS
+            PERSONAL INFORMATION
         ================================================== */}
 
-        <section style={cardStyle}>
+        <div style={sectionStyle}>
           <h2 style={sectionTitle}>
-            ✅ Matching Analysis
+            👤 Applicant Information
           </h2>
 
-          <h3
-            style={{
-              color: "#16803c",
-              marginBottom: "10px",
-            }}
-          >
-            Strengths
-          </h3>
+          <div style={gridStyle}>
+            <Info
+              label="Full Name"
+              value={
+                application.full_name ||
+                "Not provided"
+              }
+            />
 
-          {application?.strengths?.length > 0 ? (
-            <ul
-              style={{
-                lineHeight: "1.8",
-                color: "#444",
-              }}
-            >
-              {application.strengths.map(
-                (item, index) => (
-                  <li key={index}>
-                    {item}
-                  </li>
-                )
+            <Info
+              label="Email"
+              value={
+                application.email ||
+                "Not provided"
+              }
+            />
+
+            <Info
+              label="Phone"
+              value={
+                application.phone ||
+                "Not provided"
+              }
+            />
+
+            <Info
+              label="Province"
+              value={
+                application.province ||
+                "Not provided"
+              }
+            />
+
+            <Info
+              label="Institution"
+              value={
+                application.institution ||
+                "Not provided"
+              }
+            />
+
+            <Info
+              label="Qualification"
+              value={
+                application.qualification ||
+                "Not provided"
+              }
+            />
+
+            <Info
+              label="Field of Study"
+              value={
+                application.field_of_study ||
+                "Not provided"
+              }
+            />
+
+            <Info
+              label="Application Date"
+              value={formatDate(
+                application.created_at
               )}
-            </ul>
-          ) : (
-            <p style={mutedText}>
-              No strengths identified.
-            </p>
-          )}
+            />
+          </div>
+        </div>
 
-          <h3
-            style={{
-              color: "#9a6700",
-              marginTop: "25px",
-              marginBottom: "10px",
-            }}
-          >
-            Skills to Improve
-          </h3>
+        {/* ==================================================
+            SKILLS
+        ================================================== */}
 
-          {application?.missingSkills?.length >
-          0 ? (
+        <div style={sectionStyle}>
+          <h2 style={sectionTitle}>
+            💼 Skills
+          </h2>
+
+          {getSkillsArray(
+            application.skills
+          ).length > 0 ? (
             <div
               style={{
                 display: "flex",
                 flexWrap: "wrap",
-                gap: "8px",
+                gap: "10px",
               }}
             >
-              {application.missingSkills.map(
-                (skill, index) => (
-                  <span
-                    key={index}
-                    style={{
-                      background: "#fff8e6",
-                      border:
-                        "1px solid #e1c878",
-                      color: "#765400",
-                      padding:
-                        "7px 11px",
-                      borderRadius: "20px",
-                      fontSize: "14px",
-                    }}
-                  >
-                    {skill}
-                  </span>
-                )
-              )}
+              {getSkillsArray(
+                application.skills
+              ).map((skill, index) => (
+                <span
+                  key={index}
+                  style={skillBadge}
+                >
+                  {skill}
+                </span>
+              ))}
             </div>
           ) : (
             <p style={mutedText}>
-              No missing required skills.
+              No skills provided.
             </p>
           )}
+        </div>
 
-          <h3
-            style={{
-              color: "#0057B8",
-              marginTop: "25px",
-              marginBottom: "10px",
-            }}
-          >
-            Matched Skills
-          </h3>
+        {/* ==================================================
+            CAREER GOALS
+        ================================================== */}
 
-          {application?.matchedSkills?.length >
-          0 ? (
+        <div style={sectionStyle}>
+          <h2 style={sectionTitle}>
+            🎯 Career Goals
+          </h2>
+
+          <div style={textBox}>
+            {application.career_goals ||
+              "No career goals provided."}
+          </div>
+        </div>
+
+        {/* ==================================================
+            AI MATCH ANALYSIS
+        ================================================== */}
+
+        <div style={sectionStyle}>
+          <div style={sectionHeader}>
+            <div>
+              <h2 style={sectionTitle}>
+                🤖 AI Match Analysis
+              </h2>
+
+              <p style={sectionSubtitle}>
+                Compatibility with this specific
+                internship.
+              </p>
+            </div>
+
             <div
               style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "8px",
+                fontSize: "32px",
+                fontWeight: "800",
+                color:
+                  score >= 85
+                    ? "#16803c"
+                    : score >= 70
+                    ? "#0057B8"
+                    : score >= 40
+                    ? "#a66a00"
+                    : "#c62828",
               }}
             >
-              {application.matchedSkills.map(
-                (skill, index) => (
-                  <span
-                    key={index}
-                    style={{
-                      background: "#eef5ff",
-                      border:
-                        "1px solid #bdd5f2",
-                      color: "#0057B8",
-                      padding:
-                        "7px 11px",
-                      borderRadius: "20px",
-                      fontSize: "14px",
-                    }}
-                  >
-                    ✓ {skill}
-                  </span>
-                )
-              )}
+              {score}%
             </div>
-          ) : (
-            <p style={mutedText}>
-              No matching skills found.
-            </p>
+          </div>
+
+          {/* MATCH BREAKDOWN */}
+
+          <div style={gridStyle}>
+            <div
+              style={{
+                ...analysisBox,
+                background: "#f4fbf6",
+                borderColor: "#ccebd7",
+              }}
+            >
+              <strong
+                style={{
+                  color: "#16803c",
+                }}
+              >
+                Qualification
+              </strong>
+
+              <p>
+                Required:{" "}
+                <strong>
+                  {internship.qualification ||
+                    "Any"}
+                </strong>
+              </p>
+
+              <p>
+                Applicant:{" "}
+                <strong>
+                  {application.qualification ||
+                    "Not provided"}
+                </strong>
+              </p>
+            </div>
+
+            <div
+              style={{
+                ...analysisBox,
+                background: "#f4f8ff",
+                borderColor: "#c9dcf5",
+              }}
+            >
+              <strong
+                style={{
+                  color: "#0057B8",
+                }}
+              >
+                Field of Study
+              </strong>
+
+              <p>
+                Required:{" "}
+                <strong>
+                  {internship.field_of_study ||
+                    "Any"}
+                </strong>
+              </p>
+
+              <p>
+                Applicant:{" "}
+                <strong>
+                  {application.field_of_study ||
+                    "Not provided"}
+                </strong>
+              </p>
+            </div>
+          </div>
+
+          {/* STRENGTHS */}
+
+          {application.strengths?.length >
+            0 && (
+            <div
+              style={{
+                background: "#f4fbf6",
+                border:
+                  "1px solid #ccebd7",
+                borderRadius: "12px",
+                padding: "18px",
+                marginTop: "20px",
+              }}
+            >
+              <h3
+                style={{
+                  color: "#16803c",
+                  marginTop: 0,
+                }}
+              >
+                ✅ Strengths
+              </h3>
+
+              <ul
+                style={{
+                  color: "#444",
+                  lineHeight: "1.8",
+                  marginBottom: 0,
+                }}
+              >
+                {application.strengths.map(
+                  (item, index) => (
+                    <li key={index}>
+                      {item}
+                    </li>
+                  )
+                )}
+              </ul>
+            </div>
           )}
-        </section>
+
+          {/* MATCHED SKILLS */}
+
+          {application.matchedSkills?.length >
+            0 && (
+            <div
+              style={{
+                marginTop: "20px",
+              }}
+            >
+              <h3
+                style={{
+                  color: "#16803c",
+                }}
+              >
+                ✓ Matched Skills
+              </h3>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "8px",
+                }}
+              >
+                {application.matchedSkills.map(
+                  (skill, index) => (
+                    <span
+                      key={index}
+                      style={{
+                        background:
+                          "#e8f7ee",
+                        color:
+                          "#16803c",
+                        border:
+                          "1px solid #b7e4c7",
+                        padding:
+                          "7px 11px",
+                        borderRadius:
+                          "20px",
+                        fontSize:
+                          "13px",
+                        fontWeight:
+                          "600",
+                      }}
+                    >
+                      ✓ {skill}
+                    </span>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* MISSING SKILLS */}
+
+          {application.missingSkills?.length >
+            0 && (
+            <div
+              style={{
+                background: "#fffaf0",
+                border:
+                  "1px solid #f0dfb2",
+                borderRadius: "12px",
+                padding: "18px",
+                marginTop: "20px",
+              }}
+            >
+              <h3
+                style={{
+                  color: "#9a6700",
+                  marginTop: 0,
+                }}
+              >
+                ⚠️ Skills to Improve
+              </h3>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "8px",
+                }}
+              >
+                {application.missingSkills.map(
+                  (skill, index) => (
+                    <span
+                      key={index}
+                      style={{
+                        background: "#fff",
+                        color: "#7a5700",
+                        border:
+                          "1px solid #e1c878",
+                        padding:
+                          "7px 11px",
+                        borderRadius:
+                          "20px",
+                        fontSize:
+                          "13px",
+                      }}
+                    >
+                      {skill}
+                    </span>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* IMPROVEMENTS */}
+
+          {application.improvements?.length >
+            0 && (
+            <div
+              style={{
+                marginTop: "20px",
+              }}
+            >
+              <h3
+                style={{
+                  color: "#9a6700",
+                }}
+              >
+                💡 Considerations
+              </h3>
+
+              <ul
+                style={{
+                  color: "#555",
+                  lineHeight: "1.7",
+                }}
+              >
+                {application.improvements.map(
+                  (item, index) => (
+                    <li key={index}>
+                      {item}
+                    </li>
+                  )
+                )}
+              </ul>
+            </div>
+          )}
+        </div>
 
         {/* ==================================================
             DOCUMENTS
         ================================================== */}
 
-        <section style={cardStyle}>
+        <div style={sectionStyle}>
           <h2 style={sectionTitle}>
             📄 Applicant Documents
           </h2>
 
-          <p style={mutedText}>
-            Secure document links are generated when
-            the company chooses to review a document.
+          <p style={sectionSubtitle}>
+            Documents are opened through secure
+            temporary links.
           </p>
 
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fit,minmax(220px,1fr))",
-              gap: "15px",
-              marginTop: "20px",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "12px",
             }}
           >
             <button
               onClick={() =>
                 openDocument(
-                  application?.cv_url ||
-                    application?.cv ||
-                    application?.resume_url,
+                  application.cv_url ||
+                    application.cv ||
+                    application.resume_url,
                   "CV"
                 )
               }
@@ -1148,55 +1289,125 @@ export default function ApplicationDetailsPage() {
             <button
               onClick={() =>
                 openDocument(
-                  application?.qualification_url,
+                  application.qualification_url ||
+                    application.qualification_document_url ||
+                    application.qualification_file_url,
                   "qualification document"
                 )
               }
-              style={{
-                ...documentButton,
-                background: "#fff",
-                color: "#0057B8",
-                border:
-                  "2px solid #0057B8",
-              }}
+              style={documentButton}
             >
-              📜 Review Qualification
+              🎓 Review Qualification
             </button>
           </div>
-        </section>
+        </div>
 
         {/* ==================================================
-            ACTIONS
+            INTERNSHIP
         ================================================== */}
 
-        <section
-          style={{
-            ...cardStyle,
-            marginBottom: 0,
-          }}
-        >
+        <div style={sectionStyle}>
           <h2 style={sectionTitle}>
-            Recruitment Decision
+            💼 Internship Applied For
           </h2>
 
-          <p style={mutedText}>
-            Update the applicant's status after
-            reviewing their application.
+          <div style={gridStyle}>
+            <Info
+              label="Position"
+              value={
+                internship.job_title ||
+                "—"
+              }
+            />
+
+            <Info
+              label="Company"
+              value={
+                internship.company_name ||
+                "—"
+              }
+            />
+
+            <Info
+              label="Location"
+              value={
+                internship.location ||
+                "—"
+              }
+            />
+
+            <Info
+              label="Province"
+              value={
+                internship.province ||
+                "—"
+              }
+            />
+
+            <Info
+              label="Internship Type"
+              value={
+                internship.internship_type ||
+                "—"
+              }
+            />
+
+            <Info
+              label="Stipend"
+              value={
+                internship.stipend ||
+                "Not specified"
+              }
+            />
+          </div>
+        </div>
+
+        {/* ==================================================
+            BOTTOM ACTIONS
+        ================================================== */}
+
+        <div
+          style={{
+            background:
+              "linear-gradient(135deg, #0057B8, #0077d9)",
+            color: "#fff",
+            borderRadius: "18px",
+            padding: "28px",
+            textAlign: "center",
+            marginTop: "25px",
+          }}
+        >
+          <h2
+            style={{
+              marginTop: 0,
+            }}
+          >
+            Ready to make a decision?
+          </h2>
+
+          <p
+            style={{
+              opacity: 0.9,
+              marginBottom: "22px",
+            }}
+          >
+            Update the applicant's status or return
+            to the applicant list.
           </p>
 
           <div
             style={{
               display: "flex",
+              justifyContent: "center",
               flexWrap: "wrap",
-              gap: "12px",
-              marginTop: "20px",
+              gap: "10px",
             }}
           >
             <button
               onClick={() =>
                 updateStatus("shortlisted")
               }
-              style={shortlistButton}
+              style={bottomButton("#16803c")}
             >
               ⭐ Shortlist Applicant
             </button>
@@ -1205,21 +1416,23 @@ export default function ApplicationDetailsPage() {
               onClick={() =>
                 updateStatus("rejected")
               }
-              style={rejectButton}
+              style={bottomButton("#c62828")}
             >
               ✕ Reject Applicant
             </button>
 
             <button
               onClick={() =>
-                updateStatus("pending")
+                router.push(
+                  `/company/internships/${internshipId}/applicants`
+                )
               }
-              style={resetButton}
+              style={bottomButton("#fff", "#0057B8")}
             >
-              ↺ Reset to Pending
+              ← Back to Applicants
             </button>
           </div>
-        </section>
+        </div>
       </div>
     </main>
   );
@@ -1229,26 +1442,22 @@ export default function ApplicationDetailsPage() {
 // INFO
 // ============================================================
 
-function Info({ label, value, full }) {
+function Info({ label, value }) {
   return (
     <div
       style={{
         background: "#f7f9fc",
-        borderRadius: "11px",
-        padding: "15px",
-        gridColumn: full
-          ? "1 / -1"
-          : "auto",
+        borderRadius: "12px",
+        padding: "16px",
       }}
     >
       <div
         style={{
           fontSize: "12px",
           color: "#777",
+          marginBottom: "7px",
           textTransform: "uppercase",
           letterSpacing: "0.5px",
-          marginBottom: "6px",
-          fontWeight: "600",
         }}
       >
         {label}
@@ -1257,7 +1466,8 @@ function Info({ label, value, full }) {
       <div
         style={{
           color: "#222",
-          lineHeight: "1.6",
+          fontWeight: "600",
+          lineHeight: "1.5",
           wordBreak: "break-word",
         }}
       >
@@ -1268,84 +1478,236 @@ function Info({ label, value, full }) {
 }
 
 // ============================================================
+// STATUS BADGE
+// ============================================================
+
+function StatusBadge({ status }) {
+  const normalized = String(
+    status || "pending"
+  ).toLowerCase();
+
+  let background = "#f1f3f5";
+  let color = "#666";
+  let text = "Pending";
+
+  if (normalized === "shortlisted") {
+    background = "#e8f7ee";
+    color = "#16803c";
+    text = "⭐ Shortlisted";
+  }
+
+  if (normalized === "rejected") {
+    background = "#fff0f0";
+    color = "#c62828";
+    text = "✕ Rejected";
+  }
+
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        background,
+        color,
+        padding: "9px 14px",
+        borderRadius: "20px",
+        fontWeight: "700",
+      }}
+    >
+      {text}
+    </span>
+  );
+}
+
+// ============================================================
+// DATE
+// ============================================================
+
+function formatDate(value) {
+  if (!value) return "Not provided";
+
+  try {
+    return new Date(value).toLocaleDateString(
+      "en-ZA",
+      {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      }
+    );
+  } catch {
+    return String(value);
+  }
+}
+
+// ============================================================
 // STYLES
 // ============================================================
 
-const cardStyle = {
+const pageStyle = {
+  minHeight: "100vh",
+  background: "#f4f8fc",
+  padding: "30px 20px 60px",
+};
+
+const containerStyle = {
+  maxWidth: "1100px",
+  margin: "0 auto",
+};
+
+const loadingBox = {
+  background: "#fff",
+  borderRadius: "18px",
+  padding: "50px",
+  textAlign: "center",
+  color: "#0057B8",
+  fontSize: "22px",
+  fontWeight: "700",
+};
+
+const errorBox = {
+  maxWidth: "800px",
+  margin: "30px auto",
+  background: "#fff",
+  borderRadius: "18px",
+  padding: "40px",
+  textAlign: "center",
+  boxShadow: "0 8px 30px rgba(0,0,0,0.08)",
+};
+
+const headerStyle = {
+  background:
+    "linear-gradient(135deg, #0057B8, #0077d9)",
+  color: "#fff",
+  borderRadius: "20px",
+  padding: "30px",
+  marginBottom: "22px",
+  boxShadow:
+    "0 10px 30px rgba(0,87,184,0.18)",
+};
+
+const backButton = {
+  background: "rgba(255,255,255,0.15)",
+  color: "#fff",
+  border:
+    "1px solid rgba(255,255,255,0.35)",
+  borderRadius: "9px",
+  padding: "9px 14px",
+  cursor: "pointer",
+  marginBottom: "22px",
+};
+
+const sectionStyle = {
   background: "#fff",
   borderRadius: "18px",
   padding: "25px",
   marginBottom: "20px",
-  boxShadow: "0 7px 25px rgba(0,0,0,0.06)",
+  boxShadow:
+    "0 6px 24px rgba(0,0,0,0.06)",
+};
+
+const sectionHeader = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "15px",
+  flexWrap: "wrap",
+  marginBottom: "20px",
 };
 
 const sectionTitle = {
-  marginTop: 0,
-  marginBottom: "20px",
   color: "#0057B8",
+  marginTop: 0,
+  marginBottom: "7px",
 };
 
-const infoGrid = {
+const sectionSubtitle = {
+  color: "#666",
+  marginTop: 0,
+  lineHeight: "1.5",
+};
+
+const gridStyle = {
   display: "grid",
   gridTemplateColumns:
     "repeat(auto-fit,minmax(220px,1fr))",
   gap: "15px",
 };
 
+const analysisBox = {
+  border: "1px solid",
+  borderRadius: "12px",
+  padding: "18px",
+};
+
+const skillBadge = {
+  background: "#eef5ff",
+  color: "#0057B8",
+  border: "1px solid #c9dcf5",
+  padding: "8px 13px",
+  borderRadius: "20px",
+  fontSize: "14px",
+  fontWeight: "600",
+};
+
+const textBox = {
+  background: "#f7f9fc",
+  borderRadius: "12px",
+  padding: "18px",
+  color: "#444",
+  lineHeight: "1.8",
+  whiteSpace: "pre-wrap",
+};
+
 const mutedText = {
-  color: "#666",
-  lineHeight: "1.6",
+  color: "#777",
 };
 
 const primaryButton = {
-  marginTop: "20px",
-  padding: "13px 20px",
-  border: "none",
-  borderRadius: "10px",
   background: "#0057B8",
   color: "#fff",
-  fontWeight: "bold",
+  border: "none",
+  borderRadius: "10px",
+  padding: "12px 18px",
+  fontWeight: "700",
   cursor: "pointer",
 };
 
 const documentButton = {
-  width: "100%",
-  padding: "14px",
-  border: "none",
-  borderRadius: "10px",
   background: "#0057B8",
   color: "#fff",
-  fontSize: "15px",
-  fontWeight: "bold",
-  cursor: "pointer",
-};
-
-const shortlistButton = {
-  padding: "13px 18px",
   border: "none",
   borderRadius: "10px",
-  background: "#16803c",
-  color: "#fff",
-  fontWeight: "bold",
+  padding: "13px 18px",
+  fontWeight: "700",
   cursor: "pointer",
 };
 
-const rejectButton = {
-  padding: "13px 18px",
-  border: "none",
-  borderRadius: "10px",
-  background: "#c62828",
-  color: "#fff",
-  fontWeight: "bold",
-  cursor: "pointer",
-};
+function statusButton(background) {
+  return {
+    background,
+    color: "#fff",
+    border: "none",
+    borderRadius: "9px",
+    padding: "11px 16px",
+    fontWeight: "700",
+    cursor: "pointer",
+  };
+}
 
-const resetButton = {
-  padding: "13px 18px",
-  border: "1px solid #bbb",
-  borderRadius: "10px",
-  background: "#fff",
-  color: "#555",
-  fontWeight: "bold",
-  cursor: "pointer",
-};
+function bottomButton(
+  background,
+  color = "#fff"
+) {
+  return {
+    background,
+    color,
+    border:
+      background === "#fff"
+        ? "none"
+        : "1px solid rgba(255,255,255,0.2)",
+    borderRadius: "10px",
+    padding: "12px 17px",
+    fontWeight: "700",
+    cursor: "pointer",
+  };
+}
