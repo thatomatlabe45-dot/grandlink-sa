@@ -87,13 +87,11 @@ function calculateMatch(internship, application) {
   }
 
   const requiredField = (
-    internship?.field_of_study ||
-    ""
+    internship?.field_of_study || ""
   ).toLowerCase();
 
   const applicantField = (
-    application?.field_of_study ||
-    ""
+    application?.field_of_study || ""
   ).toLowerCase();
 
   if (requiredField && applicantField) {
@@ -118,8 +116,7 @@ function calculateMatch(internship, application) {
   }
 
   const requiredSkills = (
-    internship?.skills ||
-    ""
+    internship?.skills || ""
   )
     .toLowerCase()
     .split(/[,;\n]+/)
@@ -127,8 +124,7 @@ function calculateMatch(internship, application) {
     .filter(Boolean);
 
   const applicantSkills = (
-    application?.skills ||
-    ""
+    application?.skills || ""
   )
     .toLowerCase()
     .split(/[,;\n]+/)
@@ -136,12 +132,13 @@ function calculateMatch(internship, application) {
     .filter(Boolean);
 
   if (requiredSkills.length && applicantSkills.length) {
-    const matchedSkills = requiredSkills.filter((requiredSkill) =>
-      applicantSkills.some(
-        (applicantSkill) =>
-          applicantSkill.includes(requiredSkill) ||
-          requiredSkill.includes(applicantSkill)
-      )
+    const matchedSkills = requiredSkills.filter(
+      (requiredSkill) =>
+        applicantSkills.some(
+          (applicantSkill) =>
+            applicantSkill.includes(requiredSkill) ||
+            requiredSkill.includes(applicantSkill)
+        )
     );
 
     skillsScore = Math.round(
@@ -149,7 +146,10 @@ function calculateMatch(internship, application) {
     );
   }
 
-  const total = qualificationScore + fieldScore + skillsScore;
+  const total =
+    qualificationScore +
+    fieldScore +
+    skillsScore;
 
   let label = "Weak";
 
@@ -184,38 +184,14 @@ export default function CompanyDashboard() {
   const [subscription, setSubscription] = useState(null);
 
   const [loading, setLoading] = useState(true);
-  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  const [subscriptionLoading, setSubscriptionLoading] =
+    useState(true);
   const [error, setError] = useState("");
 
   const [showHeader, setShowHeader] = useState(true);
 
-  // Responsive viewport
-  const [viewportWidth, setViewportWidth] = useState(1200);
-
   // ==========================================================
-  // RESPONSIVE SCREEN SIZE
-  // ==========================================================
-
-  useEffect(() => {
-    const updateWidth = () => {
-      setViewportWidth(window.innerWidth);
-    };
-
-    updateWidth();
-
-    window.addEventListener("resize", updateWidth);
-
-    return () => {
-      window.removeEventListener("resize", updateWidth);
-    };
-  }, []);
-
-  const isMobile = viewportWidth <= 700;
-  const isSmallPhone = viewportWidth <= 420;
-  const isTablet = viewportWidth > 700 && viewportWidth <= 1050;
-
-  // ==========================================================
-  // HEADER SCROLL BEHAVIOUR
+  // HEADER SCROLL
   // ==========================================================
 
   useEffect(() => {
@@ -228,7 +204,7 @@ export default function CompanyDashboard() {
         setShowHeader(true);
       } else if (currentScrollY > lastScrollY) {
         setShowHeader(false);
-      } else if (currentScrollY < lastScrollY) {
+      } else {
         setShowHeader(true);
       }
 
@@ -258,7 +234,7 @@ export default function CompanyDashboard() {
     setSubscriptionLoading(true);
 
     try {
-      const { data, error: subscriptionError } = await supabase
+      const { data, error } = await supabase
         .from("company_subscriptions")
         .select("*")
         .eq("company_id", companyId)
@@ -268,10 +244,10 @@ export default function CompanyDashboard() {
         .limit(1)
         .maybeSingle();
 
-      if (subscriptionError) {
+      if (error) {
         console.error(
           "Subscription error:",
-          subscriptionError
+          error
         );
 
         setSubscription(null);
@@ -279,7 +255,11 @@ export default function CompanyDashboard() {
         setSubscription(data || null);
       }
     } catch (err) {
-      console.error("Subscription loading error:", err);
+      console.error(
+        "Subscription loading error:",
+        err
+      );
+
       setSubscription(null);
     } finally {
       setSubscriptionLoading(false);
@@ -342,10 +322,6 @@ export default function CompanyDashboard() {
 
       setCompany(companyData);
 
-      // --------------------------------------------------------
-      // SUBSCRIPTION
-      // --------------------------------------------------------
-
       loadSubscription(companyData.id);
 
       // --------------------------------------------------------
@@ -358,7 +334,10 @@ export default function CompanyDashboard() {
       } = await supabase
         .from("internships")
         .select("*")
-        .eq("company_name", companyData.company_name)
+        .eq(
+          "company_name",
+          companyData.company_name
+        )
         .order("created_at", {
           ascending: false,
         });
@@ -367,7 +346,8 @@ export default function CompanyDashboard() {
         throw internshipError;
       }
 
-      const loadedInternships = internshipData || [];
+      const loadedInternships =
+        internshipData || [];
 
       setInternships(loadedInternships);
 
@@ -376,9 +356,10 @@ export default function CompanyDashboard() {
       // --------------------------------------------------------
 
       if (loadedInternships.length > 0) {
-        const internshipIds = loadedInternships.map(
-          (internship) => internship.id
-        );
+        const internshipIds =
+          loadedInternships.map(
+            (internship) => internship.id
+          );
 
         const {
           data: applicationData,
@@ -386,7 +367,10 @@ export default function CompanyDashboard() {
         } = await supabase
           .from("applications")
           .select("*")
-          .in("internship_id", internshipIds)
+          .in(
+            "internship_id",
+            internshipIds
+          )
           .order("created_at", {
             ascending: false,
           });
@@ -399,13 +383,18 @@ export default function CompanyDashboard() {
 
           setApplications([]);
         } else {
-          setApplications(applicationData || []);
+          setApplications(
+            applicationData || []
+          );
         }
       } else {
         setApplications([]);
       }
     } catch (err) {
-      console.error("Dashboard error:", err);
+      console.error(
+        "Dashboard error:",
+        err
+      );
 
       setError(
         err?.message ||
@@ -428,9 +417,14 @@ export default function CompanyDashboard() {
     await supabase.auth.signOut();
 
     try {
-      localStorage.removeItem("gradlink_profile");
+      localStorage.removeItem(
+        "gradlink_profile"
+      );
     } catch (err) {
-      console.error("Local storage error:", err);
+      console.error(
+        "Local storage error:",
+        err
+      );
     }
 
     router.push("/login");
@@ -440,34 +434,41 @@ export default function CompanyDashboard() {
   // STATISTICS
   // ==========================================================
 
-  const totalApplications = applications.length;
+  const totalApplications =
+    applications.length;
 
-  const shortlistedApplications = applications.filter(
-    (application) =>
-      application.status?.toLowerCase() === "shortlisted"
-  ).length;
+  const shortlistedApplications =
+    applications.filter(
+      (application) =>
+        application.status?.toLowerCase() ===
+        "shortlisted"
+    ).length;
 
-  const rejectedApplications = applications.filter(
-    (application) =>
-      application.status?.toLowerCase() === "rejected"
-  ).length;
+  const pendingApplications =
+    applications.filter(
+      (application) => {
+        const status =
+          application.status?.toLowerCase();
 
-  const pendingApplications = applications.filter((application) => {
-    const status = application.status?.toLowerCase();
-
-    return (
-      !status ||
-      status === "pending" ||
-      status === "applied" ||
-      status === "review"
-    );
-  }).length;
+        return (
+          !status ||
+          status === "pending" ||
+          status === "applied" ||
+          status === "review"
+        );
+      }
+    ).length;
 
   const premiumActive =
-    subscription?.status?.toLowerCase() === "active";
+    subscription?.status?.toLowerCase() ===
+    "active";
+
+  const companyName =
+    company?.company_name ||
+    "Your Company";
 
   // ==========================================================
-  // LOADING SCREEN
+  // LOADING
   // ==========================================================
 
   if (loading) {
@@ -477,13 +478,14 @@ export default function CompanyDashboard() {
           <div style={styles.loadingCard}>
             <div style={styles.spinner}></div>
 
-            <div style={styles.loadingTitle}>
+            <h2 style={styles.loadingTitle}>
               Loading your dashboard
-            </div>
+            </h2>
 
-            <div style={styles.loadingText}>
-              Preparing your GradLink SA recruitment portal...
-            </div>
+            <p style={styles.loadingText}>
+              Preparing your GradLink SA
+              recruitment portal...
+            </p>
           </div>
         </div>
 
@@ -492,6 +494,7 @@ export default function CompanyDashboard() {
             from {
               transform: rotate(0deg);
             }
+
             to {
               transform: rotate(360deg);
             }
@@ -502,27 +505,37 @@ export default function CompanyDashboard() {
   }
 
   // ==========================================================
-  // ERROR SCREEN
+  // ERROR
   // ==========================================================
 
   if (error && !company) {
     return (
       <div style={styles.errorPage}>
         <div style={styles.errorCard}>
-          <div style={styles.errorIcon}>!</div>
+          <div style={styles.errorIcon}>
+            !
+          </div>
 
           <h1 style={styles.errorTitle}>
             Dashboard unavailable
           </h1>
 
-          <p style={styles.errorText}>{error}</p>
+          <p style={styles.errorText}>
+            {error}
+          </p>
 
           <div style={styles.errorActions}>
-            <Link href="/company" style={styles.primaryButton}>
+            <Link
+              href="/company"
+              style={styles.primaryButton}
+            >
               Company Profile
             </Link>
 
-            <Link href="/" style={styles.secondaryButton}>
+            <Link
+              href="/"
+              style={styles.secondaryButton}
+            >
               Home
             </Link>
           </div>
@@ -532,18 +545,12 @@ export default function CompanyDashboard() {
   }
 
   // ==========================================================
-  // FORMAT COMPANY NAME
-  // ==========================================================
-
-  const companyName =
-    company?.company_name || "Your Company";
-
-  // ==========================================================
-  // RENDER
+  // MAIN RENDER
   // ==========================================================
 
   return (
     <div style={styles.page}>
+
       {/* ======================================================
           HEADER
       ====================================================== */}
@@ -553,52 +560,32 @@ export default function CompanyDashboard() {
           ...styles.header,
           transform: showHeader
             ? "translateY(0)"
-            : "translateY(-110%)",
+            : "translateY(-120%)",
         }}
       >
-        <div
-          style={{
-            ...styles.headerInner,
-            flexDirection: isMobile ? "column" : "row",
-            alignItems: isMobile ? "stretch" : "center",
-            gap: isMobile ? "12px" : "20px",
-          }}
-        >
-          {/* LOGO / BRAND */}
+        <div style={styles.headerInner}>
+
           <Link
             href="/"
-            style={{
-              ...styles.logo,
-              justifyContent: isMobile
-                ? "center"
-                : "flex-start",
-            }}
+            style={styles.logo}
           >
-            <span style={styles.logoMark}>G</span>
+            <span style={styles.logoMark}>
+              G
+            </span>
 
             <span style={styles.logoText}>
-              GradLink <span>SA</span>
+              GradLink{" "}
+              <span style={styles.logoAccent}>
+                SA
+              </span>
             </span>
           </Link>
 
-          {/* NAVIGATION */}
-          <nav
-            style={{
-              ...styles.nav,
-              width: isMobile ? "100%" : "auto",
-              overflowX: isMobile ? "auto" : "visible",
-              justifyContent: isMobile
-                ? "flex-start"
-                : "flex-end",
-              paddingBottom: isMobile ? "3px" : "0",
-            }}
-          >
+          <nav style={styles.nav}>
+
             <Link
               href="/"
-              style={{
-                ...styles.navButton,
-                flexShrink: 0,
-              }}
+              style={styles.navButton}
             >
               <span>⌂</span>
               Home
@@ -606,10 +593,7 @@ export default function CompanyDashboard() {
 
             <Link
               href="/company"
-              style={{
-                ...styles.navButton,
-                flexShrink: 0,
-              }}
+              style={styles.navButton}
             >
               <span>▣</span>
               Company Profile
@@ -617,11 +601,7 @@ export default function CompanyDashboard() {
 
             <Link
               href="/internships"
-              style={{
-                ...styles.navButton,
-                ...styles.navPrimaryButton,
-                flexShrink: 0,
-              }}
+              style={styles.navPrimaryButton}
             >
               <span>＋</span>
               Post Internship
@@ -629,202 +609,120 @@ export default function CompanyDashboard() {
 
             <Link
               href="/company/pricing"
-              style={{
-                ...styles.navButton,
-                ...styles.navPremiumButton,
-                flexShrink: 0,
-              }}
+              style={styles.navPremiumButton}
             >
               <span>✦</span>
               Premium
             </Link>
 
             <button
+              type="button"
               onClick={handleLogout}
-              style={{
-                ...styles.navButton,
-                ...styles.logoutButton,
-                flexShrink: 0,
-              }}
+              style={styles.logoutButton}
             >
               <span>↪</span>
               Logout
             </button>
+
           </nav>
         </div>
       </header>
 
       {/* ======================================================
-          MAIN
+          HERO
       ====================================================== */}
 
       <main>
-        {/* ====================================================
-            HERO
-        ==================================================== */}
 
         <section style={styles.hero}>
           <div style={styles.container}>
-            <div
-              style={{
-                ...styles.heroGrid,
-                gridTemplateColumns:
-                  isMobile || isTablet
-                    ? "1fr"
-                    : "minmax(0, 1.35fr) minmax(320px, 0.65fr)",
-              }}
-            >
-              {/* HERO LEFT */}
-              <div
-                style={{
-                  ...styles.heroContent,
-                  minWidth: 0,
-                }}
-              >
-                <div style={styles.eyebrow}>
-                  <span style={styles.eyebrowDot}></span>
-                  RECRUITMENT PORTAL
-                </div>
 
-                <h1
-                  style={{
-                    ...styles.heroTitle,
-                    fontSize: isSmallPhone
-                      ? "34px"
-                      : isMobile
-                      ? "42px"
-                      : "56px",
-                  }}
-                >
-                  Welcome back,
-                  <br />
+            <div style={styles.heroContent}>
 
-                  <span>{companyName}</span>
-                </h1>
-
-                <p style={styles.heroText}>
-                  Manage your internships, review applicants,
-                  monitor your recruitment pipeline and connect
-                  with talented South African graduates.
-                </p>
-
-                {/* HERO ACTIONS */}
-                <div
-                  style={{
-                    ...styles.heroActions,
-                    flexDirection: isSmallPhone
-                      ? "column"
-                      : "row",
-                  }}
-                >
-                  <Link
-                    href="/internships"
-                    style={{
-                      ...styles.heroPrimaryButton,
-                      width: isSmallPhone
-                        ? "100%"
-                        : "auto",
-                    }}
-                  >
-                    <span>＋</span>
-                    Post an Internship
-                  </Link>
-
-                  <Link
-                    href="/company"
-                    style={{
-                      ...styles.heroSecondaryButton,
-                      width: isSmallPhone
-                        ? "100%"
-                        : "auto",
-                    }}
-                  >
-                    <span>▣</span>
-                    Manage Company Profile
-                  </Link>
-                </div>
+              <div style={styles.eyebrow}>
+                <span style={styles.eyebrowDot}></span>
+                RECRUITMENT PORTAL
               </div>
 
-              {/* RECRUITMENT OVERVIEW */}
-              <div
-                style={{
-                  ...styles.overviewCard,
-                  minWidth: 0,
-                }}
-              >
-                <div style={styles.overviewTop}>
-                  <div>
-                    <div style={styles.overviewLabel}>
-                      RECRUITMENT OVERVIEW
-                    </div>
+              <h1 style={styles.heroTitle}>
+                Welcome back,
+                <br />
+                <span>{companyName}</span>
+              </h1>
 
-                    <div style={styles.overviewTitle}>
-                      Your hiring activity
-                    </div>
-                  </div>
+              <p style={styles.heroText}>
+                Manage your internships, review
+                applicants, monitor your recruitment
+                pipeline and connect with talented
+                South African graduates.
+              </p>
 
-                  <div style={styles.overviewIcon}>↗</div>
-                </div>
+              <div style={styles.heroActions}>
 
-                <div style={styles.overviewDivider}></div>
+                <Link
+                  href="/internships"
+                  style={styles.heroPrimaryButton}
+                >
+                  <span>＋</span>
+                  Post an Internship
+                </Link>
 
-                <div style={styles.overviewRows}>
-                  <div style={styles.overviewRow}>
-                    <span>Active internships</span>
-                    <strong>{internships.length}</strong>
-                  </div>
+                <Link
+                  href="/company"
+                  style={styles.heroSecondaryButton}
+                >
+                  <span>▣</span>
+                  Manage Company Profile
+                </Link>
 
-                  <div style={styles.overviewRow}>
-                    <span>Total applications</span>
-                    <strong>{totalApplications}</strong>
-                  </div>
-
-                  <div style={styles.overviewRow}>
-                    <span>Shortlisted</span>
-                    <strong>{shortlistedApplications}</strong>
-                  </div>
-                </div>
-
-                <div style={styles.overviewFooter}>
-                  <span
-                    style={{
-                      ...styles.statusDot,
-                      background: premiumActive
-                        ? "#18a957"
-                        : "#f59e0b",
-                    }}
-                  ></span>
-
-                  {premiumActive
-                    ? "Premium account active"
-                    : "Standard account"}
-                </div>
               </div>
+
             </div>
+
           </div>
         </section>
 
         {/* ====================================================
-            STATISTICS
+            RECRUITMENT OVERVIEW
         ==================================================== */}
 
-        <section style={styles.section}>
+        <section style={styles.overviewSection}>
           <div style={styles.container}>
-            <div
-              style={{
-                ...styles.statsGrid,
-                gridTemplateColumns: isSmallPhone
-                  ? "1fr"
-                  : isMobile || isTablet
-                  ? "repeat(2, minmax(0, 1fr))"
-                  : "repeat(4, minmax(0, 1fr))",
-              }}
-            >
+
+            <div style={styles.sectionHeading}>
+              <div>
+                <div style={styles.sectionEyebrow}>
+                  RECRUITMENT OVERVIEW
+                </div>
+
+                <h2 style={styles.sectionTitle}>
+                  Your hiring pipeline
+                </h2>
+              </div>
+
+              <div style={styles.overviewStatus}>
+                <span
+                  style={{
+                    ...styles.statusDot,
+                    background: premiumActive
+                      ? "#18a957"
+                      : "#f59e0b",
+                  }}
+                ></span>
+
+                {premiumActive
+                  ? "Premium active"
+                  : "Recruitment workspace active"}
+              </div>
+            </div>
+
+            <div style={styles.statsGrid}>
+
               <StatCard
                 icon="▤"
                 number={internships.length}
-                label="Internships"
-                description="Internship listings"
+                label="Internship Listings"
+                description="Published opportunities"
               />
 
               <StatCard
@@ -845,8 +743,9 @@ export default function CompanyDashboard() {
                 icon="◷"
                 number={pendingApplications}
                 label="Pending Review"
-                description="Awaiting your review"
+                description="Applications awaiting review"
               />
+
             </div>
           </div>
         </section>
@@ -855,182 +754,146 @@ export default function CompanyDashboard() {
             PREMIUM
         ==================================================== */}
 
-        <section style={styles.sectionCompact}>
+        <section style={styles.section}>
           <div style={styles.container}>
-            <div
-              style={{
-                ...styles.premiumCard,
-                gridTemplateColumns:
-                  isMobile || isTablet
-                    ? "1fr"
-                    : "minmax(0, 1.45fr) minmax(280px, 0.55fr)",
-              }}
-            >
-              <div
-                style={{
-                  ...styles.premiumMain,
-                  minWidth: 0,
-                }}
-              >
-                <div style={styles.premiumBadge}>
-                  ✦ GRADLINK PREMIUM
+
+            <div style={styles.premiumCard}>
+
+              <div style={styles.premiumHeader}>
+
+                <div>
+                  <div style={styles.premiumBadge}>
+                    ✦ GRADLINK PREMIUM
+                  </div>
+
+                  <h2 style={styles.premiumTitle}>
+                    Take your recruitment further
+                  </h2>
+
+                  <p style={styles.premiumText}>
+                    Unlock premium recruitment
+                    capabilities designed to help
+                    companies discover, evaluate and
+                    manage graduate talent more
+                    efficiently.
+                  </p>
                 </div>
 
-                <h2 style={styles.premiumTitle}>
-                  Build a smarter recruitment process.
-                </h2>
+                <div style={styles.premiumPlanBox}>
 
-                <p style={styles.premiumText}>
-                  Unlock advanced recruitment tools designed
-                  to help your company discover and assess
-                  graduate talent more efficiently.
-                </p>
+                  <div style={styles.planLabel}>
+                    CURRENT PLAN
+                  </div>
 
-                <div
-                  style={{
-                    ...styles.premiumFeatures,
-                    gridTemplateColumns: isSmallPhone
-                      ? "1fr"
-                      : "repeat(2, minmax(0, 1fr))",
-                  }}
-                >
-                  <PremiumFeature
-                    icon="✦"
-                    title="AI Matching"
-                    text="Match applicants against your internship requirements."
-                  />
+                  <div style={styles.planName}>
+                    {subscription?.plan ||
+                      "Standard"}
+                  </div>
 
-                  <PremiumFeature
-                    icon="✓"
-                    title="Document Verification"
-                    text="Advanced document checking tools for eligible plans."
-                  />
+                  <div style={styles.planPrice}>
+                    {subscription?.monthly_price
+                      ? `R${subscription.monthly_price}`
+                      : "Free"}
 
-                  <PremiumFeature
-                    icon="◉"
-                    title="Applicant Insights"
-                    text="Review applications with clearer candidate information."
-                  />
+                    <span>
+                      / month
+                    </span>
+                  </div>
 
-                  <PremiumFeature
-                    icon="↗"
-                    title="Recruitment Tools"
-                    text="Organise and manage your graduate recruitment pipeline."
-                  />
-                </div>
-              </div>
-
-              <div
-                style={{
-                  ...styles.subscriptionBox,
-                  minWidth: 0,
-                }}
-              >
-                <div style={styles.subscriptionHeader}>
-                  <span>YOUR PLAN</span>
-
-                  <span
+                  <div
                     style={{
-                      ...styles.subscriptionStatus,
-                      background: premiumActive
-                        ? "rgba(24,169,87,0.12)"
-                        : "rgba(245,158,11,0.12)",
-                      color: premiumActive
-                        ? "#128047"
-                        : "#b45309",
+                      ...styles.planStatus,
+                      background:
+                        premiumActive
+                          ? "#e9f8ef"
+                          : "#fff5df",
+                      color:
+                        premiumActive
+                          ? "#147a45"
+                          : "#a15c00",
                     }}
                   >
-                    {premiumActive
+                    {subscriptionLoading
+                      ? "CHECKING..."
+                      : premiumActive
                       ? "ACTIVE"
                       : "STANDARD"}
-                  </span>
-                </div>
-
-                <div style={styles.subscriptionPlan}>
-                  {subscription?.plan ||
-                    "Standard"}
-                </div>
-
-                <div style={styles.subscriptionPrice}>
-                  {subscription?.monthly_price
-                    ? `R${subscription.monthly_price}`
-                    : "Free"}
-                  <span>/ month</span>
-                </div>
-
-                {subscriptionLoading ? (
-                  <div style={styles.subscriptionLoading}>
-                    Checking subscription...
                   </div>
-                ) : (
-                  <div style={styles.subscriptionDetails}>
-                    <SubscriptionDetail
-                      label="Status"
-                      value={
-                        premiumActive
-                          ? "Active"
-                          : "Standard"
-                      }
-                    />
 
-                    <SubscriptionDetail
-                      label="Started"
-                      value={formatDate(
-                        subscription?.started_at
-                      )}
-                    />
+                  <Link
+                    href="/company/pricing"
+                    style={styles.premiumButton}
+                  >
+                    {premiumActive
+                      ? "Manage Premium"
+                      : "View Premium Plans"}
 
-                    <SubscriptionDetail
-                      label="Renewal"
-                      value={formatDate(
-                        subscription?.current_period_end
-                      )}
-                    />
-                  </div>
-                )}
+                    <span>→</span>
+                  </Link>
 
-                <Link
-                  href="/company/pricing"
-                  style={styles.premiumButton}
-                >
-                  {premiumActive
-                    ? "Manage Premium"
-                    : "View Premium Plans"}
-                  <span>→</span>
-                </Link>
+                </div>
+
               </div>
+
+              <div style={styles.premiumFeatures}>
+
+                <PremiumFeature
+                  icon="✦"
+                  title="Advanced Recruitment Tools"
+                  text="Manage your graduate recruitment workflow more efficiently."
+                />
+
+                <PremiumFeature
+                  icon="✓"
+                  title="Enhanced Candidate Insights"
+                  text="Get clearer information when reviewing applications."
+                />
+
+                <PremiumFeature
+                  icon="◈"
+                  title="Premium Verification Features"
+                  text="Access advanced document verification capabilities."
+                />
+
+                <PremiumFeature
+                  icon="◉"
+                  title="AI Candidate Matching"
+                  text="Compare applicants against your internship requirements."
+                />
+
+              </div>
+
             </div>
+
           </div>
         </section>
         
-                {/* ====================================================
+                {/* ======================================================
             INTERNSHIP LISTINGS
-        ==================================================== */}
+        ====================================================== */}
 
         <section style={styles.section}>
           <div style={styles.container}>
-            <div style={styles.sectionHeader}>
-              <div style={{ minWidth: 0 }}>
+
+            <div style={styles.sectionHeading}>
+              <div>
                 <div style={styles.sectionEyebrow}>
-                  YOUR LISTINGS
+                  YOUR OPPORTUNITIES
                 </div>
 
                 <h2 style={styles.sectionTitle}>
                   Internship listings
                 </h2>
 
-                <p style={styles.sectionText}>
-                  Manage your internship opportunities and
-                  review the graduates who have applied.
+                <p style={styles.sectionDescription}>
+                  Manage your active internship opportunities
+                  and review the graduates who applied.
                 </p>
               </div>
 
               <Link
                 href="/internships"
-                style={{
-                  ...styles.sectionActionButton,
-                  width: isSmallPhone ? "100%" : "auto",
-                }}
+                style={styles.headingButton}
               >
                 <span>＋</span>
                 Post Internship
@@ -1039,15 +902,18 @@ export default function CompanyDashboard() {
 
             {internships.length === 0 ? (
               <div style={styles.emptyCard}>
-                <div style={styles.emptyIcon}>＋</div>
+                <div style={styles.emptyIcon}>
+                  ▤
+                </div>
 
                 <h3 style={styles.emptyTitle}>
-                  No internships yet
+                  No internship listings yet
                 </h3>
 
                 <p style={styles.emptyText}>
-                  Create your first internship listing and
-                  start receiving applications from graduates.
+                  Create your first internship opportunity
+                  and start receiving applications from
+                  South African graduates.
                 </p>
 
                 <Link
@@ -1060,7 +926,9 @@ export default function CompanyDashboard() {
               </div>
             ) : (
               <div style={styles.internshipList}>
+
                 {internships.map((internship) => {
+
                   const internshipApplications =
                     applications.filter(
                       (application) =>
@@ -1075,519 +943,856 @@ export default function CompanyDashboard() {
                         "shortlisted"
                     ).length;
 
-                  const internshipPending =
-                    internshipApplications.filter((application) => {
-                      const status =
-                        application.status?.toLowerCase();
+                  const deadline = internship.deadline
+                    ? new Date(internship.deadline)
+                    : null;
 
-                      return (
-                        !status ||
-                        status === "pending" ||
-                        status === "applied" ||
-                        status === "review"
-                      );
-                    }).length;
+                  const isExpired =
+                    deadline &&
+                    !Number.isNaN(deadline.getTime()) &&
+                    deadline < new Date();
 
                   return (
-                    <div
+                    <article
                       key={internship.id}
                       style={styles.internshipCard}
                     >
-                      <div
-                        style={{
-                          ...styles.internshipCardTop,
-                          flexDirection: isMobile
-                            ? "column"
-                            : "row",
-                        }}
-                      >
-                        <div
-                          style={{
-                            ...styles.internshipInfo,
-                            minWidth: 0,
-                          }}
-                        >
-                          <div style={styles.listingBadge}>
-                            INTERNSHIP
+
+                      <div style={styles.internshipTop}>
+
+                        <div style={styles.internshipTitleArea}>
+
+                          <div style={styles.internshipIcon}>
+                            ▤
                           </div>
 
-                          <h3 style={styles.internshipTitle}>
-                            {internship.job_title ||
-                              "Untitled Internship"}
-                          </h3>
+                          <div>
+                            <div style={styles.listingLabel}>
+                              INTERNSHIP OPPORTUNITY
+                            </div>
 
-                          <div style={styles.internshipCompany}>
-                            <span>▣</span>
-                            {internship.company_name ||
-                              companyName}
+                            <h3
+                              style={styles.internshipTitle}
+                            >
+                              {internship.job_title ||
+                                "Untitled Internship"}
+                            </h3>
+
+                            <p
+                              style={
+                                styles.internshipCompany
+                              }
+                            >
+                              {internship.company_name ||
+                                companyName}
+                            </p>
                           </div>
 
-                          <div
-                            style={{
-                              ...styles.internshipMeta,
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            {internship.location && (
-                              <span>
-                                <b>⌖</b>
-                                {internship.location}
-                              </span>
-                            )}
-
-                            {internship.province && (
-                              <span>
-                                <b>◈</b>
-                                {internship.province}
-                              </span>
-                            )}
-
-                            {internship.internship_type && (
-                              <span>
-                                <b>◷</b>
-                                {internship.internship_type}
-                              </span>
-                            )}
-                          </div>
                         </div>
 
                         <div
                           style={{
-                            ...styles.internshipActions,
-                            width: isMobile
-                              ? "100%"
-                              : "auto",
+                            ...styles.listingStatus,
+                            ...(isExpired
+                              ? styles.listingStatusExpired
+                              : styles.listingStatusActive),
                           }}
                         >
-                          <Link
-                            href={`/company/internships/${internship.id}/applicants`}
-                            style={{
-                              ...styles.viewApplicantsButton,
-                              width: isMobile
-                                ? "100%"
-                                : "auto",
-                            }}
-                          >
-                            <span>◉</span>
-                            View Applicants
-                          </Link>
-
-                          <Link
-                            href={`/internships/${internship.id}`}
-                            style={{
-                              ...styles.viewDetailsButton,
-                              width: isMobile
-                                ? "100%"
-                                : "auto",
-                            }}
-                          >
-                            View Details
-                            <span>→</span>
-                          </Link>
+                          <span></span>
+                          {isExpired
+                            ? "Expired"
+                            : "Active"}
                         </div>
+
                       </div>
 
-                      <div style={styles.internshipDivider}></div>
+                      <div style={styles.internshipDetails}>
+
+                        <div style={styles.detailItem}>
+                          <span
+                            style={styles.detailIcon}
+                          >
+                            ◉
+                          </span>
+
+                          <div>
+                            <span
+                              style={styles.detailLabel}
+                            >
+                              Location
+                            </span>
+
+                            <strong
+                              style={styles.detailValue}
+                            >
+                              {internship.location ||
+                                internship.province ||
+                                "South Africa"}
+                            </strong>
+                          </div>
+                        </div>
+
+                        <div style={styles.detailItem}>
+                          <span
+                            style={styles.detailIcon}
+                          >
+                            ◇
+                          </span>
+
+                          <div>
+                            <span
+                              style={styles.detailLabel}
+                            >
+                              Type
+                            </span>
+
+                            <strong
+                              style={styles.detailValue}
+                            >
+                              {internship.internship_type ||
+                                "Internship"}
+                            </strong>
+                          </div>
+                        </div>
+
+                        <div style={styles.detailItem}>
+                          <span
+                            style={styles.detailIcon}
+                          >
+                            R
+                          </span>
+
+                          <div>
+                            <span
+                              style={styles.detailLabel}
+                            >
+                              Stipend
+                            </span>
+
+                            <strong
+                              style={styles.detailValue}
+                            >
+                              {internship.stipend ||
+                                "Not specified"}
+                            </strong>
+                          </div>
+                        </div>
+
+                        <div style={styles.detailItem}>
+                          <span
+                            style={styles.detailIcon}
+                          >
+                            ◷
+                          </span>
+
+                          <div>
+                            <span
+                              style={styles.detailLabel}
+                            >
+                              Deadline
+                            </span>
+
+                            <strong
+                              style={styles.detailValue}
+                            >
+                              {deadline &&
+                              !Number.isNaN(
+                                deadline.getTime()
+                              )
+                                ? deadline.toLocaleDateString(
+                                    "en-ZA",
+                                    {
+                                      day: "2-digit",
+                                      month: "short",
+                                      year: "numeric",
+                                    }
+                                  )
+                                : "Not specified"}
+                            </strong>
+                          </div>
+                        </div>
+
+                      </div>
 
                       <div
-                        style={{
-                          ...styles.applicationSummary,
-                          gridTemplateColumns: isSmallPhone
-                            ? "1fr"
-                            : "repeat(3, minmax(0, 1fr))",
-                        }}
+                        style={styles.applicationSummary}
                       >
-                        <ApplicationSummary
-                          icon="◉"
-                          number={internshipApplications.length}
-                          label="Applications"
-                        />
 
-                        <ApplicationSummary
-                          icon="✓"
-                          number={internshipShortlisted}
-                          label="Shortlisted"
-                        />
+                        <div
+                          style={
+                            styles.applicationSummaryItem
+                          }
+                        >
+                          <strong>
+                            {internshipApplications.length}
+                          </strong>
 
-                        <ApplicationSummary
-                          icon="◷"
-                          number={internshipPending}
-                          label="Pending review"
-                        />
+                          <span>
+                            Applications
+                          </span>
+                        </div>
+
+                        <div
+                          style={
+                            styles.applicationSummaryItem
+                          }
+                        >
+                          <strong>
+                            {internshipShortlisted}
+                          </strong>
+
+                          <span>
+                            Shortlisted
+                          </span>
+                        </div>
+
+                        <div
+                          style={
+                            styles.applicationSummaryItem
+                          }
+                        >
+                          <strong>
+                            {Math.max(
+                              internshipApplications.length -
+                                internshipShortlisted,
+                              0
+                            )}
+                          </strong>
+
+                          <span>
+                            Other applicants
+                          </span>
+                        </div>
+
                       </div>
-                    </div>
+
+                      <div
+                        style={styles.internshipActions}
+                      >
+
+                        <Link
+                          href={`/company/internships/${internship.id}/applicants`}
+                          style={styles.applicantsButton}
+                        >
+                          <span>◉</span>
+                          View Applicants
+                        </Link>
+
+                        <Link
+                          href={`/internships/${internship.id}`}
+                          style={styles.viewButton}
+                        >
+                          View Details
+                          <span>→</span>
+                        </Link>
+
+                      </div>
+
+                    </article>
                   );
                 })}
+
               </div>
             )}
+
           </div>
         </section>
 
-        {/* ====================================================
-            RECRUITMENT ACTIVITY
-        ==================================================== */}
 
-        <section style={styles.sectionCompact}>
+        {/* ======================================================
+            RECENT APPLICATIONS
+        ====================================================== */}
+
+        <section style={styles.sectionAlt}>
           <div style={styles.container}>
-            <div style={styles.sectionHeader}>
-              <div style={{ minWidth: 0 }}>
+
+            <div style={styles.sectionHeading}>
+              <div>
                 <div style={styles.sectionEyebrow}>
-                  APPLICATION ACTIVITY
+                  CANDIDATE ACTIVITY
                 </div>
 
                 <h2 style={styles.sectionTitle}>
                   Recent applications
                 </h2>
 
-                <p style={styles.sectionText}>
-                  Keep track of the latest graduates applying
-                  to your internship opportunities.
+                <p style={styles.sectionDescription}>
+                  Keep track of the latest graduates who
+                  have applied to your opportunities.
                 </p>
               </div>
+
+              {applications.length > 0 && (
+                <div style={styles.applicationCount}>
+                  {applications.length} total
+                </div>
+              )}
+
             </div>
 
             {applications.length === 0 ? (
               <div style={styles.emptyCard}>
-                <div style={styles.emptyIcon}>◉</div>
+                <div style={styles.emptyIcon}>
+                  ◉
+                </div>
 
                 <h3 style={styles.emptyTitle}>
                   No applications yet
                 </h3>
 
                 <p style={styles.emptyText}>
-                  Applications from graduates will appear here
-                  once they apply to your internships.
+                  Applications from graduates will appear
+                  here once they apply to your internship
+                  listings.
                 </p>
               </div>
             ) : (
               <div style={styles.applicationList}>
-                {applications
-                  .slice(0, 6)
-                  .map((application) => {
-                    const internship = internships.find(
-                      (item) =>
-                        String(item.id) ===
-                        String(application.internship_id)
-                    );
 
-                    const match = calculateMatch(
-                      internship,
-                      application
-                    );
+                {applications
+                  .slice(0, 8)
+                  .map((application) => {
+
+                    const internship =
+                      internships.find(
+                        (item) =>
+                          String(item.id) ===
+                          String(
+                            application.internship_id
+                          )
+                      );
+
+                    const match =
+                      calculateMatch(
+                        internship,
+                        application
+                      );
 
                     const status =
-                      application.status || "Pending";
+                      application.status ||
+                      "Pending";
 
                     return (
                       <div
                         key={application.id}
                         style={styles.applicationCard}
                       >
+
                         <div
-                          style={{
-                            ...styles.applicationMain,
-                            flexDirection: isMobile
-                              ? "column"
-                              : "row",
-                          }}
+                          style={
+                            styles.applicationAvatar
+                          }
                         >
-                          <div
-                            style={styles.applicantAvatar}
-                          >
-                            {(
-                              application.full_name ||
-                              "G"
-                            )
-                              .charAt(0)
-                              .toUpperCase()}
-                          </div>
+                          {(
+                            application.full_name ||
+                            "G"
+                          )
+                            .trim()
+                            .charAt(0)
+                            .toUpperCase()}
+                        </div>
+
+                        <div
+                          style={
+                            styles.applicationMain
+                          }
+                        >
 
                           <div
-                            style={{
-                              ...styles.applicantInfo,
-                              minWidth: 0,
-                            }}
+                            style={
+                              styles.applicationNameRow
+                            }
                           >
                             <h3
                               style={
-                                styles.applicantName
+                                styles.applicationName
                               }
                             >
                               {application.full_name ||
                                 "Graduate Applicant"}
                             </h3>
 
-                            <div
-                              style={
-                                styles.applicantEmail
-                              }
-                            >
-                              {application.email ||
-                                "No email provided"}
-                            </div>
-
-                            <div
-                              style={{
-                                ...styles.applicantRole,
-                                overflowWrap:
-                                  "anywhere",
-                              }}
-                            >
-                              Applied for:{" "}
-                              <strong>
-                                {internship?.job_title ||
-                                  "Internship"}
-                              </strong>
-                            </div>
-                          </div>
-
-                          <div
-                            style={{
-                              ...styles.matchBox,
-                              alignSelf: isMobile
-                                ? "stretch"
-                                : "center",
-                              width: isMobile
-                                ? "100%"
-                                : "auto",
-                            }}
-                          >
-                            <div
-                              style={
-                                styles.matchNumber
-                              }
-                            >
-                              {match.total}%
-                            </div>
-
-                            <div
-                              style={styles.matchLabel}
-                            >
-                              AI Match
-                            </div>
-                          </div>
-
-                          <div
-                            style={{
-                              ...styles.applicationStatusBox,
-                              alignSelf: isMobile
-                                ? "stretch"
-                                : "center",
-                            }}
-                          >
                             <span
-                              style={{
-                                ...styles.statusBadge,
-                                ...getStatusStyle(status),
-                              }}
+                              style={getStatusStyle(
+                                status
+                              )}
                             >
                               {status}
                             </span>
                           </div>
 
-                          <Link
-                            href={`/company/internships/${application.internship_id}/applicants`}
-                            style={{
-                              ...styles.reviewButton,
-                              width: isMobile
-                                ? "100%"
-                                : "auto",
-                            }}
+                          <p
+                            style={
+                              styles.applicationRole
+                            }
                           >
-                            Review
-                            <span>→</span>
-                          </Link>
+                            Applied for{" "}
+                            <strong>
+                              {internship?.job_title ||
+                                "Internship"}
+                            </strong>
+                          </p>
+
+                          <div
+                            style={
+                              styles.applicationMeta
+                            }
+                          >
+
+                            <span>
+                              {application.email ||
+                                "Email unavailable"}
+                            </span>
+
+                            <span>
+                              {application.qualification ||
+                                "Qualification not provided"}
+                            </span>
+
+                            <span>
+                              {application.field_of_study ||
+                                "Field not provided"}
+                            </span>
+
+                          </div>
+
                         </div>
+
+                        <div
+                          style={
+                            styles.matchScore
+                          }
+                        >
+                          <div
+                            style={
+                              styles.matchNumber
+                            }
+                          >
+                            {match.total}%
+                          </div>
+
+                          <span>
+                            {match.label}
+                          </span>
+                        </div>
+
+                        <Link
+                          href={`/company/internships/${application.internship_id}/applicants`}
+                          style={
+                            styles.applicationArrow
+                          }
+                          aria-label="View applicant"
+                        >
+                          →
+                        </Link>
+
                       </div>
                     );
                   })}
+
               </div>
             )}
+
           </div>
         </section>
 
-        {/* ====================================================
+
+        {/* ======================================================
             QUICK ACTIONS
-        ==================================================== */}
+        ====================================================== */}
 
         <section style={styles.section}>
           <div style={styles.container}>
-            <div style={styles.quickActionsCard}>
-              <div style={styles.quickActionsHeader}>
-                <div>
-                  <div style={styles.sectionEyebrow}>
-                    QUICK ACTIONS
-                  </div>
 
-                  <h2 style={styles.quickActionsTitle}>
-                    Manage your GradLink account
-                  </h2>
+            <div style={styles.quickActionsBox}>
+
+              <div style={styles.quickActionsIntro}>
+                <div style={styles.sectionEyebrow}>
+                  QUICK ACTIONS
                 </div>
+
+                <h2 style={styles.quickActionsTitle}>
+                  Keep your recruitment moving
+                </h2>
+
+                <p style={styles.quickActionsText}>
+                  Everything you need to manage your
+                  GradLink SA company account.
+                </p>
               </div>
 
-              <div
-                style={{
-                  ...styles.quickActionsGrid,
-                  gridTemplateColumns: isSmallPhone
-                    ? "1fr"
-                    : isMobile || isTablet
-                    ? "repeat(2, minmax(0, 1fr))"
-                    : "repeat(4, minmax(0, 1fr))",
-                }}
-              >
+              <div style={styles.quickActionsGrid}>
+
                 <QuickAction
                   href="/internships"
                   icon="＋"
                   title="Post Internship"
-                  text="Create a new opportunity."
+                  text="Create a new opportunity"
                 />
 
                 <QuickAction
                   href="/company"
                   icon="▣"
                   title="Company Profile"
-                  text="Update your company information."
+                  text="Update your company details"
                 />
 
                 <QuickAction
                   href="/company/pricing"
                   icon="✦"
-                  title="Premium"
-                  text="View recruitment plans."
+                  title="Premium Plans"
+                  text="Explore recruitment features"
                 />
 
                 <QuickAction
                   href="/"
                   icon="⌂"
-                  title="Back Home"
-                  text="Return to GradLink SA."
+                  title="Visit GradLink"
+                  text="Return to the main website"
                 />
+
               </div>
+
             </div>
+
           </div>
         </section>
+
       </main>
 
-      {/* ======================================================
+
+      {/* ========================================================
           FOOTER
-      ====================================================== */}
+      ======================================================== */}
 
       <footer style={styles.footer}>
-        <div
-          style={{
-            ...styles.footerInner,
-            flexDirection: isMobile
-              ? "column"
-              : "row",
-            textAlign: isMobile
-              ? "center"
-              : "left",
-          }}
-        >
-          <div style={styles.footerBrand}>
-            <div style={styles.footerLogo}>
-              <span style={styles.logoMark}>
-                G
-              </span>
+        <div style={styles.container}>
 
-              <span style={styles.logoText}>
-                GradLink <span>SA</span>
-              </span>
+          <div style={styles.footerMain}>
+
+            <div style={styles.footerBrand}>
+
+              <Link
+                href="/"
+                style={styles.footerLogo}
+              >
+                <span style={styles.footerLogoMark}>
+                  G
+                </span>
+
+                <span>
+                  GradLink{" "}
+                  <b>SA</b>
+                </span>
+              </Link>
+
+              <p style={styles.footerText}>
+                Connecting South African graduates
+                with meaningful career opportunities.
+              </p>
+
             </div>
 
-            <p style={styles.footerText}>
-              Connecting South African graduates with
-              internship opportunities.
-            </p>
+            <div style={styles.footerLinks}>
+
+              <div>
+                <div style={styles.footerHeading}>
+                  COMPANY
+                </div>
+
+                <Link
+                  href="/company"
+                  style={styles.footerLink}
+                >
+                  Company Profile
+                </Link>
+
+                <Link
+                  href="/internships"
+                  style={styles.footerLink}
+                >
+                  Post Internship
+                </Link>
+
+                <Link
+                  href="/company/pricing"
+                  style={styles.footerLink}
+                >
+                  Premium
+                </Link>
+              </div>
+
+              <div>
+                <div style={styles.footerHeading}>
+                  GRADLINK SA
+                </div>
+
+                <Link
+                  href="/"
+                  style={styles.footerLink}
+                >
+                  Home
+                </Link>
+
+                <Link
+                  href="/internships"
+                  style={styles.footerLink}
+                >
+                  Internships
+                </Link>
+
+                <Link
+                  href="/jobs"
+                  style={styles.footerLink}
+                >
+                  Jobs
+                </Link>
+              </div>
+
+            </div>
+
           </div>
 
-          <div style={styles.footerLinks}>
-            <Link href="/" style={styles.footerLink}>
-              Home
-            </Link>
+          <div style={styles.footerBottom}>
+            <span>
+              © {new Date().getFullYear()} GradLink SA.
+              All rights reserved.
+            </span>
 
-            <Link
-              href="/company"
-              style={styles.footerLink}
-            >
-              Company Profile
-            </Link>
-
-            <Link
-              href="/internships"
-              style={styles.footerLink}
-            >
-              Post Internship
-            </Link>
-
-            <Link
-              href="/company/pricing"
-              style={styles.footerLink}
-            >
-              Premium
-            </Link>
+            <span>
+              Innovation. Opportunity. Growth.
+            </span>
           </div>
-        </div>
 
-        <div style={styles.footerBottom}>
-          © {new Date().getFullYear()} GradLink SA. All
-          rights reserved.
         </div>
       </footer>
 
-      {/* ======================================================
-          GLOBAL RESPONSIVE CSS
-      ====================================================== */}
+
+      {/* ========================================================
+          GLOBAL RESPONSIVE STYLES
+      ======================================================== */}
 
       <style jsx global>{`
+
         * {
           box-sizing: border-box;
         }
 
         html {
-          overflow-x: hidden;
           scroll-behavior: smooth;
         }
 
         body {
           margin: 0;
           padding: 0;
-          overflow-x: hidden;
-          background: #f6f9fc;
+          background: #f5f8fc;
+          color: #10233f;
+          font-family:
+            Inter,
+            ui-sans-serif,
+            system-ui,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            sans-serif;
         }
 
+        a {
+          text-decoration: none;
+        }
+
+        button,
         a {
           -webkit-tap-highlight-color: transparent;
         }
 
-        button {
-          font-family: inherit;
+        @keyframes gradlinkSpin {
+          from {
+            transform: rotate(0deg);
+          }
+
+          to {
+            transform: rotate(360deg);
+          }
         }
 
-        @media (max-width: 700px) {
-          body {
+        @media (max-width: 1100px) {
+
+          .gradlink-dashboard-placeholder {
+            display: none;
+          }
+
+        }
+
+        @media (max-width: 900px) {
+
+          .gradlink-stats-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .gradlink-premium-header {
+            grid-template-columns: 1fr;
+          }
+
+          .gradlink-premium-plan {
             width: 100%;
-            max-width: 100%;
           }
+
         }
 
-        @media (max-width: 420px) {
-          input,
-          textarea,
-          select,
-          button,
-          a {
-            max-width: 100%;
+        @media (max-width: 720px) {
+
+          .gradlink-container {
+            width: 100%;
+            padding-left: 18px;
+            padding-right: 18px;
           }
+
+          .gradlink-header-inner {
+            min-height: auto;
+            padding-top: 12px;
+            padding-bottom: 12px;
+            align-items: flex-start;
+          }
+
+          .gradlink-nav {
+            width: 100%;
+            overflow-x: auto;
+            padding-bottom: 2px;
+            scrollbar-width: none;
+          }
+
+          .gradlink-nav::-webkit-scrollbar {
+            display: none;
+          }
+
+          .gradlink-nav-button {
+            flex: 0 0 auto;
+          }
+
+          .gradlink-hero {
+            padding-top: 145px;
+            padding-bottom: 55px;
+          }
+
+          .gradlink-hero-title {
+            font-size: 42px !important;
+            line-height: 1.02 !important;
+          }
+
+          .gradlink-section-heading {
+            align-items: flex-start !important;
+            flex-direction: column !important;
+          }
+
+          .gradlink-heading-button {
+            width: 100%;
+          }
+
+          .gradlink-stats-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .gradlink-premium-features {
+            grid-template-columns: 1fr !important;
+          }
+
+          .gradlink-internship-details {
+            grid-template-columns: 1fr 1fr !important;
+          }
+
+          .gradlink-internship-actions {
+            grid-template-columns: 1fr !important;
+          }
+
+          .gradlink-application-card {
+            grid-template-columns: auto 1fr auto !important;
+          }
+
+          .gradlink-application-match {
+            display: none;
+          }
+
+          .gradlink-application-meta {
+            grid-template-columns: 1fr !important;
+          }
+
+          .gradlink-quick-actions-grid {
+            grid-template-columns: 1fr !important;
+          }
+
+          .gradlink-footer-main {
+            grid-template-columns: 1fr !important;
+          }
+
+          .gradlink-footer-bottom {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+          }
+
         }
+
+        @media (max-width: 480px) {
+
+          .gradlink-container {
+            padding-left: 14px;
+            padding-right: 14px;
+          }
+
+          .gradlink-hero {
+            padding-top: 150px;
+          }
+
+          .gradlink-hero-title {
+            font-size: 35px !important;
+          }
+
+          .gradlink-hero-actions {
+            grid-template-columns: 1fr !important;
+          }
+
+          .gradlink-premium-card {
+            padding: 22px !important;
+          }
+
+          .gradlink-premium-title {
+            font-size: 25px !important;
+          }
+
+          .gradlink-internship-details {
+            grid-template-columns: 1fr !important;
+          }
+
+          .gradlink-internship-top {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+          }
+
+          .gradlink-application-card {
+            grid-template-columns: auto 1fr !important;
+          }
+
+          .gradlink-application-arrow {
+            display: none;
+          }
+
+          .gradlink-section {
+            padding-top: 38px !important;
+            padding-bottom: 38px !important;
+          }
+
+        }
+
       `}</style>
+
     </div>
   );
 }
 
-// ============================================================
-// STAT CARD
-// ============================================================
+
+/* ==============================================================
+   STAT CARD
+   ============================================================== */
 
 function StatCard({
   icon,
@@ -1596,13 +1801,17 @@ function StatCard({
   description,
 }) {
   return (
-    <div style={styles.statCard}>
-      <div style={styles.statTop}>
-        <div style={styles.statIcon}>{icon}</div>
+    <div
+      style={styles.statCard}
+      className="gradlink-stat-card"
+    >
 
-        <div style={styles.statNumber}>
-          {number}
-        </div>
+      <div style={styles.statIcon}>
+        {icon}
+      </div>
+
+      <div style={styles.statNumber}>
+        {number}
       </div>
 
       <div style={styles.statLabel}>
@@ -1612,13 +1821,15 @@ function StatCard({
       <div style={styles.statDescription}>
         {description}
       </div>
+
     </div>
   );
 }
 
-// ============================================================
-// PREMIUM FEATURE
-// ============================================================
+
+/* ==============================================================
+   PREMIUM FEATURE
+   ============================================================== */
 
 function PremiumFeature({
   icon,
@@ -1626,72 +1837,33 @@ function PremiumFeature({
   text,
 }) {
   return (
-    <div style={styles.premiumFeature}>
+    <div
+      style={styles.premiumFeature}
+      className="gradlink-premium-feature"
+    >
+
       <div style={styles.premiumFeatureIcon}>
         {icon}
       </div>
 
-      <div style={{ minWidth: 0 }}>
-        <div style={styles.premiumFeatureTitle}>
-          {title}
-        </div>
-
-        <div style={styles.premiumFeatureText}>
-          {text}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// SUBSCRIPTION DETAIL
-// ============================================================
-
-function SubscriptionDetail({
-  label,
-  value,
-}) {
-  return (
-    <div style={styles.subscriptionDetail}>
-      <span>{label}</span>
-
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-// ============================================================
-// APPLICATION SUMMARY
-// ============================================================
-
-function ApplicationSummary({
-  icon,
-  number,
-  label,
-}) {
-  return (
-    <div style={styles.applicationSummaryItem}>
-      <div style={styles.applicationSummaryIcon}>
-        {icon}
-      </div>
-
       <div>
-        <div style={styles.applicationSummaryNumber}>
-          {number}
-        </div>
+        <h3 style={styles.premiumFeatureTitle}>
+          {title}
+        </h3>
 
-        <div style={styles.applicationSummaryLabel}>
-          {label}
-        </div>
+        <p style={styles.premiumFeatureText}>
+          {text}
+        </p>
       </div>
+
     </div>
   );
 }
 
-// ============================================================
-// QUICK ACTION
-// ============================================================
+
+/* ==============================================================
+   QUICK ACTION
+   ============================================================== */
 
 function QuickAction({
   href,
@@ -1703,92 +1875,91 @@ function QuickAction({
     <Link
       href={href}
       style={styles.quickAction}
+      className="gradlink-quick-action"
     >
+
       <div style={styles.quickActionIcon}>
         {icon}
       </div>
 
-      <div style={{ minWidth: 0 }}>
-        <div style={styles.quickActionTitle}>
+      <div style={styles.quickActionContent}>
+        <strong style={styles.quickActionTitle}>
           {title}
-        </div>
+        </strong>
 
-        <div style={styles.quickActionText}>
+        <span style={styles.quickActionText}>
           {text}
-        </div>
+        </span>
       </div>
 
       <span style={styles.quickActionArrow}>
         →
       </span>
+
     </Link>
   );
 }
 
-// ============================================================
-// STATUS STYLE
-// ============================================================
+
+/* ==============================================================
+   APPLICATION STATUS
+   ============================================================== */
 
 function getStatusStyle(status) {
-  const normalized =
-    status?.toLowerCase() || "pending";
+  const value =
+    String(status || "Pending").toLowerCase();
 
-  if (normalized === "shortlisted") {
+  if (value === "shortlisted") {
     return {
-      background: "#e8f7ef",
+      ...styles.statusBadge,
+      background: "#e8f8ef",
       color: "#147a45",
+      border: "1px solid #c8edd8",
     };
   }
 
-  if (normalized === "rejected") {
+  if (value === "rejected") {
     return {
-      background: "#fdecec",
+      ...styles.statusBadge,
+      background: "#fff0f0",
       color: "#b42318",
+      border: "1px solid #f4cccc",
     };
   }
 
   return {
-    background: "#fff6df",
-    color: "#a15c00",
+    ...styles.statusBadge,
+    background: "#fff6e5",
+    color: "#9a5b00",
+    border: "1px solid #f4dfb1",
   };
 }
 
-// ============================================================
-// FORMAT DATE
-// ============================================================
 
-function formatDate(value) {
-  if (!value) return "—";
-
-  try {
-    return new Date(value).toLocaleDateString(
-      "en-ZA",
-      {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }
-    );
-  } catch {
-    return "—";
-  }
-}
-
-// ============================================================
-// STYLES
-// ============================================================
+/* ==============================================================
+   STYLES
+   ============================================================== */
 
 const styles = {
+
   page: {
     minHeight: "100vh",
-    background: "#f6f9fc",
-    color: "#10243e",
+    background: "#f5f8fc",
+    color: "#10233f",
     overflowX: "hidden",
   },
 
-  // ----------------------------------------------------------
-  // LOADING
-  // ----------------------------------------------------------
+  container: {
+    width: "100%",
+    maxWidth: "1180px",
+    margin: "0 auto",
+    paddingLeft: "24px",
+    paddingRight: "24px",
+  },
+
+  /* ----------------------------------------------------------
+     LOADING
+     ---------------------------------------------------------- */
 
   loadingPage: {
     minHeight: "100vh",
@@ -1796,111 +1967,104 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     padding: "24px",
-    background:
-      "linear-gradient(135deg, #eef5fb 0%, #f8fbff 100%)",
+    background: "#f5f8fc",
   },
 
   loadingCard: {
     width: "100%",
     maxWidth: "430px",
+    padding: "42px 30px",
     background: "#ffffff",
-    border: "1px solid #e3ebf3",
-    borderRadius: "24px",
-    padding: "42px 28px",
+    border: "1px solid #dfe7f2",
+    borderRadius: "18px",
     textAlign: "center",
-    boxShadow:
-      "0 18px 50px rgba(15, 55, 95, 0.10)",
   },
 
   spinner: {
-    width: "42px",
-    height: "42px",
-    borderRadius: "50%",
-    border: "4px solid #dbe8f4",
-    borderTopColor: "#1478c9",
-    animation:
-      "gradlinkSpin 0.8s linear infinite",
+    width: "44px",
+    height: "44px",
     margin: "0 auto 20px",
+    border: "4px solid #dce6f4",
+    borderTopColor: "#1769e0",
+    borderRadius: "50%",
+    animation: "gradlinkSpin 0.8s linear infinite",
   },
 
   loadingTitle: {
-    fontSize: "20px",
+    margin: "0 0 8px",
+    fontSize: "22px",
     fontWeight: 800,
-    color: "#10243e",
-    marginBottom: "8px",
+    color: "#10233f",
   },
 
   loadingText: {
+    margin: 0,
     fontSize: "14px",
     lineHeight: 1.6,
-    color: "#68788c",
+    color: "#6a7b91",
   },
 
-  // ----------------------------------------------------------
-  // ERROR
-  // ----------------------------------------------------------
+  /* ----------------------------------------------------------
+     ERROR
+     ---------------------------------------------------------- */
 
   errorPage: {
     minHeight: "100vh",
     display: "flex",
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
     padding: "24px",
-    background:
-      "linear-gradient(135deg, #eef5fb 0%, #f8fbff 100%)",
+    background: "#f5f8fc",
   },
 
   errorCard: {
     width: "100%",
     maxWidth: "520px",
+    padding: "40px 30px",
     background: "#ffffff",
-    border: "1px solid #e3ebf3",
-    borderRadius: "24px",
-    padding: "36px 28px",
+    border: "1px solid #dfe7f2",
+    borderRadius: "18px",
     textAlign: "center",
-    boxShadow:
-      "0 18px 50px rgba(15, 55, 95, 0.10)",
   },
 
   errorIcon: {
     width: "54px",
     height: "54px",
     margin: "0 auto 18px",
-    borderRadius: "50%",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "#fff1f1",
+    borderRadius: "50%",
+    background: "#fff0f0",
     color: "#c62828",
-    fontSize: "24px",
+    fontSize: "25px",
     fontWeight: 900,
   },
 
   errorTitle: {
     margin: "0 0 10px",
-    fontSize: "25px",
+    fontSize: "26px",
     fontWeight: 850,
-    color: "#10243e",
   },
 
   errorText: {
-    margin: "0",
+    margin: "0 auto 24px",
+    maxWidth: "420px",
+    color: "#697b91",
+    lineHeight: 1.6,
     fontSize: "15px",
-    lineHeight: 1.7,
-    color: "#68788c",
   },
 
   errorActions: {
     display: "flex",
-    gap: "12px",
     justifyContent: "center",
+    gap: "10px",
     flexWrap: "wrap",
-    marginTop: "24px",
   },
 
-  // ----------------------------------------------------------
-  // HEADER
-  // ----------------------------------------------------------
+  /* ----------------------------------------------------------
+     HEADER
+     ---------------------------------------------------------- */
 
   header: {
     position: "fixed",
@@ -1908,458 +2072,387 @@ const styles = {
     left: 0,
     right: 0,
     zIndex: 1000,
-    background:
-      "rgba(255,255,255,0.96)",
-    borderBottom: "1px solid #e4ebf2",
-    boxShadow:
-      "0 8px 30px rgba(18, 50, 80, 0.07)",
-    transition:
-      "transform 0.28s ease",
-    backdropFilter: "blur(14px)",
-    WebkitBackdropFilter: "blur(14px)",
+    background: "rgba(255,255,255,0.98)",
+    borderBottom: "1px solid #dfe7f2",
+    boxShadow: "0 5px 20px rgba(16,35,63,0.07)",
+    transition: "transform 0.28s ease",
   },
 
   headerInner: {
     width: "100%",
-    maxWidth: "1280px",
+    maxWidth: "1220px",
+    minHeight: "78px",
     margin: "0 auto",
-    padding: "14px 24px",
+    padding: "12px 24px",
     display: "flex",
+    alignItems: "center",
     justifyContent: "space-between",
+    gap: "18px",
   },
 
   logo: {
-    display: "flex",
+    display: "inline-flex",
     alignItems: "center",
     gap: "10px",
-    textDecoration: "none",
-    color: "#10243e",
-    minWidth: 0,
+    color: "#10233f",
+    flexShrink: 0,
   },
 
   logoMark: {
     width: "38px",
     height: "38px",
-    flexShrink: 0,
-    borderRadius: "11px",
+    borderRadius: "10px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background:
-      "linear-gradient(135deg, #0c65ad, #1d91df)",
+    background: "#1769e0",
     color: "#ffffff",
-    fontSize: "21px",
+    fontSize: "20px",
     fontWeight: 900,
-    boxShadow:
-      "0 7px 18px rgba(18, 119, 200, 0.22)",
   },
 
   logoText: {
     fontSize: "21px",
-    fontWeight: 900,
+    fontWeight: 850,
     letterSpacing: "-0.5px",
-    whiteSpace: "nowrap",
+  },
+
+  logoAccent: {
+    color: "#1769e0",
   },
 
   nav: {
     display: "flex",
     alignItems: "center",
     gap: "8px",
+    overflowX: "auto",
+    scrollbarWidth: "none",
   },
 
   navButton: {
     minHeight: "42px",
-    padding: "0 14px",
+    padding: "0 13px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     gap: "7px",
-    borderRadius: "10px",
-    border: "1px solid #d8e3ed",
+    border: "1px solid #ccd8e8",
+    borderRadius: "9px",
     background: "#ffffff",
-    color: "#29435e",
-    textDecoration: "none",
+    color: "#253b57",
     fontSize: "13px",
     fontWeight: 750,
     whiteSpace: "nowrap",
-    cursor: "pointer",
-    boxShadow:
-      "0 2px 5px rgba(20, 50, 80, 0.05)",
   },
 
   navPrimaryButton: {
-    background:
-      "linear-gradient(135deg, #0d70bf, #168bd8)",
-    borderColor: "#0d70bf",
+    minHeight: "42px",
+    padding: "0 15px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "7px",
+    border: "1px solid #1769e0",
+    borderRadius: "9px",
+    background: "#1769e0",
     color: "#ffffff",
-    boxShadow:
-      "0 7px 18px rgba(13, 112, 191, 0.20)",
+    fontSize: "13px",
+    fontWeight: 800,
+    whiteSpace: "nowrap",
   },
 
   navPremiumButton: {
-    background:
-      "linear-gradient(135deg, #173f68, #235f91)",
-    borderColor: "#173f68",
-    color: "#ffffff",
-    boxShadow:
-      "0 7px 18px rgba(23, 63, 104, 0.18)",
+    minHeight: "42px",
+    padding: "0 15px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "7px",
+    border: "1px solid #d9b54a",
+    borderRadius: "9px",
+    background: "#fff9e7",
+    color: "#7a5900",
+    fontSize: "13px",
+    fontWeight: 800,
+    whiteSpace: "nowrap",
   },
 
   logoutButton: {
-    fontFamily: "inherit",
+    minHeight: "42px",
+    padding: "0 13px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "7px",
+    border: "1px solid #e2c7c7",
+    borderRadius: "9px",
+    background: "#ffffff",
+    color: "#9b3030",
+    fontSize: "13px",
+    fontWeight: 750,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
   },
 
-  // ----------------------------------------------------------
-  // HERO
-  // ----------------------------------------------------------
+  /* ----------------------------------------------------------
+     HERO
+     ---------------------------------------------------------- */
 
   hero: {
     paddingTop: "150px",
-    paddingBottom: "72px",
+    paddingBottom: "76px",
     background:
-      "radial-gradient(circle at top right, rgba(40,145,220,0.13), transparent 36%), linear-gradient(135deg, #edf6fd 0%, #ffffff 72%)",
-    borderBottom: "1px solid #e5edf4",
-  },
-
-  container: {
-    width: "100%",
-    maxWidth: "1280px",
-    margin: "0 auto",
-    paddingLeft: "24px",
-    paddingRight: "24px",
-  },
-
-  heroGrid: {
-    display: "grid",
-    gap: "34px",
-    alignItems: "center",
+      "linear-gradient(135deg, #eef5ff 0%, #ffffff 58%, #f7fbff 100%)",
+    borderBottom: "1px solid #e0e8f3",
   },
 
   heroContent: {
-    width: "100%",
+    maxWidth: "850px",
   },
 
   eyebrow: {
     display: "inline-flex",
     alignItems: "center",
-    gap: "8px",
-    padding: "7px 11px",
+    gap: "9px",
+    marginBottom: "18px",
+    padding: "8px 12px",
+    border: "1px solid #cbdcf4",
     borderRadius: "999px",
-    background: "#e5f2fc",
-    border: "1px solid #cfe5f6",
-    color: "#1165a5",
+    background: "#ffffff",
+    color: "#1769e0",
     fontSize: "11px",
     fontWeight: 850,
-    letterSpacing: "1.1px",
+    letterSpacing: "1.2px",
   },
 
   eyebrowDot: {
     width: "7px",
     height: "7px",
     borderRadius: "50%",
-    background: "#1493df",
-    flexShrink: 0,
+    background: "#18a957",
   },
 
   heroTitle: {
-    margin: "20px 0 18px",
-    color: "#10243e",
+    margin: 0,
+    fontSize: "58px",
+    lineHeight: 1.03,
+    letterSpacing: "-2.5px",
     fontWeight: 900,
-    lineHeight: 1.06,
-    letterSpacing: "-1.8px",
-    overflowWrap: "anywhere",
+    color: "#10233f",
   },
 
   heroText: {
     maxWidth: "720px",
-    margin: 0,
-    color: "#61748a",
-    fontSize: "16px",
-    lineHeight: 1.75,
+    margin: "22px 0 0",
+    color: "#61738a",
+    fontSize: "17px",
+    lineHeight: 1.7,
   },
 
   heroActions: {
+    marginTop: "30px",
     display: "flex",
     gap: "12px",
     flexWrap: "wrap",
-    marginTop: "28px",
   },
 
   heroPrimaryButton: {
-    minHeight: "48px",
-    padding: "0 19px",
+    minHeight: "50px",
+    padding: "0 20px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "8px",
-    borderRadius: "11px",
-    background:
-      "linear-gradient(135deg, #0c70bd, #188dd8)",
-    border: "1px solid #0c70bd",
+    gap: "9px",
+    border: "1px solid #1769e0",
+    borderRadius: "10px",
+    background: "#1769e0",
     color: "#ffffff",
-    textDecoration: "none",
     fontSize: "14px",
     fontWeight: 800,
-    boxShadow:
-      "0 9px 22px rgba(12,112,189,0.20)",
   },
 
   heroSecondaryButton: {
-    minHeight: "48px",
-    padding: "0 19px",
+    minHeight: "50px",
+    padding: "0 20px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "8px",
-    borderRadius: "11px",
+    gap: "9px",
+    border: "1px solid #cbd7e6",
+    borderRadius: "10px",
     background: "#ffffff",
-    border: "1px solid #d4e0ea",
-    color: "#23425f",
-    textDecoration: "none",
+    color: "#233b59",
     fontSize: "14px",
     fontWeight: 800,
-    boxShadow:
-      "0 5px 14px rgba(20,50,80,0.07)",
   },
 
-  // ----------------------------------------------------------
-  // OVERVIEW
-  // ----------------------------------------------------------
+  /* ----------------------------------------------------------
+     SECTIONS
+     ---------------------------------------------------------- */
 
-  overviewCard: {
-    width: "100%",
-    background:
-      "linear-gradient(145deg, #12395d, #0b2844)",
-    borderRadius: "22px",
-    padding: "26px",
-    color: "#ffffff",
-    boxShadow:
-      "0 22px 50px rgba(12, 43, 72, 0.20)",
-    border: "1px solid rgba(255,255,255,0.08)",
+  section: {
+    paddingTop: "68px",
+    paddingBottom: "68px",
   },
 
-  overviewTop: {
+  sectionAlt: {
+    paddingTop: "68px",
+    paddingBottom: "68px",
+    background: "#eef3f9",
+    borderTop: "1px solid #e1e8f1",
+    borderBottom: "1px solid #e1e8f1",
+  },
+
+  overviewSection: {
+    paddingTop: "64px",
+    paddingBottom: "32px",
+    background: "#f5f8fc",
+  },
+
+  sectionHeading: {
+    marginBottom: "28px",
     display: "flex",
-    alignItems: "flex-start",
+    alignItems: "flex-end",
     justifyContent: "space-between",
-    gap: "15px",
+    gap: "20px",
   },
 
-  overviewLabel: {
-    fontSize: "10px",
-    letterSpacing: "1.4px",
+  sectionEyebrow: {
+    marginBottom: "8px",
+    color: "#1769e0",
+    fontSize: "11px",
+    fontWeight: 900,
+    letterSpacing: "1.3px",
+  },
+
+  sectionTitle: {
+    margin: 0,
+    color: "#10233f",
+    fontSize: "30px",
+    lineHeight: 1.15,
     fontWeight: 850,
-    color: "#91bad9",
-    marginBottom: "7px",
+    letterSpacing: "-0.7px",
   },
 
-  overviewTitle: {
-    fontSize: "20px",
-    fontWeight: 850,
-    lineHeight: 1.25,
-  },
-
-  overviewIcon: {
-    width: "42px",
-    height: "42px",
-    borderRadius: "12px",
-    background:
-      "rgba(255,255,255,0.10)",
-    border:
-      "1px solid rgba(255,255,255,0.10)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "19px",
-    flexShrink: 0,
-  },
-
-  overviewDivider: {
-    height: "1px",
-    background:
-      "rgba(255,255,255,0.12)",
-    margin: "22px 0 5px",
-  },
-
-  overviewRows: {
-    display: "flex",
-    flexDirection: "column",
-  },
-
-  overviewRow: {
-    minHeight: "50px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "15px",
-    borderBottom:
-      "1px solid rgba(255,255,255,0.08)",
-    color: "#d6e5f1",
+  sectionDescription: {
+    maxWidth: "650px",
+    margin: "9px 0 0",
+    color: "#708197",
     fontSize: "14px",
+    lineHeight: 1.6,
   },
 
-  overviewFooter: {
-    display: "flex",
+  overviewStatus: {
+    minHeight: "38px",
+    padding: "0 12px",
+    display: "inline-flex",
     alignItems: "center",
     gap: "8px",
-    marginTop: "18px",
-    color: "#d6e5f1",
+    border: "1px solid #d7e1ed",
+    borderRadius: "9px",
+    background: "#ffffff",
+    color: "#53677f",
     fontSize: "12px",
-    fontWeight: 700,
+    fontWeight: 750,
+    whiteSpace: "nowrap",
   },
 
   statusDot: {
     width: "8px",
     height: "8px",
     borderRadius: "50%",
-    flexShrink: 0,
   },
 
-  // ----------------------------------------------------------
-  // SECTIONS
-  // ----------------------------------------------------------
-
-  section: {
-    paddingTop: "62px",
-    paddingBottom: "4px",
-  },
-
-  sectionCompact: {
-    paddingTop: "34px",
-    paddingBottom: "4px",
-  },
-
-  sectionHeader: {
-    display: "flex",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: "24px",
-    marginBottom: "24px",
-  },
-
-  sectionEyebrow: {
-    fontSize: "10px",
-    fontWeight: 900,
-    letterSpacing: "1.3px",
-    color: "#1478c9",
-    marginBottom: "7px",
-  },
-
-  sectionTitle: {
-    margin: 0,
-    fontSize: "30px",
-    lineHeight: 1.15,
-    letterSpacing: "-0.8px",
-    fontWeight: 900,
-    color: "#10243e",
-  },
-
-  sectionText: {
-    margin: "8px 0 0",
-    color: "#6c7d90",
-    fontSize: "14px",
-    lineHeight: 1.65,
-    maxWidth: "700px",
-  },
-
-  sectionActionButton: {
+  headingButton: {
     minHeight: "44px",
     padding: "0 16px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "7px",
-    borderRadius: "10px",
-    background:
-      "linear-gradient(135deg, #0c70bd, #168bd8)",
-    border: "1px solid #0c70bd",
+    gap: "8px",
+    border: "1px solid #1769e0",
+    borderRadius: "9px",
+    background: "#1769e0",
     color: "#ffffff",
-    textDecoration: "none",
     fontSize: "13px",
     fontWeight: 800,
     whiteSpace: "nowrap",
-    boxShadow:
-      "0 7px 18px rgba(12,112,189,0.17)",
   },
 
-  // ----------------------------------------------------------
-  // STATISTICS
-  // ----------------------------------------------------------
+  /* ----------------------------------------------------------
+     STATS
+     ---------------------------------------------------------- */
 
   statsGrid: {
     display: "grid",
-    gap: "16px",
+    gridTemplateColumns:
+      "repeat(4, minmax(0, 1fr))",
+    gap: "14px",
   },
 
   statCard: {
     minWidth: 0,
+    padding: "24px",
     background: "#ffffff",
-    border: "1px solid #e0e8f0",
-    borderRadius: "18px",
-    padding: "21px",
-    boxShadow:
-      "0 8px 25px rgba(20,55,90,0.055)",
-  },
-
-  statTop: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    marginBottom: "17px",
+    border: "1px solid #dce5f0",
+    borderRadius: "14px",
+    boxShadow: "0 4px 14px rgba(16,35,63,0.045)",
   },
 
   statIcon: {
-    width: "39px",
-    height: "39px",
-    borderRadius: "11px",
-    background: "#eaf5fd",
-    border: "1px solid #d5eaf8",
-    color: "#1478c9",
+    width: "40px",
+    height: "40px",
+    marginBottom: "18px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: "9px",
+    background: "#edf4ff",
+    color: "#1769e0",
+    fontSize: "18px",
     fontWeight: 900,
   },
 
   statNumber: {
-    fontSize: "28px",
+    fontSize: "34px",
+    lineHeight: 1,
     fontWeight: 900,
-    color: "#10243e",
+    color: "#10233f",
   },
 
   statLabel: {
-    fontSize: "15px",
-    fontWeight: 850,
-    color: "#183653",
-    marginBottom: "5px",
+    marginTop: "9px",
+    color: "#263c58",
+    fontSize: "14px",
+    fontWeight: 800,
   },
 
   statDescription: {
+    marginTop: "5px",
+    color: "#8291a4",
     fontSize: "12px",
-    color: "#7a8999",
-    lineHeight: 1.5,
   },
 
-  // ----------------------------------------------------------
-  // PREMIUM
-  // ----------------------------------------------------------
+  /* ----------------------------------------------------------
+     PREMIUM
+     ---------------------------------------------------------- */
 
   premiumCard: {
-    width: "100%",
-    display: "grid",
-    gap: "22px",
-    padding: "27px",
-    borderRadius: "24px",
+    padding: "32px",
     background:
-      "linear-gradient(135deg, #0e3356, #124d7c)",
+      "linear-gradient(135deg, #102b50 0%, #153d70 100%)",
+    borderRadius: "18px",
+    border: "1px solid #173e70",
+    boxShadow: "0 12px 28px rgba(16,43,80,0.15)",
     color: "#ffffff",
-    boxShadow:
-      "0 20px 48px rgba(11,55,91,0.17)",
   },
 
-  premiumMain: {
-    width: "100%",
+  premiumHeader: {
+    display: "grid",
+    gridTemplateColumns:
+      "minmax(0, 1fr) 300px",
+    gap: "30px",
+    alignItems: "start",
   },
 
   premiumBadge: {
@@ -2367,173 +2460,135 @@ const styles = {
     alignItems: "center",
     minHeight: "28px",
     padding: "0 10px",
+    border: "1px solid rgba(255,255,255,0.18)",
     borderRadius: "999px",
-    background:
-      "rgba(255,255,255,0.10)",
-    border:
-      "1px solid rgba(255,255,255,0.12)",
-    color: "#c8e7ff",
+    background: "rgba(255,255,255,0.08)",
+    color: "#d9e8ff",
     fontSize: "10px",
     fontWeight: 900,
-    letterSpacing: "1px",
+    letterSpacing: "1.1px",
   },
 
   premiumTitle: {
-    margin: "17px 0 10px",
-    fontSize: "28px",
-    lineHeight: 1.2,
-    letterSpacing: "-0.7px",
-    fontWeight: 900,
+    margin: "15px 0 0",
+    color: "#ffffff",
+    fontSize: "30px",
+    lineHeight: 1.15,
+    fontWeight: 850,
   },
 
   premiumText: {
-    margin: 0,
-    maxWidth: "700px",
-    color: "#c9dceb",
+    maxWidth: "670px",
+    margin: "12px 0 0",
+    color: "#c5d5e9",
     fontSize: "14px",
     lineHeight: 1.7,
   },
 
+  premiumPlanBox: {
+    padding: "22px",
+    background: "rgba(255,255,255,0.07)",
+    border: "1px solid rgba(255,255,255,0.16)",
+    borderRadius: "13px",
+  },
+
+  planLabel: {
+    color: "#9eb5d2",
+    fontSize: "9px",
+    fontWeight: 900,
+    letterSpacing: "1.2px",
+  },
+
+  planName: {
+    marginTop: "7px",
+    color: "#ffffff",
+    fontSize: "20px",
+    fontWeight: 850,
+  },
+
+  planPrice: {
+    marginTop: "4px",
+    color: "#ffffff",
+    fontSize: "25px",
+    fontWeight: 900,
+  },
+
+  planStatus: {
+    display: "inline-flex",
+    marginTop: "12px",
+    padding: "6px 9px",
+    borderRadius: "7px",
+    fontSize: "10px",
+    fontWeight: 900,
+    letterSpacing: "0.7px",
+  },
+
+  premiumButton: {
+    minHeight: "42px",
+    marginTop: "15px",
+    padding: "0 13px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    border: "1px solid #ffffff",
+    borderRadius: "8px",
+    background: "#ffffff",
+    color: "#153b6b",
+    fontSize: "12px",
+    fontWeight: 850,
+  },
+
   premiumFeatures: {
+    marginTop: "30px",
+    paddingTop: "28px",
     display: "grid",
-    gap: "12px",
-    marginTop: "22px",
+    gridTemplateColumns:
+      "repeat(4, minmax(0, 1fr))",
+    gap: "18px",
+    borderTop:
+      "1px solid rgba(255,255,255,0.13)",
   },
 
   premiumFeature: {
     display: "flex",
-    gap: "12px",
     alignItems: "flex-start",
+    gap: "12px",
     minWidth: 0,
-    padding: "13px",
-    borderRadius: "13px",
-    background:
-      "rgba(255,255,255,0.07)",
-    border:
-      "1px solid rgba(255,255,255,0.08)",
   },
 
   premiumFeatureIcon: {
-    width: "30px",
-    height: "30px",
-    borderRadius: "9px",
+    width: "32px",
+    height: "32px",
     flexShrink: 0,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background:
-      "rgba(255,255,255,0.10)",
-    color: "#a9dcff",
-    fontSize: "13px",
+    borderRadius: "8px",
+    background: "rgba(255,255,255,0.1)",
+    color: "#dbeaff",
+    fontSize: "14px",
     fontWeight: 900,
   },
 
   premiumFeatureTitle: {
+    margin: "0 0 5px",
+    color: "#ffffff",
     fontSize: "13px",
-    fontWeight: 850,
-    marginBottom: "4px",
+    lineHeight: 1.3,
+    fontWeight: 800,
   },
 
   premiumFeatureText: {
+    margin: 0,
+    color: "#afc3dd",
     fontSize: "11px",
     lineHeight: 1.5,
-    color: "#b9d0e2",
   },
 
-  subscriptionBox: {
-    width: "100%",
-    padding: "21px",
-    borderRadius: "18px",
-    background: "#ffffff",
-    color: "#10243e",
-    boxShadow:
-      "0 12px 30px rgba(0,0,0,0.13)",
-  },
-
-  subscriptionHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "10px",
-    fontSize: "9px",
-    fontWeight: 900,
-    letterSpacing: "1px",
-    color: "#708297",
-  },
-
-  subscriptionStatus: {
-    padding: "5px 8px",
-    borderRadius: "999px",
-    fontSize: "9px",
-    fontWeight: 900,
-  },
-
-  subscriptionPlan: {
-    marginTop: "17px",
-    fontSize: "20px",
-    fontWeight: 900,
-    overflowWrap: "anywhere",
-  },
-
-  subscriptionPrice: {
-    marginTop: "6px",
-    fontSize: "27px",
-    fontWeight: 900,
-    color: "#1478c9",
-  },
-
-  subscriptionPrice span: {
-    fontSize: "12px",
-    fontWeight: 700,
-    color: "#7c8b9a",
-  },
-
-  subscriptionLoading: {
-    marginTop: "16px",
-    fontSize: "12px",
-    color: "#75869a",
-  },
-
-  subscriptionDetails: {
-    display: "flex",
-    flexDirection: "column",
-    marginTop: "17px",
-    borderTop: "1px solid #e8edf2",
-  },
-
-  subscriptionDetail: {
-    minHeight: "38px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "10px",
-    borderBottom: "1px solid #edf1f5",
-    fontSize: "11px",
-    color: "#77879a",
-  },
-
-  premiumButton: {
-    width: "100%",
-    minHeight: "45px",
-    marginTop: "17px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "10px",
-    padding: "0 14px",
-    borderRadius: "10px",
-    background:
-      "linear-gradient(135deg, #0c70bd, #168bd8)",
-    border: "1px solid #0c70bd",
-    color: "#ffffff",
-    textDecoration: "none",
-    fontSize: "12px",
-    fontWeight: 850,
-  },
-
-  // ----------------------------------------------------------
-  // INTERNSHIP LISTINGS
-  // ----------------------------------------------------------
+  /* ----------------------------------------------------------
+     INTERNSHIPS
+     ---------------------------------------------------------- */
 
   internshipList: {
     display: "flex",
@@ -2543,215 +2598,340 @@ const styles = {
 
   internshipCard: {
     width: "100%",
-    minWidth: 0,
+    padding: "24px",
     background: "#ffffff",
-    border: "1px solid #dfe8f0",
-    borderRadius: "20px",
-    padding: "21px",
-    boxShadow:
-      "0 8px 25px rgba(20,55,90,0.055)",
+    border: "1px solid #dce5f0",
+    borderRadius: "15px",
+    boxShadow: "0 4px 14px rgba(16,35,63,0.045)",
   },
 
-  internshipCardTop: {
+  internshipTop: {
     display: "flex",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: "22px",
+    gap: "20px",
   },
 
-  internshipInfo: {
-    flex: 1,
-    width: "100%",
+  internshipTitleArea: {
+    minWidth: 0,
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "13px",
   },
 
-  listingBadge: {
-    display: "inline-flex",
-    minHeight: "25px",
+  internshipIcon: {
+    width: "44px",
+    height: "44px",
+    flexShrink: 0,
+    display: "flex",
     alignItems: "center",
-    padding: "0 8px",
-    borderRadius: "7px",
-    background: "#edf6fd",
-    color: "#1478c9",
+    justifyContent: "center",
+    borderRadius: "10px",
+    background: "#edf4ff",
+    color: "#1769e0",
+    fontSize: "18px",
+    fontWeight: 900,
+  },
+
+  listingLabel: {
+    marginBottom: "4px",
+    color: "#8493a7",
     fontSize: "9px",
     fontWeight: 900,
-    letterSpacing: "0.8px",
+    letterSpacing: "1px",
   },
 
   internshipTitle: {
-    margin: "10px 0 7px",
-    fontSize: "20px",
+    margin: 0,
+    color: "#10233f",
+    fontSize: "21px",
     lineHeight: 1.25,
-    fontWeight: 900,
-    color: "#10243e",
-    overflowWrap: "anywhere",
+    fontWeight: 850,
   },
 
   internshipCompany: {
-    display: "flex",
+    margin: "5px 0 0",
+    color: "#61748c",
+    fontSize: "13px",
+  },
+
+  listingStatus: {
+    minHeight: "31px",
+    flexShrink: 0,
+    padding: "0 10px",
+    display: "inline-flex",
     alignItems: "center",
     gap: "7px",
-    color: "#4f667d",
-    fontSize: "13px",
+    borderRadius: "7px",
+    fontSize: "11px",
+    fontWeight: 800,
+  },
+
+  listingStatusActive: {
+    background: "#eaf8f0",
+    color: "#157a45",
+    border: "1px solid #cbead8",
+  },
+
+  listingStatusExpired: {
+    background: "#fff0f0",
+    color: "#ad3333",
+    border: "1px solid #efcccc",
+  },
+
+  internshipDetails: {
+    marginTop: "24px",
+    paddingTop: "20px",
+    paddingBottom: "20px",
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(4, minmax(0, 1fr))",
+    gap: "16px",
+    borderTop: "1px solid #edf1f6",
+    borderBottom: "1px solid #edf1f6",
+  },
+
+  detailItem: {
+    minWidth: 0,
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "9px",
+  },
+
+  detailIcon: {
+    width: "28px",
+    height: "28px",
+    flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "7px",
+    background: "#f0f5fb",
+    color: "#50708f",
+    fontSize: "11px",
+    fontWeight: 900,
+  },
+
+  detailLabel: {
+    display: "block",
+    marginBottom: "3px",
+    color: "#8a98aa",
+    fontSize: "10px",
     fontWeight: 700,
   },
 
-  internshipMeta: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    marginTop: "13px",
-    fontSize: "11px",
-    color: "#738397",
-  },
-
-  internshipMeta span: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "5px",
-    minHeight: "28px",
-    padding: "0 8px",
-    borderRadius: "8px",
-    background: "#f5f8fb",
-    border: "1px solid #e5ebf1",
-  },
-
-  internshipMeta b: {
-    color: "#1478c9",
-  },
-
-  internshipActions: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-    flexShrink: 0,
-  },
-
-  viewApplicantsButton: {
-    minHeight: "43px",
-    padding: "0 14px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "7px",
-    borderRadius: "10px",
-    background:
-      "linear-gradient(135deg, #0c70bd, #168bd8)",
-    border: "1px solid #0c70bd",
-    color: "#ffffff",
-    textDecoration: "none",
+  detailValue: {
+    display: "block",
+    color: "#344b66",
     fontSize: "12px",
-    fontWeight: 850,
-    whiteSpace: "nowrap",
-    boxShadow:
-      "0 6px 15px rgba(12,112,189,0.16)",
-  },
-
-  viewDetailsButton: {
-    minHeight: "42px",
-    padding: "0 14px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "7px",
-    borderRadius: "10px",
-    background: "#ffffff",
-    border: "1px solid #d6e1eb",
-    color: "#31506c",
-    textDecoration: "none",
-    fontSize: "12px",
+    lineHeight: 1.35,
     fontWeight: 800,
-    whiteSpace: "nowrap",
-  },
-
-  internshipDivider: {
-    height: "1px",
-    background: "#e9eef3",
-    margin: "20px 0 15px",
+    wordBreak: "break-word",
   },
 
   applicationSummary: {
     display: "grid",
-    gap: "10px",
+    gridTemplateColumns:
+      "repeat(3, minmax(0, 1fr))",
+    gap: "12px",
+    paddingTop: "18px",
   },
 
   applicationSummaryItem: {
-    minWidth: 0,
-    minHeight: "60px",
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    padding: "10px 12px",
-    borderRadius: "11px",
-    background: "#f8fafc",
-    border: "1px solid #edf1f5",
+    padding: "12px",
+    borderRadius: "9px",
+    background: "#f7f9fc",
+    border: "1px solid #e7edf4",
   },
 
-  applicationSummaryIcon: {
-    width: "30px",
-    height: "30px",
-    flexShrink: 0,
+  internshipActions: {
+    marginTop: "18px",
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "10px",
+  },
+
+  applicantsButton: {
+    minHeight: "46px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    gap: "8px",
+    border: "1px solid #1769e0",
+    borderRadius: "9px",
+    background: "#1769e0",
+    color: "#ffffff",
+    fontSize: "13px",
+    fontWeight: 800,
+  },
+
+  viewButton: {
+    minHeight: "46px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    border: "1px solid #ccd8e8",
+    borderRadius: "9px",
+    background: "#ffffff",
+    color: "#263e5b",
+    fontSize: "13px",
+    fontWeight: 800,
+  },
+
+  /* ----------------------------------------------------------
+     APPLICATIONS
+     ---------------------------------------------------------- */
+
+  applicationCount: {
+    padding: "7px 11px",
+    border: "1px solid #d5e0ed",
     borderRadius: "8px",
-    background: "#eaf5fd",
-    color: "#1478c9",
-    fontSize: "12px",
+    background: "#ffffff",
+    color: "#536a84",
+    fontSize: "11px",
+    fontWeight: 800,
+  },
+
+  applicationList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+  },
+
+  applicationCard: {
+    minWidth: 0,
+    display: "grid",
+    gridTemplateColumns:
+      "44px minmax(0, 1fr) 70px 38px",
+    alignItems: "center",
+    gap: "15px",
+    padding: "17px",
+    background: "#ffffff",
+    border: "1px solid #dce5f0",
+    borderRadius: "13px",
+  },
+
+  applicationAvatar: {
+    width: "44px",
+    height: "44px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "50%",
+    background: "#eaf2ff",
+    color: "#1769e0",
+    fontSize: "16px",
     fontWeight: 900,
   },
 
-  applicationSummaryNumber: {
+  applicationMain: {
+    minWidth: 0,
+  },
+
+  applicationNameRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "9px",
+    flexWrap: "wrap",
+  },
+
+  applicationName: {
+    margin: 0,
+    color: "#172f4d",
+    fontSize: "14px",
+    fontWeight: 850,
+  },
+
+  statusBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    minHeight: "23px",
+    padding: "0 7px",
+    borderRadius: "6px",
+    fontSize: "9px",
+    fontWeight: 850,
+  },
+
+  applicationRole: {
+    margin: "5px 0 0",
+    color: "#718299",
+    fontSize: "12px",
+  },
+
+  applicationMeta: {
+    marginTop: "9px",
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "7px 16px",
+    color: "#8a98aa",
+    fontSize: "10px",
+  },
+
+  matchScore: {
+    textAlign: "center",
+  },
+
+  matchNumber: {
+    color: "#1769e0",
+    fontSize: "18px",
+    lineHeight: 1,
+    fontWeight: 900,
+  },
+
+  applicationArrow: {
+    width: "36px",
+    height: "36px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    border: "1px solid #d5dfeb",
+    borderRadius: "8px",
+    background: "#ffffff",
+    color: "#1769e0",
     fontSize: "17px",
     fontWeight: 900,
-    color: "#10243e",
   },
 
-  applicationSummaryLabel: {
-    fontSize: "10px",
-    color: "#77879a",
-    marginTop: "2px",
-  },
-
-  // ----------------------------------------------------------
-  // EMPTY STATE
-  // ----------------------------------------------------------
+  /* ----------------------------------------------------------
+     EMPTY
+     ---------------------------------------------------------- */
 
   emptyCard: {
-    width: "100%",
+    padding: "46px 24px",
     background: "#ffffff",
-    border: "1px dashed #cbd9e6",
-    borderRadius: "20px",
-    padding: "40px 24px",
+    border: "1px solid #dce5f0",
+    borderRadius: "15px",
     textAlign: "center",
   },
 
   emptyIcon: {
-    width: "48px",
-    height: "48px",
-    margin: "0 auto 14px",
-    borderRadius: "13px",
+    width: "50px",
+    height: "50px",
+    margin: "0 auto 15px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "#eaf5fd",
-    color: "#1478c9",
-    fontSize: "22px",
+    borderRadius: "12px",
+    background: "#edf4ff",
+    color: "#1769e0",
+    fontSize: "20px",
     fontWeight: 900,
   },
 
   emptyTitle: {
     margin: 0,
+    color: "#203752",
     fontSize: "19px",
-    fontWeight: 900,
-    color: "#10243e",
+    fontWeight: 850,
   },
 
   emptyText: {
     maxWidth: "520px",
-    margin: "8px auto 20px",
+    margin: "9px auto 20px",
+    color: "#74849a",
     fontSize: "13px",
     lineHeight: 1.65,
-    color: "#748498",
   },
 
   primaryButton: {
@@ -2760,17 +2940,13 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "9px",
-    borderRadius: "10px",
-    background:
-      "linear-gradient(135deg, #0c70bd, #168bd8)",
-    border: "1px solid #0c70bd",
+    gap: "8px",
+    border: "1px solid #1769e0",
+    borderRadius: "9px",
+    background: "#1769e0",
     color: "#ffffff",
-    textDecoration: "none",
     fontSize: "13px",
-    fontWeight: 850,
-    boxShadow:
-      "0 7px 18px rgba(12,112,189,0.17)",
+    fontWeight: 800,
   },
 
   secondaryButton: {
@@ -2779,278 +2955,184 @@ const styles = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "9px",
-    borderRadius: "10px",
-    background: "#ffffff",
-    border: "1px solid #d5e0ea",
-    color: "#294762",
-    textDecoration: "none",
-    fontSize: "13px",
-    fontWeight: 850,
-  },
-
-  // ----------------------------------------------------------
-  // APPLICATIONS
-  // ----------------------------------------------------------
-
-  applicationList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-  },
-
-  applicationCard: {
-    width: "100%",
-    minWidth: 0,
-    background: "#ffffff",
-    border: "1px solid #dfe8f0",
-    borderRadius: "17px",
-    padding: "16px",
-    boxShadow:
-      "0 6px 20px rgba(20,55,90,0.045)",
-  },
-
-  applicationMain: {
-    display: "flex",
-    alignItems: "center",
-    gap: "13px",
-    minWidth: 0,
-  },
-
-  applicantAvatar: {
-    width: "46px",
-    height: "46px",
-    flexShrink: 0,
-    borderRadius: "13px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background:
-      "linear-gradient(135deg, #dceffc, #edf7fd)",
-    color: "#1269a9",
-    fontSize: "17px",
-    fontWeight: 900,
-  },
-
-  applicantInfo: {
-    flex: 1,
-  },
-
-  applicantName: {
-    margin: 0,
-    fontSize: "14px",
-    fontWeight: 900,
-    color: "#10243e",
-    overflowWrap: "anywhere",
-  },
-
-  applicantEmail: {
-    marginTop: "4px",
-    fontSize: "11px",
-    color: "#708195",
-    overflowWrap: "anywhere",
-  },
-
-  applicantRole: {
-    marginTop: "5px",
-    fontSize: "11px",
-    color: "#65778b",
-    lineHeight: 1.5,
-  },
-
-  matchBox: {
-    minWidth: "74px",
-    padding: "8px 10px",
-    borderRadius: "10px",
-    textAlign: "center",
-    background: "#eef8f3",
-    border: "1px solid #d8eee2",
-  },
-
-  matchNumber: {
-    fontSize: "16px",
-    fontWeight: 900,
-    color: "#16834b",
-  },
-
-  matchLabel: {
-    marginTop: "2px",
-    fontSize: "8px",
-    fontWeight: 850,
-    color: "#64816f",
-    textTransform: "uppercase",
-    letterSpacing: "0.5px",
-  },
-
-  applicationStatusBox: {
-    flexShrink: 0,
-  },
-
-  statusBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "28px",
-    padding: "0 9px",
-    borderRadius: "999px",
-    fontSize: "9px",
-    fontWeight: 900,
-    whiteSpace: "nowrap",
-  },
-
-  reviewButton: {
-    minHeight: "38px",
-    padding: "0 12px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "7px",
+    gap: "8px",
+    border: "1px solid #ccd8e8",
     borderRadius: "9px",
     background: "#ffffff",
-    border: "1px solid #d4e0ea",
-    color: "#2e4d68",
-    textDecoration: "none",
-    fontSize: "11px",
-    fontWeight: 850,
-    whiteSpace: "nowrap",
+    color: "#263e5b",
+    fontSize: "13px",
+    fontWeight: 800,
   },
 
-  // ----------------------------------------------------------
-  // QUICK ACTIONS
-  // ----------------------------------------------------------
+  /* ----------------------------------------------------------
+     QUICK ACTIONS
+     ---------------------------------------------------------- */
 
-  quickActionsCard: {
-    width: "100%",
+  quickActionsBox: {
+    padding: "30px",
     background: "#ffffff",
-    border: "1px solid #dfe8f0",
-    borderRadius: "20px",
-    padding: "23px",
-    boxShadow:
-      "0 8px 25px rgba(20,55,90,0.05)",
+    border: "1px solid #dce5f0",
+    borderRadius: "16px",
   },
 
-  quickActionsHeader: {
-    marginBottom: "18px",
+  quickActionsIntro: {
+    marginBottom: "22px",
   },
 
   quickActionsTitle: {
     margin: 0,
-    fontSize: "22px",
-    fontWeight: 900,
-    color: "#10243e",
+    color: "#10233f",
+    fontSize: "25px",
+    fontWeight: 850,
+  },
+
+  quickActionsText: {
+    margin: "7px 0 0",
+    color: "#738399",
+    fontSize: "13px",
+    lineHeight: 1.6,
   },
 
   quickActionsGrid: {
     display: "grid",
-    gap: "11px",
+    gridTemplateColumns:
+      "repeat(4, minmax(0, 1fr))",
+    gap: "10px",
   },
 
   quickAction: {
     minWidth: 0,
-    minHeight: "82px",
+    minHeight: "88px",
+    padding: "15px",
     display: "flex",
     alignItems: "center",
     gap: "11px",
-    padding: "13px",
-    borderRadius: "12px",
-    background: "#f8fafc",
-    border: "1px solid #e4ebf1",
-    textDecoration: "none",
-    color: "#10243e",
+    border: "1px solid #dbe4ef",
+    borderRadius: "10px",
+    background: "#f9fbfd",
+    color: "#203752",
   },
 
   quickActionIcon: {
     width: "35px",
     height: "35px",
     flexShrink: 0,
-    borderRadius: "10px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "#eaf5fd",
-    color: "#1478c9",
-    fontWeight: 900,
-  },
-
-  quickActionTitle: {
-    fontSize: "12px",
-    fontWeight: 850,
-    marginBottom: "3px",
-  },
-
-  quickActionText: {
-    fontSize: "10px",
-    lineHeight: 1.45,
-    color: "#77879a",
-  },
-
-  quickActionArrow: {
-    marginLeft: "auto",
-    flexShrink: 0,
-    color: "#1478c9",
+    borderRadius: "8px",
+    background: "#eaf2ff",
+    color: "#1769e0",
     fontSize: "15px",
     fontWeight: 900,
   },
 
-  // ----------------------------------------------------------
-  // FOOTER
-  // ----------------------------------------------------------
-
-  footer: {
-    marginTop: "70px",
-    background: "#0d2944",
-    color: "#ffffff",
+  quickActionContent: {
+    minWidth: 0,
+    flex: 1,
   },
 
-  footerInner: {
-    width: "100%",
-    maxWidth: "1280px",
-    margin: "0 auto",
-    padding: "34px 24px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "30px",
+  quickActionTitle: {
+    display: "block",
+    color: "#233a57",
+    fontSize: "12px",
+    fontWeight: 850,
+  },
+
+  quickActionText: {
+    display: "block",
+    marginTop: "4px",
+    color: "#8593a5",
+    fontSize: "10px",
+    lineHeight: 1.35,
+  },
+
+  quickActionArrow: {
+    color: "#1769e0",
+    fontSize: "16px",
+    fontWeight: 900,
+  },
+
+  /* ----------------------------------------------------------
+     FOOTER
+     ---------------------------------------------------------- */
+
+  footer: {
+    background: "#0d1f36",
+    color: "#ffffff",
+    paddingTop: "46px",
+    paddingBottom: "22px",
+  },
+
+  footerMain: {
+    display: "grid",
+    gridTemplateColumns: "1.5fr 1fr",
+    gap: "60px",
+    paddingBottom: "35px",
   },
 
   footerBrand: {
-    minWidth: 0,
+    maxWidth: "430px",
   },
 
   footerLogo: {
     display: "inline-flex",
     alignItems: "center",
     gap: "9px",
+    color: "#ffffff",
+    fontSize: "20px",
+    fontWeight: 850,
   },
 
-  footerText: {
-    maxWidth: "420px",
-    margin: "11px 0 0",
-    color: "#a9bfd1",
-    fontSize: "12px",
-    lineHeight: 1.6,
-  },
-
-  footerLinks: {
+  footerLogoMark: {
+    width: "34px",
+    height: "34px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "18px",
-    flexWrap: "wrap",
+    borderRadius: "9px",
+    background: "#1769e0",
+    color: "#ffffff",
+    fontWeight: 900,
+  },
+
+  footerText: {
+    margin: "13px 0 0",
+    color: "#9db0c8",
+    fontSize: "12px",
+    lineHeight: 1.7,
+  },
+
+  footerLinks: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "30px",
+  },
+
+  footerHeading: {
+    marginBottom: "12px",
+    color: "#dce8f6",
+    fontSize: "10px",
+    fontWeight: 900,
+    letterSpacing: "1px",
   },
 
   footerLink: {
-    color: "#d9e7f1",
-    textDecoration: "none",
-    fontSize: "12px",
-    fontWeight: 700,
+    display: "block",
+    marginBottom: "9px",
+    color: "#9db0c8",
+    fontSize: "11px",
   },
 
   footerBottom: {
-    borderTop: "1px solid rgba(255,255,255,0.09)",
-    padding: "16px 24px",
-    textAlign: "center",
-    color: "#8ea8bc",
+    paddingTop: "20px",
+    borderTop: "1px solid rgba(255,255,255,0.1)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "15px",
+    color: "#7f94ae",
     fontSize: "10px",
   },
+
 };
