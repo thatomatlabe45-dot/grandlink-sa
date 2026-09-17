@@ -31,7 +31,10 @@ function getQualificationLevel(value) {
     return 6;
   }
 
-  if (text.includes("honours") || text.includes("honors")) {
+  if (
+    text.includes("honours") ||
+    text.includes("honors")
+  ) {
     return 5;
   }
 
@@ -64,7 +67,7 @@ function getQualificationLevel(value) {
 }
 
 // ============================================================
-// MATCHING
+// AI MATCHING
 // ============================================================
 
 function calculateMatch(application, internship) {
@@ -105,13 +108,15 @@ function calculateMatch(application, internship) {
     .filter(Boolean);
 
   // Qualification
-  const applicantLevel = getQualificationLevel(
-    applicantQualification
-  );
+  const applicantLevel =
+    getQualificationLevel(
+      applicantQualification
+    );
 
-  const requiredLevel = getQualificationLevel(
-    requiredQualification
-  );
+  const requiredLevel =
+    getQualificationLevel(
+      requiredQualification
+    );
 
   if (requiredLevel === 0) {
     qualificationScore = 35;
@@ -135,13 +140,17 @@ function calculateMatch(application, internship) {
     requiredField &&
     applicantField
   ) {
-    const requiredWords = requiredField
-      .split(/\s+/)
-      .filter((word) => word.length > 3);
+    const requiredWords =
+      requiredField
+        .split(/\s+/)
+        .filter(
+          (word) => word.length > 3
+        );
 
-    const matchedWords = requiredWords.filter((word) =>
-      applicantField.includes(word)
-    );
+    const matchedWords =
+      requiredWords.filter((word) =>
+        applicantField.includes(word)
+      );
 
     if (matchedWords.length > 0) {
       fieldScore = 20;
@@ -152,16 +161,19 @@ function calculateMatch(application, internship) {
   if (requiredSkills.length === 0) {
     skillsScore = 30;
   } else {
-    const matchedSkills = requiredSkills.filter((skill) =>
-      applicantSkills.some(
-        (appSkill) =>
-          appSkill.includes(skill) ||
-          skill.includes(appSkill)
-      )
-    );
+    const matchedSkills =
+      requiredSkills.filter((skill) =>
+        applicantSkills.some(
+          (appSkill) =>
+            appSkill.includes(skill) ||
+            skill.includes(appSkill)
+        )
+      );
 
     skillsScore = Math.round(
-      (matchedSkills.length / requiredSkills.length) * 30
+      (matchedSkills.length /
+        requiredSkills.length) *
+        30
     );
   }
 
@@ -187,7 +199,7 @@ function calculateMatch(application, internship) {
 }
 
 // ============================================================
-// PAGE
+// COMPANY DASHBOARD
 // ============================================================
 
 export default function CompanyDashboard() {
@@ -199,7 +211,8 @@ export default function CompanyDashboard() {
   const [internships, setInternships] = useState([]);
   const [applications, setApplications] = useState([]);
 
-  const [subscription, setSubscription] = useState(null);
+  const [subscription, setSubscription] =
+    useState(null);
 
   const [loading, setLoading] = useState(true);
   const [subscriptionLoading, setSubscriptionLoading] =
@@ -208,7 +221,7 @@ export default function CompanyDashboard() {
   const [error, setError] = useState("");
 
   // ==========================================================
-  // LOAD USER
+  // LOAD DASHBOARD
   // ==========================================================
 
   useEffect(() => {
@@ -240,12 +253,14 @@ export default function CompanyDashboard() {
       // COMPANY
       // ========================================================
 
-      const { data: companyData, error: companyError } =
-        await supabase
-          .from("companies")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
+      const {
+        data: companyData,
+        error: companyError,
+      } = await supabase
+        .from("companies")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
       if (companyError) {
         throw companyError;
@@ -266,17 +281,19 @@ export default function CompanyDashboard() {
       // INTERNSHIPS
       // ========================================================
 
-      const { data: internshipData, error: internshipError } =
-        await supabase
-          .from("internships")
-          .select("*")
-          .eq(
-            "company_name",
-            companyData.company_name
-          )
-          .order("created_at", {
-            ascending: false,
-          });
+      const {
+        data: internshipData,
+        error: internshipError,
+      } = await supabase
+        .from("internships")
+        .select("*")
+        .eq(
+          "company_name",
+          companyData.company_name
+        )
+        .order("created_at", {
+          ascending: false,
+        });
 
       if (internshipError) {
         console.error(
@@ -285,7 +302,8 @@ export default function CompanyDashboard() {
         );
       }
 
-      const loadedInternships = internshipData || [];
+      const loadedInternships =
+        internshipData || [];
 
       setInternships(loadedInternships);
 
@@ -294,18 +312,24 @@ export default function CompanyDashboard() {
       // ========================================================
 
       if (loadedInternships.length > 0) {
-        const internshipIds = loadedInternships.map(
-          (item) => item.id
-        );
+        const internshipIds =
+          loadedInternships.map(
+            (item) => item.id
+          );
 
-        const { data: applicationData, error: applicationError } =
-          await supabase
-            .from("applications")
-            .select("*")
-            .in("internship_id", internshipIds)
-            .order("created_at", {
-              ascending: false,
-            });
+        const {
+          data: applicationData,
+          error: applicationError,
+        } = await supabase
+          .from("applications")
+          .select("*")
+          .in(
+            "internship_id",
+            internshipIds
+          )
+          .order("created_at", {
+            ascending: false,
+          });
 
         if (applicationError) {
           console.error(
@@ -314,7 +338,9 @@ export default function CompanyDashboard() {
           );
         }
 
-        setApplications(applicationData || []);
+        setApplications(
+          applicationData || []
+        );
       } else {
         setApplications([]);
       }
@@ -323,7 +349,9 @@ export default function CompanyDashboard() {
       // SUBSCRIPTION
       // ========================================================
 
-      await loadSubscription(companyData.id);
+      await loadSubscription(
+        companyData.id
+      );
     } catch (err) {
       console.error(err);
 
@@ -340,11 +368,16 @@ export default function CompanyDashboard() {
   // LOAD SUBSCRIPTION
   // ==========================================================
 
-  async function loadSubscription(companyId) {
+  async function loadSubscription(
+    companyId
+  ) {
     try {
       setSubscriptionLoading(true);
 
-      const { data, error } = await supabase
+      const {
+        data,
+        error,
+      } = await supabase
         .from("company_subscriptions")
         .select("*")
         .eq("company_id", companyId)
@@ -385,14 +418,16 @@ export default function CompanyDashboard() {
     await supabase.auth.signOut();
 
     if (typeof window !== "undefined") {
-      localStorage.removeItem("gradlink_profile");
+      localStorage.removeItem(
+        "gradlink_profile"
+      );
     }
 
     router.push("/login");
   }
 
   // ==========================================================
-  // APPLICATION COUNTS
+  // STATISTICS
   // ==========================================================
 
   const totalApplications =
@@ -401,14 +436,18 @@ export default function CompanyDashboard() {
   const shortlisted =
     applications.filter(
       (app) =>
-        String(app.status || "").toLowerCase() ===
+        String(
+          app.status || ""
+        ).toLowerCase() ===
         "shortlisted"
     ).length;
 
   const rejected =
     applications.filter(
       (app) =>
-        String(app.status || "").toLowerCase() ===
+        String(
+          app.status || ""
+        ).toLowerCase() ===
         "rejected"
     ).length;
 
@@ -416,6 +455,8 @@ export default function CompanyDashboard() {
   // PREMIUM STATUS
   // ==========================================================
 
+  // IMPORTANT:
+  // A company is Premium ONLY when status is exactly "active".
   const isPremiumActive =
     subscription?.status === "active";
 
@@ -499,7 +540,9 @@ export default function CompanyDashboard() {
               "0 10px 35px rgba(0,0,0,0.08)",
           }}
         >
-          <h2>Dashboard Error</h2>
+          <h2>
+            Dashboard Error
+          </h2>
 
           <p
             style={{
@@ -530,7 +573,7 @@ export default function CompanyDashboard() {
   }
 
   // ==========================================================
-  // RENDER
+  // DASHBOARD
   // ==========================================================
 
   return (
@@ -562,7 +605,8 @@ export default function CompanyDashboard() {
             margin: "auto",
             padding: "16px 20px",
             display: "flex",
-            justifyContent: "space-between",
+            justifyContent:
+              "space-between",
             alignItems: "center",
             gap: "15px",
           }}
@@ -595,6 +639,8 @@ export default function CompanyDashboard() {
               display: "flex",
               alignItems: "center",
               gap: "8px",
+              flexWrap: "wrap",
+              justifyContent: "flex-end",
             }}
           >
             <Link
@@ -725,7 +771,8 @@ export default function CompanyDashboard() {
               textDecoration: "none",
               background: "#fff",
               color: "#1261ff",
-              border: "1px solid #d6e1f0",
+              border:
+                "1px solid #d6e1f0",
               padding: "13px 20px",
               borderRadius: "11px",
               fontWeight: "800",
@@ -734,8 +781,9 @@ export default function CompanyDashboard() {
             Edit Company Profile
           </Link>
 
+          {/* CORRECT PRICING ROUTE */}
           <Link
-            href="/company/pricing"
+            href="/company-pricing"
             style={{
               textDecoration: "none",
               background: "#111827",
@@ -815,7 +863,8 @@ export default function CompanyDashboard() {
                 justifyContent:
                   "space-between",
                 gap: "20px",
-                alignItems: "flex-start",
+                alignItems:
+                  "flex-start",
               }}
             >
               <div
@@ -825,18 +874,23 @@ export default function CompanyDashboard() {
               >
                 <div
                   style={{
-                    display: "inline-flex",
-                    alignItems: "center",
+                    display:
+                      "inline-flex",
+                    alignItems:
+                      "center",
                     gap: "7px",
                     background:
                       "rgba(255,255,255,0.12)",
                     border:
                       "1px solid rgba(255,255,255,0.18)",
-                    padding: "7px 11px",
-                    borderRadius: "999px",
+                    padding:
+                      "7px 11px",
+                    borderRadius:
+                      "999px",
                     fontSize: "12px",
                     fontWeight: "800",
-                    marginBottom: "12px",
+                    marginBottom:
+                      "12px",
                   }}
                 >
                   💎 GRADLINK PREMIUM
@@ -860,12 +914,15 @@ export default function CompanyDashboard() {
                     lineHeight: 1.6,
                   }}
                 >
-                  Unlock advanced tools designed
-                  to help your company screen
-                  and evaluate applicants more
-                  efficiently.
+                  Unlock advanced tools
+                  designed to help your
+                  company screen and
+                  evaluate applicants
+                  more efficiently.
                 </p>
               </div>
+
+              {/* STATUS */}
 
               <div
                 style={{
@@ -882,7 +939,8 @@ export default function CompanyDashboard() {
                   style={{
                     fontSize: "12px",
                     opacity: 0.75,
-                    marginBottom: "6px",
+                    marginBottom:
+                      "6px",
                   }}
                 >
                   CURRENT STATUS
@@ -898,9 +956,10 @@ export default function CompanyDashboard() {
                       style={{
                         fontSize: "20px",
                         fontWeight: "900",
-                        color: isPremiumActive
-                          ? "#7ff0b0"
-                          : "#ffd27a",
+                        color:
+                          isPremiumActive
+                            ? "#7ff0b0"
+                            : "#ffd27a",
                       }}
                     >
                       {isPremiumActive
@@ -910,9 +969,12 @@ export default function CompanyDashboard() {
 
                     <div
                       style={{
-                        marginTop: "8px",
-                        fontSize: "14px",
-                        opacity: 0.8,
+                        marginTop:
+                          "8px",
+                        fontSize:
+                          "14px",
+                        opacity:
+                          0.8,
                       }}
                     >
                       {subscription?.plan ||
@@ -928,11 +990,12 @@ export default function CompanyDashboard() {
                 height: "1px",
                 background:
                   "rgba(255,255,255,0.13)",
-                margin: "25px 0",
+                margin:
+                  "25px 0",
               }}
             />
 
-            {/* PREMIUM DETAILS */}
+            {/* PREMIUM FEATURES */}
 
             <div
               style={{
@@ -961,7 +1024,7 @@ export default function CompanyDashboard() {
               />
             </div>
 
-            {/* SUBSCRIPTION INFO */}
+            {/* SUBSCRIPTION DETAILS */}
 
             {subscription && (
               <div
@@ -969,7 +1032,8 @@ export default function CompanyDashboard() {
                   marginTop: "22px",
                   background:
                     "rgba(255,255,255,0.08)",
-                  borderRadius: "14px",
+                  borderRadius:
+                    "14px",
                   padding: "16px",
                   display: "grid",
                   gridTemplateColumns:
@@ -988,9 +1052,18 @@ export default function CompanyDashboard() {
                 <SubscriptionDetail
                   title="Monthly Price"
                   value={
-                    subscription.monthly_price != null
+                    subscription.monthly_price !=
+                    null
                       ? `R${subscription.monthly_price}`
                       : "—"
+                  }
+                />
+
+                <SubscriptionDetail
+                  title="Status"
+                  value={
+                    subscription.status ||
+                    "—"
                   }
                 />
 
@@ -1010,7 +1083,7 @@ export default function CompanyDashboard() {
               </div>
             )}
 
-            {/* BUTTON */}
+            {/* CORRECT PRICING ROUTE */}
 
             <div
               style={{
@@ -1018,14 +1091,18 @@ export default function CompanyDashboard() {
               }}
             >
               <Link
-                href="/company/pricing"
+                href="/company-pricing"
                 style={{
-                  display: "inline-block",
+                  display:
+                    "inline-block",
                   background: "#fff",
                   color: "#123f88",
-                  textDecoration: "none",
-                  padding: "13px 21px",
-                  borderRadius: "11px",
+                  textDecoration:
+                    "none",
+                  padding:
+                    "13px 21px",
+                  borderRadius:
+                    "11px",
                   fontWeight: "900",
                 }}
               >
@@ -1045,10 +1122,12 @@ export default function CompanyDashboard() {
                   marginBottom: 0,
                 }}
               >
-                Selecting a plan does not
-                automatically activate Premium.
-                Premium features require an
-                active verified subscription.
+                Selecting a plan does
+                not automatically
+                activate Premium.
+                Premium features require
+                an active verified
+                subscription.
               </p>
             )}
           </div>
@@ -1066,7 +1145,9 @@ export default function CompanyDashboard() {
                 "space-between",
               alignItems: "center",
               gap: "15px",
-              marginBottom: "18px",
+              marginBottom:
+                "18px",
+              flexWrap: "wrap",
             }}
           >
             <div>
@@ -1081,11 +1162,13 @@ export default function CompanyDashboard() {
 
               <p
                 style={{
-                  margin: "5px 0 0",
+                  margin:
+                    "5px 0 0",
                   color: "#667085",
                 }}
               >
-                Manage your posted internship
+                Manage your posted
+                internship
                 opportunities.
               </p>
             </div>
@@ -1093,7 +1176,8 @@ export default function CompanyDashboard() {
             <Link
               href="/internships"
               style={{
-                textDecoration: "none",
+                textDecoration:
+                  "none",
                 color: "#1261ff",
                 fontWeight: "800",
               }}
@@ -1102,21 +1186,27 @@ export default function CompanyDashboard() {
             </Link>
           </div>
 
-          {internships.length === 0 ? (
+          {internships.length ===
+          0 ? (
             <div
               style={{
                 background: "#fff",
                 border:
                   "1px dashed #cbd5e1",
-                borderRadius: "18px",
-                padding: "40px 20px",
-                textAlign: "center",
+                borderRadius:
+                  "18px",
+                padding:
+                  "40px 20px",
+                textAlign:
+                  "center",
               }}
             >
               <div
                 style={{
-                  fontSize: "42px",
-                  marginBottom: "10px",
+                  fontSize:
+                    "42px",
+                  marginBottom:
+                    "10px",
                 }}
               >
                 💼
@@ -1128,23 +1218,32 @@ export default function CompanyDashboard() {
 
               <p
                 style={{
-                  color: "#667085",
+                  color:
+                    "#667085",
                 }}
               >
-                Post your first internship
-                and start receiving applications.
+                Post your first
+                internship and
+                start receiving
+                applications.
               </p>
 
               <Link
                 href="/internships"
                 style={{
-                  display: "inline-block",
-                  background: "#1261ff",
+                  display:
+                    "inline-block",
+                  background:
+                    "#1261ff",
                   color: "#fff",
-                  padding: "12px 18px",
-                  borderRadius: "10px",
-                  textDecoration: "none",
-                  fontWeight: "800",
+                  padding:
+                    "12px 18px",
+                  borderRadius:
+                    "10px",
+                  textDecoration:
+                    "none",
+                  fontWeight:
+                    "800",
                 }}
               >
                 Post Internship
@@ -1153,7 +1252,8 @@ export default function CompanyDashboard() {
           ) : (
             <div
               style={{
-                display: "grid",
+                display:
+                  "grid",
                 gap: "16px",
               }}
             >
@@ -1172,21 +1272,28 @@ export default function CompanyDashboard() {
 
                   return (
                     <div
-                      key={internship.id}
+                      key={
+                        internship.id
+                      }
                       style={{
-                        background: "#fff",
+                        background:
+                          "#fff",
                         border:
                           "1px solid #e6ebf2",
-                        borderRadius: "18px",
-                        padding: "22px",
+                        borderRadius:
+                          "18px",
+                        padding:
+                          "22px",
                         boxShadow:
                           "0 8px 25px rgba(0,0,0,0.04)",
                       }}
                     >
                       <div
                         style={{
-                          display: "flex",
-                          flexWrap: "wrap",
+                          display:
+                            "flex",
+                          flexWrap:
+                            "wrap",
                           justifyContent:
                             "space-between",
                           gap: "18px",
@@ -1194,14 +1301,16 @@ export default function CompanyDashboard() {
                       >
                         <div
                           style={{
-                            flex: "1 1 450px",
+                            flex:
+                              "1 1 450px",
                           }}
                         >
                           <h3
                             style={{
                               margin:
                                 "0 0 8px",
-                              fontSize: "21px",
+                              fontSize:
+                                "21px",
                             }}
                           >
                             {internship.job_title ||
@@ -1210,9 +1319,12 @@ export default function CompanyDashboard() {
 
                           <div
                             style={{
-                              color: "#667085",
-                              fontSize: "14px",
-                              lineHeight: 1.8,
+                              color:
+                                "#667085",
+                              fontSize:
+                                "14px",
+                              lineHeight:
+                                1.8,
                             }}
                           >
                             📍{" "}
@@ -1243,7 +1355,8 @@ export default function CompanyDashboard() {
 
                         <div
                           style={{
-                            display: "flex",
+                            display:
+                              "flex",
                             flexDirection:
                               "column",
                             alignItems:
@@ -1255,19 +1368,22 @@ export default function CompanyDashboard() {
                             style={{
                               background:
                                 "#eef4ff",
-                              color: "#1261ff",
+                              color:
+                                "#1261ff",
                               padding:
                                 "9px 13px",
                               borderRadius:
                                 "999px",
                               fontWeight:
                                 "800",
-                              fontSize: "13px",
+                              fontSize:
+                                "13px",
                             }}
                           >
                             👥 {count}{" "}
                             Application
-                            {count !== 1
+                            {count !==
+                            1
                               ? "s"
                               : ""}
                           </div>
@@ -1277,7 +1393,8 @@ export default function CompanyDashboard() {
                             style={{
                               background:
                                 "#1261ff",
-                              color: "#fff",
+                              color:
+                                "#fff",
                               textDecoration:
                                 "none",
                               padding:
@@ -1315,9 +1432,11 @@ export default function CompanyDashboard() {
             textAlign: "center",
           }}
         >
-          © {new Date().getFullYear()} GradLink
-          SA — Connecting South African
-          graduates with opportunities.
+          ©{" "}
+          {new Date().getFullYear()}{" "}
+          GradLink SA — Connecting
+          South African graduates
+          with opportunities.
         </footer>
       </div>
     </main>
@@ -1441,11 +1560,14 @@ function SubscriptionDetail({
       <div
         style={{
           fontSize: "11px",
-          textTransform: "uppercase",
-          letterSpacing: "0.5px",
+          textTransform:
+            "uppercase",
+          letterSpacing:
+            "0.5px",
           color:
             "rgba(255,255,255,0.55)",
-          marginBottom: "5px",
+          marginBottom:
+            "5px",
         }}
       >
         {title}
@@ -1475,11 +1597,14 @@ function formatDate(value) {
   try {
     return new Date(
       value
-    ).toLocaleDateString("en-ZA", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    ).toLocaleDateString(
+      "en-ZA",
+      {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }
+    );
   } catch {
     return "—";
   }
