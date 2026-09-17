@@ -17,43 +17,58 @@ const supabase = createClient(
 function getQualificationLevel(value) {
   if (!value) return 0;
 
-  const text = value.toLowerCase();
+  const v = value.toLowerCase();
 
   if (
-    text.includes("phd") ||
-    text.includes("doctorate") ||
-    text.includes("master") ||
-    text.includes("postgrad")
+    v.includes("phd") ||
+    v.includes("doctorate") ||
+    v.includes("doctoral")
   ) {
     return 6;
   }
 
-  if (text.includes("honours") || text.includes("honor")) {
+  if (
+    v.includes("master") ||
+    v.includes("postgrad") ||
+    v.includes("post-graduate")
+  ) {
+    return 6;
+  }
+
+  if (v.includes("honours") || v.includes("honors")) {
     return 5;
   }
 
   if (
-    text.includes("degree") ||
-    text.includes("bachelor") ||
-    text.includes("bsc") ||
-    text.includes("bcom") ||
-    text.includes("ba")
+    v.includes("degree") ||
+    v.includes("bachelor") ||
+    v.includes("bsc") ||
+    v.includes("ba ") ||
+    v.includes("bcom")
   ) {
     return 4;
   }
 
-  if (text.includes("diploma")) {
+  if (
+    v.includes("diploma") ||
+    v.includes("national diploma")
+  ) {
     return 3;
   }
 
-  if (text.includes("certificate")) {
+  if (
+    v.includes("certificate") ||
+    v.includes("n6") ||
+    v.includes("n5") ||
+    v.includes("n4")
+  ) {
     return 2;
   }
 
   if (
-    text.includes("matric") ||
-    text.includes("grade 12") ||
-    text.includes("grade12")
+    v.includes("matric") ||
+    v.includes("grade 12") ||
+    v.includes("grade12")
   ) {
     return 1;
   }
@@ -62,352 +77,497 @@ function getQualificationLevel(value) {
 }
 
 // ============================================================
+// NORMALISE TEXT
+// ============================================================
+
+function normaliseText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// ============================================================
+// SKILLS
+// ============================================================
+
+function getSkills(value) {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value
+      .map((skill) => normaliseText(skill))
+      .filter(Boolean);
+  }
+
+  return String(value)
+    .split(/[,;\n|]/)
+    .map((skill) => normaliseText(skill))
+    .filter(Boolean);
+}
+
+// ============================================================
 // AI MATCHING
 // ============================================================
 
-function calculateMatch(internship, application) {
-  let qualificationScore = 0;
-  let fieldScore = 0;
-  let skillsScore = 0;
-
-  const requiredQualification = getQualificationLevel(
+function calculateMatch(internship, applicant) {
+  const internshipQualification = getQualificationLevel(
     internship?.qualification
   );
 
   const applicantQualification = getQualificationLevel(
-    application?.qualification
+    applicant?.qualification
   );
 
-  if (
-    applicantQualification > 0 &&
-    requiredQualification > 0 &&
-    applicantQualification >= requiredQualification
+  let qualificationScore = 0;
+
+  if (internshipQualification === 0) {
+    qualificationScore = 35;
+  } else if (
+    applicantQualification >= internshipQualification
   ) {
     qualificationScore = 35;
+  } else if (
+    applicantQualification === internshipQualification - 1
+  ) {
+    qualificationScore = 15;
   }
 
-  const requiredField = (
-    internship?.field_of_study || ""
-  ).toLowerCase();
+  // ----------------------------------------------------------
+  // FIELD OF STUDY
+  // ----------------------------------------------------------
 
-  const applicantField = (
-    application?.field_of_study || ""
-  ).toLowerCase();
+  const requiredField = normaliseText(
+    internship?.field_of_study
+  );
 
-  if (requiredField && applicantField) {
-    if (
-      applicantField.includes(requiredField) ||
-      requiredField.includes(applicantField)
-    ) {
-      fieldScore = 35;
-    } else {
-      const requiredWords = requiredField
-        .split(/[\s,/&-]+/)
-        .filter(Boolean);
+  const applicantField = normaliseText(
+    applicant?.field_of_study
+  );
 
-      const matchedField = requiredWords.some((word) =>
-        applicantField.includes(word)
+  let fieldScore = 0;
+
+  if (!requiredField) {
+    fieldScore = 35;
+  } else if (!applicantField) {
+    fieldScore = 0;
+  } else if (
+    applicantField.includes(requiredField) ||
+    requiredField.includes(applicantField)
+  ) {
+    fieldScore = 35;
+  } else {
+    const requiredWords = requiredField.split(" ");
+    const applicantWords = applicantField.split(" ");
+
+    const matchedWords = requiredWords.filter((word) =>
+      word.length > 2 &&
+      applicantWords.some((appWord) =>
+        appWord.includes(word) || word.includes(appWord)
+      )
+    );
+
+    if (matchedWords.length > 0) {
+      fieldScore = Math.min(
+        35,
+        Math.round(
+          (matchedWords.length / requiredWords.length) * 35
+        )
       );
-
-      if (matchedField) {
-        fieldScore = 20;
-      }
     }
   }
 
-  const requiredSkills = (
-    internship?.skills || ""
-  )
-    .toLowerCase()
-    .split(/[,;\n]+/)
-    .map((skill) => skill.trim())
-    .filter(Boolean);
+  // ----------------------------------------------------------
+  // SKILLS
+  // ----------------------------------------------------------
 
-  const applicantSkills = (
-    application?.skills || ""
-  )
-    .toLowerCase()
-    .split(/[,;\n]+/)
-    .map((skill) => skill.trim())
-    .filter(Boolean);
+  const requiredSkills = getSkills(internship?.skills);
+  const applicantSkills = getSkills(applicant?.skills);
 
-  if (requiredSkills.length && applicantSkills.length) {
-    const matchedSkills = requiredSkills.filter(
-      (requiredSkill) =>
-        applicantSkills.some(
-          (applicantSkill) =>
-            applicantSkill.includes(requiredSkill) ||
-            requiredSkill.includes(applicantSkill)
-        )
+  let skillScore = 0;
+  let matchedSkills = [];
+  let missingSkills = [];
+
+  if (requiredSkills.length === 0) {
+    skillScore = 30;
+  } else {
+    matchedSkills = requiredSkills.filter((requiredSkill) =>
+      applicantSkills.some(
+        (applicantSkill) =>
+          applicantSkill.includes(requiredSkill) ||
+          requiredSkill.includes(applicantSkill)
+      )
     );
 
-    skillsScore = Math.round(
+    missingSkills = requiredSkills.filter(
+      (requiredSkill) => !matchedSkills.includes(requiredSkill)
+    );
+
+    skillScore = Math.round(
       (matchedSkills.length / requiredSkills.length) * 30
     );
   }
 
-  const total =
-    qualificationScore +
-    fieldScore +
-    skillsScore;
+  const totalScore = Math.max(
+    0,
+    Math.min(
+      100,
+      qualificationScore + fieldScore + skillScore
+    )
+  );
 
   let label = "Weak";
 
-  if (total >= 85) {
+  if (totalScore >= 85) {
     label = "Strong";
-  } else if (total >= 70) {
+  } else if (totalScore >= 70) {
     label = "Good";
-  } else if (total >= 40) {
+  } else if (totalScore >= 40) {
     label = "Possible";
   }
 
+  const strengths = [];
+
+  if (qualificationScore >= 35) {
+    strengths.push("Qualification meets the requirement");
+  }
+
+  if (fieldScore >= 35) {
+    strengths.push("Field of study matches");
+  }
+
+  if (matchedSkills.length > 0) {
+    strengths.push(
+      `${matchedSkills.length} required skill${
+        matchedSkills.length === 1 ? "" : "s"
+      } matched`
+    );
+  }
+
+  const improvements = [];
+
+  if (
+    internshipQualification > 0 &&
+    applicantQualification < internshipQualification
+  ) {
+    improvements.push(
+      "Qualification level is below the internship requirement"
+    );
+  }
+
+  if (fieldScore < 35 && requiredField) {
+    improvements.push(
+      "Field of study does not fully match"
+    );
+  }
+
+  if (missingSkills.length > 0) {
+    improvements.push(
+      `Missing skills: ${missingSkills.join(", ")}`
+    );
+  }
+
+  let summary = "Limited match for this internship.";
+
+  if (totalScore >= 85) {
+    summary =
+      "Applicant appears to be a strong match based on the available profile information.";
+  } else if (totalScore >= 70) {
+    summary =
+      "Applicant appears to be a good match with several relevant qualifications or skills.";
+  } else if (totalScore >= 40) {
+    summary =
+      "Applicant has some relevant information but may require further review.";
+  }
+
   return {
-    total,
+    totalScore,
     label,
     qualificationScore,
     fieldScore,
-    skillsScore,
+    skillScore,
+    matchedSkills,
+    missingSkills,
+    strengths,
+    improvements,
+    summary,
   };
 }
 
 // ============================================================
-// MAIN DASHBOARD
+// SCORE DISPLAY
+// ============================================================
+
+function getScoreClass(score) {
+  if (score >= 85) return "score-strong";
+  if (score >= 70) return "score-good";
+  if (score >= 40) return "score-possible";
+  return "score-weak";
+}
+
+// ============================================================
+// COMPANY DASHBOARD
 // ============================================================
 
 export default function CompanyDashboard() {
   const router = useRouter();
 
   const [user, setUser] = useState(null);
-  const [company, setCompany] = useState(null);
+  const [companyData, setCompanyData] = useState(null);
+
   const [internships, setInternships] = useState([]);
   const [applications, setApplications] = useState([]);
-  const [subscription, setSubscription] = useState(null);
 
   const [loading, setLoading] = useState(true);
-  const [subscriptionLoading, setSubscriptionLoading] =
-    useState(true);
+  const [loadingApplications, setLoadingApplications] =
+    useState(false);
+
   const [error, setError] = useState("");
 
-  const [showHeader, setShowHeader] = useState(true);
+  const [selectedInternship, setSelectedInternship] =
+    useState(null);
 
-  // ==========================================================
-  // HEADER SCROLL
-  // ==========================================================
+  const [selectedApplication, setSelectedApplication] =
+    useState(null);
 
-  useEffect(() => {
-    let lastScrollY = window.scrollY;
-
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-
-      if (currentScrollY <= 20) {
-        setShowHeader(true);
-      } else if (currentScrollY > lastScrollY) {
-        setShowHeader(false);
-      } else {
-        setShowHeader(true);
-      }
-
-      lastScrollY = currentScrollY;
-    };
-
-    window.addEventListener("scroll", handleScroll, {
-      passive: true,
-    });
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
-  }, []);
-
-  // ==========================================================
-  // LOAD SUBSCRIPTION
-  // ==========================================================
-
-  async function loadSubscription(companyId) {
-    if (!companyId) {
-      setSubscription(null);
-      setSubscriptionLoading(false);
-      return;
-    }
-
-    setSubscriptionLoading(true);
-
-    try {
-      const { data, error } = await supabase
-        .from("company_subscriptions")
-        .select("*")
-        .eq("company_id", companyId)
-        .order("created_at", {
-          ascending: false,
-        })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error(
-          "Subscription error:",
-          error
-        );
-
-        setSubscription(null);
-      } else {
-        setSubscription(data || null);
-      }
-    } catch (err) {
-      console.error(
-        "Subscription loading error:",
-        err
-      );
-
-      setSubscription(null);
-    } finally {
-      setSubscriptionLoading(false);
-    }
-  }
+  const [message, setMessage] = useState("");
 
   // ==========================================================
   // LOAD DASHBOARD
   // ==========================================================
 
-  async function loadDashboard() {
-    setLoading(true);
-    setError("");
+  useEffect(() => {
+    loadDashboard();
+  }, []);
 
+  async function loadDashboard() {
     try {
+      setLoading(true);
+      setError("");
+
       const {
-        data: authData,
-        error: authError,
+        data: { user: currentUser },
+        error: userError,
       } = await supabase.auth.getUser();
 
-      if (authError) {
-        throw authError;
-      }
-
-      const authUser = authData?.user;
-
-      if (!authUser) {
+      if (userError || !currentUser) {
         router.push("/login");
         return;
       }
 
-      setUser(authUser);
+      setUser(currentUser);
 
-      // --------------------------------------------------------
-      // COMPANY
-      // --------------------------------------------------------
+      // ------------------------------------------------------
+      // LOAD COMPANY
+      // ------------------------------------------------------
 
-      const {
-        data: companyData,
-        error: companyError,
-      } = await supabase
-        .from("companies")
-        .select("*")
-        .eq("user_id", authUser.id)
-        .maybeSingle();
+      const { data: company, error: companyError } =
+        await supabase
+          .from("companies")
+          .select("*")
+          .eq("user_id", currentUser.id)
+          .maybeSingle();
 
       if (companyError) {
-        throw companyError;
-      }
-
-      if (!companyData) {
-        setError(
-          "We could not find your company profile. Please complete your company profile first."
-        );
-
-        setLoading(false);
-        setSubscriptionLoading(false);
+        console.error(companyError);
+        setError("Unable to load company profile.");
         return;
       }
 
-      setCompany(companyData);
-
-      loadSubscription(companyData.id);
-
-      // --------------------------------------------------------
-      // INTERNSHIPS
-      // --------------------------------------------------------
-
-      const {
-        data: internshipData,
-        error: internshipError,
-      } = await supabase
-        .from("internships")
-        .select("*")
-        .eq(
-          "company_name",
-          companyData.company_name
-        )
-        .order("created_at", {
-          ascending: false,
-        });
-
-      if (internshipError) {
-        throw internshipError;
+      if (!company) {
+        setError(
+          "Company profile could not be found. Please complete your company profile first."
+        );
+        return;
       }
 
-      const loadedInternships =
-        internshipData || [];
+      setCompanyData(company);
 
-      setInternships(loadedInternships);
+      // ------------------------------------------------------
+      // LOAD INTERNSHIPS
+      // ------------------------------------------------------
 
-      // --------------------------------------------------------
-      // APPLICATIONS
-      // --------------------------------------------------------
-
-      if (loadedInternships.length > 0) {
-        const internshipIds =
-          loadedInternships.map(
-            (internship) => internship.id
-          );
-
-        const {
-          data: applicationData,
-          error: applicationError,
-        } = await supabase
-          .from("applications")
+      const { data: internshipData, error: internshipError } =
+        await supabase
+          .from("internships")
           .select("*")
-          .in(
-            "internship_id",
-            internshipIds
-          )
+          .eq("company_name", company.company_name)
           .order("created_at", {
             ascending: false,
           });
 
-        if (applicationError) {
-          console.error(
-            "Application loading error:",
-            applicationError
-          );
-
-          setApplications([]);
-        } else {
-          setApplications(
-            applicationData || []
-          );
-        }
-      } else {
-        setApplications([]);
+      if (internshipError) {
+        console.error(internshipError);
+        setError("Unable to load your internships.");
+        return;
       }
-    } catch (err) {
-      console.error(
-        "Dashboard error:",
-        err
-      );
 
-      setError(
-        err?.message ||
-          "Something went wrong while loading your dashboard."
-      );
+      setInternships(internshipData || []);
+
+    } catch (err) {
+      console.error(err);
+      setError("Something went wrong loading the dashboard.");
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => {
-    loadDashboard();
-  }, []);
+  // ==========================================================
+  // LOAD APPLICATIONS FOR INTERNSHIP
+  // ==========================================================
+
+  async function loadApplications(internship) {
+    try {
+      setSelectedInternship(internship);
+      setSelectedApplication(null);
+      setLoadingApplications(true);
+      setMessage("");
+
+      const { data, error: applicationError } =
+        await supabase
+          .from("applications")
+          .select("*")
+          .eq("internship_id", internship.id)
+          .order("created_at", {
+            ascending: false,
+          });
+
+      if (applicationError) {
+        console.error(applicationError);
+        setMessage("Unable to load applications.");
+        return;
+      }
+
+      const applicationRows = data || [];
+
+      // ------------------------------------------------------
+      // LOAD GRADUATE PROFILES
+      // ------------------------------------------------------
+
+      const graduateIds = [
+        ...new Set(
+          applicationRows
+            .map((application) => application.graduate_id)
+            .filter(Boolean)
+        ),
+      ];
+
+      let graduates = [];
+
+      if (graduateIds.length > 0) {
+        const { data: graduateData, error: graduateError } =
+          await supabase
+            .from("graduates")
+            .select("*")
+            .in("id", graduateIds);
+
+        if (graduateError) {
+          console.error(graduateError);
+        } else {
+          graduates = graduateData || [];
+        }
+      }
+
+      // ------------------------------------------------------
+      // MERGE PROFILE INFORMATION + AI SCORE
+      // ------------------------------------------------------
+
+      const enrichedApplications = applicationRows.map(
+        (application) => {
+          const graduate = graduates.find(
+            (item) => item.id === application.graduate_id
+          );
+
+          const mergedApplicant = {
+            ...graduate,
+            ...application,
+          };
+
+          const analysis = calculateMatch(
+            internship,
+            mergedApplicant
+          );
+
+          return {
+            ...mergedApplicant,
+            analysis,
+          };
+        }
+      );
+
+      enrichedApplications.sort(
+        (a, b) =>
+          b.analysis.totalScore -
+          a.analysis.totalScore
+      );
+
+      setApplications(enrichedApplications);
+    } catch (err) {
+      console.error(err);
+      setMessage("Something went wrong loading applications.");
+    } finally {
+      setLoadingApplications(false);
+    }
+  }
+
+  // ==========================================================
+  // UPDATE APPLICATION STATUS
+  // ==========================================================
+
+  async function updateApplicationStatus(
+    applicationId,
+    status
+  ) {
+    try {
+      setMessage("");
+
+      const { error: updateError } = await supabase
+        .from("applications")
+        .update({
+          status,
+        })
+        .eq("id", applicationId);
+
+      if (updateError) {
+        console.error(updateError);
+        setMessage("Unable to update application status.");
+        return;
+      }
+
+      setApplications((previous) =>
+        previous.map((application) =>
+          application.id === applicationId
+            ? {
+                ...application,
+                status,
+              }
+            : application
+        )
+      );
+
+      if (
+        selectedApplication &&
+        selectedApplication.id === applicationId
+      ) {
+        setSelectedApplication({
+          ...selectedApplication,
+          status,
+        });
+      }
+
+      setMessage(
+        status === "shortlisted"
+          ? "Applicant shortlisted successfully."
+          : status === "rejected"
+          ? "Applicant rejected."
+          : "Application status reset."
+      );
+    } catch (err) {
+      console.error(err);
+      setMessage("Something went wrong.");
+    }
+  }
 
   // ==========================================================
   // LOGOUT
@@ -416,56 +576,10 @@ export default function CompanyDashboard() {
   async function handleLogout() {
     await supabase.auth.signOut();
 
-    try {
-      localStorage.removeItem(
-        "gradlink_profile"
-      );
-    } catch (err) {
-      console.error(
-        "Local storage error:",
-        err
-      );
-    }
+    localStorage.removeItem("gradlink_profile");
 
     router.push("/login");
   }
-
-  // ==========================================================
-  // STATISTICS
-  // ==========================================================
-
-  const totalApplications =
-    applications.length;
-
-  const shortlistedApplications =
-    applications.filter(
-      (application) =>
-        application.status?.toLowerCase() ===
-        "shortlisted"
-    ).length;
-
-  const pendingApplications =
-    applications.filter(
-      (application) => {
-        const status =
-          application.status?.toLowerCase();
-
-        return (
-          !status ||
-          status === "pending" ||
-          status === "applied" ||
-          status === "review"
-        );
-      }
-    ).length;
-
-  const premiumActive =
-    subscription?.status?.toLowerCase() ===
-    "active";
-
-  const companyName =
-    company?.company_name ||
-    "Your Company";
 
   // ==========================================================
   // LOADING
@@ -473,2666 +587,2923 @@ export default function CompanyDashboard() {
 
   if (loading) {
     return (
-      <>
-        <div style={styles.loadingPage}>
-          <div style={styles.loadingCard}>
-            <div style={styles.spinner}></div>
+      <main className="dashboard-loading">
+        <div className="loading-card">
+          <div className="loading-spinner"></div>
 
-            <h2 style={styles.loadingTitle}>
-              Loading your dashboard
-            </h2>
+          <h2>Loading Company Dashboard</h2>
 
-            <p style={styles.loadingText}>
-              Preparing your GradLink SA
-              recruitment portal...
-            </p>
-          </div>
+          <p>
+            Please wait while we load your company
+            information.
+          </p>
         </div>
 
-        <style jsx global>{`
-          @keyframes gradlinkSpin {
-            from {
-              transform: rotate(0deg);
-            }
+        <style jsx>{`
+          .dashboard-loading {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: #f5f8fc;
+            font-family: Arial, sans-serif;
+          }
 
+          .loading-card {
+            width: 100%;
+            max-width: 460px;
+            background: white;
+            border-radius: 20px;
+            padding: 40px 28px;
+            text-align: center;
+            box-shadow: 0 12px 35px rgba(15, 23, 42, 0.08);
+          }
+
+          .loading-spinner {
+            width: 42px;
+            height: 42px;
+            margin: 0 auto 20px;
+            border: 4px solid #dbe7f5;
+            border-top-color: #1769aa;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+          }
+
+          .loading-card h2 {
+            margin: 0 0 8px;
+            color: #102a43;
+          }
+
+          .loading-card p {
+            margin: 0;
+            color: #627d98;
+            line-height: 1.6;
+          }
+
+          @keyframes spin {
             to {
               transform: rotate(360deg);
             }
           }
         `}</style>
-      </>
+      </main>
     );
   }
 
   // ==========================================================
-  // ERROR
-  // ==========================================================
-
-  if (error && !company) {
-    return (
-      <div style={styles.errorPage}>
-        <div style={styles.errorCard}>
-          <div style={styles.errorIcon}>
-            !
-          </div>
-
-          <h1 style={styles.errorTitle}>
-            Dashboard unavailable
-          </h1>
-
-          <p style={styles.errorText}>
-            {error}
-          </p>
-
-          <div style={styles.errorActions}>
-            <Link
-              href="/company"
-              style={styles.primaryButton}
-            >
-              Company Profile
-            </Link>
-
-            <Link
-              href="/"
-              style={styles.secondaryButton}
-            >
-              Home
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ==========================================================
-  // MAIN RENDER
+  // MAIN DASHBOARD
   // ==========================================================
 
   return (
-    <div style={styles.page}>
+    <main className="dashboard-page">
 
-      {/* ======================================================
+      {/* =====================================================
           HEADER
-      ====================================================== */}
+      ===================================================== */}
 
-      <header
-        style={{
-          ...styles.header,
-          transform: showHeader
-            ? "translateY(0)"
-            : "translateY(-120%)",
-        }}
-      >
-        <div style={styles.headerInner}>
+      <header className="dashboard-header">
+        <div className="header-inner">
 
           <Link
             href="/"
-            style={styles.logo}
+            className="brand"
           >
-            <span style={styles.logoMark}>
+            <div className="brand-mark">
               G
-            </span>
+            </div>
 
-            <span style={styles.logoText}>
-              GradLink{" "}
-              <span style={styles.logoAccent}>
-                SA
-              </span>
-            </span>
+            <div>
+              <div className="brand-name">
+                GRADLINK SA
+              </div>
+
+              <div className="brand-subtitle">
+                RECRUITMENT PORTAL
+              </div>
+            </div>
           </Link>
 
-          <nav style={styles.nav}>
+          <div className="header-actions">
 
             <Link
               href="/"
-              style={styles.navButton}
+              className="header-button"
             >
-              <span>⌂</span>
               Home
             </Link>
 
             <Link
               href="/company"
-              style={styles.navButton}
+              className="header-button"
             >
-              <span>▣</span>
               Company Profile
-            </Link>
-
-            <Link
-              href="/internships"
-              style={styles.navPrimaryButton}
-            >
-              <span>＋</span>
-              Post Internship
-            </Link>
-
-            <Link
-              href="/company/pricing"
-              style={styles.navPremiumButton}
-            >
-              <span>✦</span>
-              Premium
             </Link>
 
             <button
               type="button"
+              className="logout-button"
               onClick={handleLogout}
-              style={styles.logoutButton}
             >
-              <span>↪</span>
               Logout
             </button>
 
-          </nav>
+          </div>
         </div>
       </header>
 
-      {/* ======================================================
-          HERO
-      ====================================================== */}
+      {/* =====================================================
+          CONTENT
+      ===================================================== */}
 
-      <main>
+      <section className="dashboard-content">
 
-        <section style={styles.hero}>
-          <div style={styles.container}>
+        <div className="welcome-section">
 
-            <div style={styles.heroContent}>
+          <div>
+            <div className="eyebrow">
+              COMPANY DASHBOARD
+            </div>
 
-              <div style={styles.eyebrow}>
-                <span style={styles.eyebrowDot}></span>
-                RECRUITMENT PORTAL
+            <h1>
+              Welcome back
+              {companyData?.company_name
+                ? `, ${companyData.company_name}`
+                : ""}
+            </h1>
+
+            <p>
+              Manage your internship opportunities and
+              review applicants from one place.
+            </p>
+          </div>
+
+          <Link
+            href="/internships"
+            className="post-button"
+          >
+            <span>＋</span>
+            Post Internship
+          </Link>
+
+        </div>
+
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
+        )}
+
+        {message && (
+          <div className="success-message">
+            {message}
+          </div>
+        )}
+
+        {/* ===================================================
+            STATISTICS
+        =================================================== */}
+
+        <div className="stats-grid">
+
+          <div className="stat-card">
+            <div className="stat-icon">
+              💼
+            </div>
+
+            <div>
+              <div className="stat-number">
+                {internships.length}
               </div>
 
-              <h1 style={styles.heroTitle}>
-                Welcome back,
-                <br />
-                <span>{companyName}</span>
-              </h1>
+              <div className="stat-label">
+                Internship Listings
+              </div>
+            </div>
+          </div>
 
-              <p style={styles.heroText}>
-                Manage your internships, review
-                applicants, monitor your recruitment
-                pipeline and connect with talented
-                South African graduates.
+          <div className="stat-card">
+            <div className="stat-icon">
+              👥
+            </div>
+
+            <div>
+              <div className="stat-number">
+                {selectedInternship
+                  ? applications.length
+                  : "—"}
+              </div>
+
+              <div className="stat-label">
+                Applications
+              </div>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon">
+              ⭐
+            </div>
+
+            <div>
+              <div className="stat-number">
+                {selectedInternship &&
+                applications.length > 0
+                  ? Math.round(
+                      applications.reduce(
+                        (total, application) =>
+                          total +
+                          application.analysis.totalScore,
+                        0
+                      ) / applications.length
+                    )
+                  : "—"}
+              </div>
+
+              <div className="stat-label">
+                Average Match
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* ===================================================
+            INTERNSHIPS
+        =================================================== */}
+
+        <section className="section">
+
+          <div className="section-heading">
+            <div>
+              <div className="eyebrow">
+                YOUR OPPORTUNITIES
+              </div>
+
+              <h2>
+                Internship Listings
+              </h2>
+
+              <p>
+                Select an internship to view its
+                applicants.
               </p>
-
-              <div style={styles.heroActions}>
-
-                <Link
-                  href="/internships"
-                  style={styles.heroPrimaryButton}
-                >
-                  <span>＋</span>
-                  Post an Internship
-                </Link>
-
-                <Link
-                  href="/company"
-                  style={styles.heroSecondaryButton}
-                >
-                  <span>▣</span>
-                  Manage Company Profile
-                </Link>
-
-              </div>
-
-            </div>
-
-          </div>
-        </section>
-
-        {/* ====================================================
-            RECRUITMENT OVERVIEW
-        ==================================================== */}
-
-        <section style={styles.overviewSection}>
-          <div style={styles.container}>
-
-            <div style={styles.sectionHeading}>
-              <div>
-                <div style={styles.sectionEyebrow}>
-                  RECRUITMENT OVERVIEW
-                </div>
-
-                <h2 style={styles.sectionTitle}>
-                  Your hiring pipeline
-                </h2>
-              </div>
-
-              <div style={styles.overviewStatus}>
-                <span
-                  style={{
-                    ...styles.statusDot,
-                    background: premiumActive
-                      ? "#18a957"
-                      : "#f59e0b",
-                  }}
-                ></span>
-
-                {premiumActive
-                  ? "Premium active"
-                  : "Recruitment workspace active"}
-              </div>
-            </div>
-
-            <div style={styles.statsGrid}>
-
-              <StatCard
-                icon="▤"
-                number={internships.length}
-                label="Internship Listings"
-                description="Published opportunities"
-              />
-
-              <StatCard
-                icon="◉"
-                number={totalApplications}
-                label="Applications"
-                description="Graduate applications"
-              />
-
-              <StatCard
-                icon="✓"
-                number={shortlistedApplications}
-                label="Shortlisted"
-                description="Candidates shortlisted"
-              />
-
-              <StatCard
-                icon="◷"
-                number={pendingApplications}
-                label="Pending Review"
-                description="Applications awaiting review"
-              />
-
             </div>
           </div>
-        </section>
 
-        {/* ====================================================
-            PREMIUM
-        ==================================================== */}
+          {internships.length === 0 ? (
+            <div className="empty-card">
 
-        <section style={styles.section}>
-          <div style={styles.container}>
-
-            <div style={styles.premiumCard}>
-
-              <div style={styles.premiumHeader}>
-
-                <div>
-                  <div style={styles.premiumBadge}>
-                    ✦ GRADLINK PREMIUM
-                  </div>
-
-                  <h2 style={styles.premiumTitle}>
-                    Take your recruitment further
-                  </h2>
-
-                  <p style={styles.premiumText}>
-                    Unlock premium recruitment
-                    capabilities designed to help
-                    companies discover, evaluate and
-                    manage graduate talent more
-                    efficiently.
-                  </p>
-                </div>
-
-                <div style={styles.premiumPlanBox}>
-
-                  <div style={styles.planLabel}>
-                    CURRENT PLAN
-                  </div>
-
-                  <div style={styles.planName}>
-                    {subscription?.plan ||
-                      "Standard"}
-                  </div>
-
-                  <div style={styles.planPrice}>
-                    {subscription?.monthly_price
-                      ? `R${subscription.monthly_price}`
-                      : "Free"}
-
-                    <span>
-                      / month
-                    </span>
-                  </div>
-
-                  <div
-                    style={{
-                      ...styles.planStatus,
-                      background:
-                        premiumActive
-                          ? "#e9f8ef"
-                          : "#fff5df",
-                      color:
-                        premiumActive
-                          ? "#147a45"
-                          : "#a15c00",
-                    }}
-                  >
-                    {subscriptionLoading
-                      ? "CHECKING..."
-                      : premiumActive
-                      ? "ACTIVE"
-                      : "STANDARD"}
-                  </div>
-
-                  <Link
-                    href="/company/pricing"
-                    style={styles.premiumButton}
-                  >
-                    {premiumActive
-                      ? "Manage Premium"
-                      : "View Premium Plans"}
-
-                    <span>→</span>
-                  </Link>
-
-                </div>
-
+              <div className="empty-icon">
+                💼
               </div>
 
-              <div style={styles.premiumFeatures}>
+              <h3>
+                No internship listings yet
+              </h3>
 
-                <PremiumFeature
-                  icon="✦"
-                  title="Advanced Recruitment Tools"
-                  text="Manage your graduate recruitment workflow more efficiently."
-                />
-
-                <PremiumFeature
-                  icon="✓"
-                  title="Enhanced Candidate Insights"
-                  text="Get clearer information when reviewing applications."
-                />
-
-                <PremiumFeature
-                  icon="◈"
-                  title="Premium Verification Features"
-                  text="Access advanced document verification capabilities."
-                />
-
-                <PremiumFeature
-                  icon="◉"
-                  title="AI Candidate Matching"
-                  text="Compare applicants against your internship requirements."
-                />
-
-              </div>
-
-            </div>
-
-          </div>
-        </section>
-        
-                {/* ======================================================
-            INTERNSHIP LISTINGS
-        ====================================================== */}
-
-        <section style={styles.section}>
-          <div style={styles.container}>
-
-            <div style={styles.sectionHeading}>
-              <div>
-                <div style={styles.sectionEyebrow}>
-                  YOUR OPPORTUNITIES
-                </div>
-
-                <h2 style={styles.sectionTitle}>
-                  Internship listings
-                </h2>
-
-                <p style={styles.sectionDescription}>
-                  Manage your active internship opportunities
-                  and review the graduates who applied.
-                </p>
-              </div>
+              <p>
+                Create your first internship opportunity
+                and start receiving applications.
+              </p>
 
               <Link
                 href="/internships"
-                style={styles.headingButton}
+                className="empty-button"
               >
-                <span>＋</span>
-                Post Internship
+                Post Your First Internship
               </Link>
+
             </div>
+          ) : (
+            <div className="internship-grid">
 
-            {internships.length === 0 ? (
-              <div style={styles.emptyCard}>
-                <div style={styles.emptyIcon}>
-                  ▤
-                </div>
-
-                <h3 style={styles.emptyTitle}>
-                  No internship listings yet
-                </h3>
-
-                <p style={styles.emptyText}>
-                  Create your first internship opportunity
-                  and start receiving applications from
-                  South African graduates.
-                </p>
-
-                <Link
-                  href="/internships"
-                  style={styles.primaryButton}
+              {internships.map((internship) => (
+                <article
+                  key={internship.id}
+                  className={`internship-card ${
+                    selectedInternship?.id === internship.id
+                      ? "selected"
+                      : ""
+                  }`}
                 >
-                  Create Internship
-                  <span>→</span>
-                </Link>
-              </div>
-            ) : (
-              <div style={styles.internshipList}>
 
-                {internships.map((internship) => {
+                  <div className="card-top">
 
-                  const internshipApplications =
-                    applications.filter(
-                      (application) =>
-                        String(application.internship_id) ===
-                        String(internship.id)
-                    );
+                    <div className="company-badge">
+                      {(
+                        internship.company_name ||
+                        companyData?.company_name ||
+                        "C"
+                      )
+                        .charAt(0)
+                        .toUpperCase()}
+                    </div>
 
-                  const internshipShortlisted =
-                    internshipApplications.filter(
-                      (application) =>
-                        application.status?.toLowerCase() ===
-                        "shortlisted"
-                    ).length;
+                    <div className="card-status">
+                      Active
+                    </div>
 
-                  const deadline = internship.deadline
-                    ? new Date(internship.deadline)
-                    : null;
+                  </div>
 
-                  const isExpired =
-                    deadline &&
-                    !Number.isNaN(deadline.getTime()) &&
-                    deadline < new Date();
+                  <h3>
+                    {internship.job_title ||
+                      "Internship Opportunity"}
+                  </h3>
 
-                  return (
-                    <article
-                      key={internship.id}
-                      style={styles.internshipCard}
+                  <p className="company-name">
+                    {internship.company_name}
+                  </p>
+
+                  <div className="details-list">
+
+                    {internship.location && (
+                      <div className="detail">
+                        <span>📍</span>
+                        <span>
+                          {internship.location}
+                        </span>
+                      </div>
+                    )}
+
+                    {internship.province && (
+                      <div className="detail">
+                        <span>🗺️</span>
+                        <span>
+                          {internship.province}
+                        </span>
+                      </div>
+                    )}
+
+                    {internship.internship_type && (
+                      <div className="detail">
+                        <span>🏢</span>
+                        <span>
+                          {internship.internship_type}
+                        </span>
+                      </div>
+                    )}
+
+                    {internship.stipend && (
+                      <div className="detail">
+                        <span>💰</span>
+                        <span>
+                          {internship.stipend}
+                        </span>
+                      </div>
+                    )}
+
+                  </div>
+
+                  <div className="card-actions">
+
+                    <Link
+                      href={`/internships/${internship.id}`}
+                      className="view-button"
                     >
+                      View Details
+                    </Link>
 
-                      <div style={styles.internshipTop}>
+                    <button
+                      type="button"
+                      className="applicants-button"
+                      onClick={() =>
+                        loadApplications(internship)
+                      }
+                    >
+                      View Applicants
+                    </button>
 
-                        <div style={styles.internshipTitleArea}>
+                  </div>
 
-                          <div style={styles.internshipIcon}>
-                            ▤
-                          </div>
+                </article>
+              ))}
 
-                          <div>
-                            <div style={styles.listingLabel}>
-                              INTERNSHIP OPPORTUNITY
-                            </div>
+            </div>
+          )}
 
-                            <h3
-                              style={styles.internshipTitle}
-                            >
-                              {internship.job_title ||
-                                "Untitled Internship"}
-                            </h3>
-
-                            <p
-                              style={
-                                styles.internshipCompany
-                              }
-                            >
-                              {internship.company_name ||
-                                companyName}
-                            </p>
-                          </div>
-
-                        </div>
-
-                        <div
-                          style={{
-                            ...styles.listingStatus,
-                            ...(isExpired
-                              ? styles.listingStatusExpired
-                              : styles.listingStatusActive),
-                          }}
-                        >
-                          <span></span>
-                          {isExpired
-                            ? "Expired"
-                            : "Active"}
-                        </div>
-
-                      </div>
-
-                      <div style={styles.internshipDetails}>
-
-                        <div style={styles.detailItem}>
-                          <span
-                            style={styles.detailIcon}
-                          >
-                            ◉
-                          </span>
-
-                          <div>
-                            <span
-                              style={styles.detailLabel}
-                            >
-                              Location
-                            </span>
-
-                            <strong
-                              style={styles.detailValue}
-                            >
-                              {internship.location ||
-                                internship.province ||
-                                "South Africa"}
-                            </strong>
-                          </div>
-                        </div>
-
-                        <div style={styles.detailItem}>
-                          <span
-                            style={styles.detailIcon}
-                          >
-                            ◇
-                          </span>
-
-                          <div>
-                            <span
-                              style={styles.detailLabel}
-                            >
-                              Type
-                            </span>
-
-                            <strong
-                              style={styles.detailValue}
-                            >
-                              {internship.internship_type ||
-                                "Internship"}
-                            </strong>
-                          </div>
-                        </div>
-
-                        <div style={styles.detailItem}>
-                          <span
-                            style={styles.detailIcon}
-                          >
-                            R
-                          </span>
-
-                          <div>
-                            <span
-                              style={styles.detailLabel}
-                            >
-                              Stipend
-                            </span>
-
-                            <strong
-                              style={styles.detailValue}
-                            >
-                              {internship.stipend ||
-                                "Not specified"}
-                            </strong>
-                          </div>
-                        </div>
-
-                        <div style={styles.detailItem}>
-                          <span
-                            style={styles.detailIcon}
-                          >
-                            ◷
-                          </span>
-
-                          <div>
-                            <span
-                              style={styles.detailLabel}
-                            >
-                              Deadline
-                            </span>
-
-                            <strong
-                              style={styles.detailValue}
-                            >
-                              {deadline &&
-                              !Number.isNaN(
-                                deadline.getTime()
-                              )
-                                ? deadline.toLocaleDateString(
-                                    "en-ZA",
-                                    {
-                                      day: "2-digit",
-                                      month: "short",
-                                      year: "numeric",
-                                    }
-                                  )
-                                : "Not specified"}
-                            </strong>
-                          </div>
-                        </div>
-
-                      </div>
-
-                      <div
-                        style={styles.applicationSummary}
-                      >
-
-                        <div
-                          style={
-                            styles.applicationSummaryItem
-                          }
-                        >
-                          <strong>
-                            {internshipApplications.length}
-                          </strong>
-
-                          <span>
-                            Applications
-                          </span>
-                        </div>
-
-                        <div
-                          style={
-                            styles.applicationSummaryItem
-                          }
-                        >
-                          <strong>
-                            {internshipShortlisted}
-                          </strong>
-
-                          <span>
-                            Shortlisted
-                          </span>
-                        </div>
-
-                        <div
-                          style={
-                            styles.applicationSummaryItem
-                          }
-                        >
-                          <strong>
-                            {Math.max(
-                              internshipApplications.length -
-                                internshipShortlisted,
-                              0
-                            )}
-                          </strong>
-
-                          <span>
-                            Other applicants
-                          </span>
-                        </div>
-
-                      </div>
-
-                      <div
-                        style={styles.internshipActions}
-                      >
-
-                        <Link
-                          href={`/company/internships/${internship.id}/applicants`}
-                          style={styles.applicantsButton}
-                        >
-                          <span>◉</span>
-                          View Applicants
-                        </Link>
-
-                        <Link
-                          href={`/internships/${internship.id}`}
-                          style={styles.viewButton}
-                        >
-                          View Details
-                          <span>→</span>
-                        </Link>
-
-                      </div>
-
-                    </article>
-                  );
-                })}
-
-              </div>
-            )}
-
-          </div>
         </section>
 
+        {/* ===================================================
+            APPLICATIONS
+        =================================================== */}
 
-        {/* ======================================================
-            RECENT APPLICATIONS
-        ====================================================== */}
+        {selectedInternship && (
+          <section className="section applications-section">
 
-        <section style={styles.sectionAlt}>
-          <div style={styles.container}>
+            <div className="section-heading">
 
-            <div style={styles.sectionHeading}>
               <div>
-                <div style={styles.sectionEyebrow}>
-                  CANDIDATE ACTIVITY
+                <div className="eyebrow">
+                  APPLICANTS
                 </div>
 
-                <h2 style={styles.sectionTitle}>
-                  Recent applications
+                <h2>
+                  {selectedInternship.job_title}
                 </h2>
 
-                <p style={styles.sectionDescription}>
-                  Keep track of the latest graduates who
-                  have applied to your opportunities.
+                <p>
+                  Review applicants for this specific
+                  internship.
                 </p>
               </div>
 
-              {applications.length > 0 && (
-                <div style={styles.applicationCount}>
-                  {applications.length} total
-                </div>
-              )}
+              <button
+                type="button"
+                className="close-selection"
+                onClick={() => {
+                  setSelectedInternship(null);
+                  setApplications([]);
+                  setSelectedApplication(null);
+                }}
+              >
+                Close
+              </button>
 
             </div>
 
-            {applications.length === 0 ? (
-              <div style={styles.emptyCard}>
-                <div style={styles.emptyIcon}>
-                  ◉
+            {loadingApplications ? (
+              <div className="loading-applications">
+                <div className="small-spinner"></div>
+                <p>
+                  Loading applications...
+                </p>
+              </div>
+            ) : applications.length === 0 ? (
+              <div className="empty-card">
+
+                <div className="empty-icon">
+                  👥
                 </div>
 
-                <h3 style={styles.emptyTitle}>
+                <h3>
                   No applications yet
                 </h3>
 
-                <p style={styles.emptyText}>
-                  Applications from graduates will appear
-                  here once they apply to your internship
-                  listings.
+                <p>
+                  Applications for this internship
+                  will appear here when graduates apply.
                 </p>
+
               </div>
             ) : (
-              <div style={styles.applicationList}>
+              <div className="applications-layout">
 
-                {applications
-                  .slice(0, 8)
-                  .map((application) => {
+                <div className="applications-list">
 
-                    const internship =
-                      internships.find(
-                        (item) =>
-                          String(item.id) ===
-                          String(
-                            application.internship_id
-                          )
-                      );
-
-                    const match =
-                      calculateMatch(
-                        internship,
-                        application
-                      );
-
-                    const status =
-                      application.status ||
-                      "Pending";
+                  {applications.map((application) => {
+                    const score =
+                      application.analysis.totalScore;
 
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={application.id}
-                        style={styles.applicationCard}
+                        className={`application-card ${
+                          selectedApplication?.id ===
+                          application.id
+                            ? "active"
+                            : ""
+                        }`}
+                        onClick={() =>
+                          setSelectedApplication(
+                            application
+                          )
+                        }
                       >
 
-                        <div
-                          style={
-                            styles.applicationAvatar
-                          }
-                        >
+                        <div className="applicant-avatar">
                           {(
                             application.full_name ||
-                            "G"
+                            "A"
                           )
-                            .trim()
                             .charAt(0)
                             .toUpperCase()}
                         </div>
 
-                        <div
-                          style={
-                            styles.applicationMain
-                          }
-                        >
+                        <div className="applicant-main">
 
-                          <div
-                            style={
-                              styles.applicationNameRow
-                            }
-                          >
-                            <h3
-                              style={
-                                styles.applicationName
-                              }
-                            >
-                              {application.full_name ||
-                                "Graduate Applicant"}
-                            </h3>
-
-                            <span
-                              style={getStatusStyle(
-                                status
-                              )}
-                            >
-                              {status}
-                            </span>
+                          <div className="applicant-name">
+                            {application.full_name ||
+                              "Applicant"}
                           </div>
 
-                          <p
-                            style={
-                              styles.applicationRole
-                            }
-                          >
-                            Applied for{" "}
-                            <strong>
-                              {internship?.job_title ||
-                                "Internship"}
-                            </strong>
-                          </p>
+                          <div className="applicant-field">
+                            {application.field_of_study ||
+                              "Field not provided"}
+                          </div>
 
-                          <div
-                            style={
-                              styles.applicationMeta
-                            }
-                          >
-
-                            <span>
-                              {application.email ||
-                                "Email unavailable"}
-                            </span>
-
-                            <span>
-                              {application.qualification ||
-                                "Qualification not provided"}
-                            </span>
-
-                            <span>
-                              {application.field_of_study ||
-                                "Field not provided"}
-                            </span>
-
+                          <div className="applicant-status">
+                            {application.status ||
+                              "pending"}
                           </div>
 
                         </div>
 
                         <div
-                          style={
-                            styles.matchScore
-                          }
+                          className={`match-score ${getScoreClass(
+                            score
+                          )}`}
                         >
-                          <div
-                            style={
-                              styles.matchNumber
-                            }
-                          >
-                            {match.total}%
-                          </div>
+                          <strong>
+                            {score}%
+                          </strong>
 
                           <span>
-                            {match.label}
+                            {application.analysis.label}
                           </span>
                         </div>
 
-                        <Link
-                          href={`/company/internships/${application.internship_id}/applicants`}
-                          style={
-                            styles.applicationArrow
-                          }
-                          aria-label="View applicant"
-                        >
-                          →
-                        </Link>
-
-                      </div>
+                      </button>
                     );
                   })}
+
+                </div>
+                
+                                <div className="application-details">
+
+                  {!selectedApplication ? (
+                    <div className="details-placeholder">
+
+                      <div className="placeholder-icon">
+                        👤
+                      </div>
+
+                      <h3>
+                        Select an applicant
+                      </h3>
+
+                      <p>
+                        Choose an applicant from the list
+                        to view their profile, match
+                        analysis and application details.
+                      </p>
+
+                    </div>
+                  ) : (
+                    <>
+                      {/* =====================================
+                          APPLICANT HEADER
+                      ====================================== */}
+
+                      <div className="applicant-detail-header">
+
+                        <div className="large-avatar">
+                          {(
+                            selectedApplication.full_name ||
+                            "A"
+                          )
+                            .charAt(0)
+                            .toUpperCase()}
+                        </div>
+
+                        <div className="detail-header-info">
+
+                          <div className="eyebrow">
+                            APPLICANT
+                          </div>
+
+                          <h2>
+                            {selectedApplication.full_name ||
+                              "Applicant"}
+                          </h2>
+
+                          <p>
+                            {selectedApplication.email ||
+                              "Email not provided"}
+                          </p>
+
+                        </div>
+
+                        <div
+                          className={`large-score ${getScoreClass(
+                            selectedApplication.analysis
+                              .totalScore
+                          )}`}
+                        >
+                          <strong>
+                            {
+                              selectedApplication.analysis
+                                .totalScore
+                            }%
+                          </strong>
+
+                          <span>
+                            {
+                              selectedApplication.analysis
+                                .label
+                            } Match
+                          </span>
+                        </div>
+
+                      </div>
+
+                      {/* =====================================
+                          APPLICATION STATUS
+                      ====================================== */}
+
+                      <div className="status-section">
+
+                        <div className="status-title">
+                          Application Status
+                        </div>
+
+                        <div className="status-buttons">
+
+                          <button
+                            type="button"
+                            className={`status-button shortlist ${
+                              selectedApplication.status ===
+                              "shortlisted"
+                                ? "current"
+                                : ""
+                            }`}
+                            onClick={() =>
+                              updateApplicationStatus(
+                                selectedApplication.id,
+                                "shortlisted"
+                              )
+                            }
+                          >
+                            ✓ Shortlist
+                          </button>
+
+                          <button
+                            type="button"
+                            className={`status-button reject ${
+                              selectedApplication.status ===
+                              "rejected"
+                                ? "current"
+                                : ""
+                            }`}
+                            onClick={() =>
+                              updateApplicationStatus(
+                                selectedApplication.id,
+                                "rejected"
+                              )
+                            }
+                          >
+                            ✕ Reject
+                          </button>
+
+                          <button
+                            type="button"
+                            className={`status-button reset ${
+                              !selectedApplication.status ||
+                              selectedApplication.status ===
+                                "pending"
+                                ? "current"
+                                : ""
+                            }`}
+                            onClick={() =>
+                              updateApplicationStatus(
+                                selectedApplication.id,
+                                "pending"
+                              )
+                            }
+                          >
+                            Reset
+                          </button>
+
+                        </div>
+
+                      </div>
+
+                      {/* =====================================
+                          BASIC INFORMATION
+                      ====================================== */}
+
+                      <div className="detail-section">
+
+                        <div className="detail-section-title">
+                          Applicant Information
+                        </div>
+
+                        <div className="info-grid">
+
+                          <div className="info-box">
+                            <span>
+                              Full Name
+                            </span>
+
+                            <strong>
+                              {selectedApplication.full_name ||
+                                "Not provided"}
+                            </strong>
+                          </div>
+
+                          <div className="info-box">
+                            <span>
+                              Email
+                            </span>
+
+                            <strong>
+                              {selectedApplication.email ||
+                                "Not provided"}
+                            </strong>
+                          </div>
+
+                          <div className="info-box">
+                            <span>
+                              Phone
+                            </span>
+
+                            <strong>
+                              {selectedApplication.phone ||
+                                "Not provided"}
+                            </strong>
+                          </div>
+
+                          <div className="info-box">
+                            <span>
+                              Qualification
+                            </span>
+
+                            <strong>
+                              {selectedApplication.qualification ||
+                                "Not provided"}
+                            </strong>
+                          </div>
+
+                          <div className="info-box">
+                            <span>
+                              Field of Study
+                            </span>
+
+                            <strong>
+                              {selectedApplication.field_of_study ||
+                                "Not provided"}
+                            </strong>
+                          </div>
+
+                        </div>
+
+                      </div>
+
+                      {/* =====================================
+                          SKILLS
+                      ====================================== */}
+
+                      <div className="detail-section">
+
+                        <div className="detail-section-title">
+                          Skills
+                        </div>
+
+                        {getSkills(
+                          selectedApplication.skills
+                        ).length > 0 ? (
+                          <div className="skills-list">
+
+                            {getSkills(
+                              selectedApplication.skills
+                            ).map((skill, index) => (
+                              <span
+                                className="skill-tag"
+                                key={`${skill}-${index}`}
+                              >
+                                {skill}
+                              </span>
+                            ))}
+
+                          </div>
+                        ) : (
+                          <p className="muted">
+                            No skills provided.
+                          </p>
+                        )}
+
+                      </div>
+
+                      {/* =====================================
+                          AI MATCH ANALYSIS
+                      ====================================== */}
+
+                      <div className="match-analysis">
+
+                        <div className="analysis-header">
+
+                          <div>
+                            <div className="eyebrow">
+                              GRADLINK AI
+                            </div>
+
+                            <h3>
+                              Match Analysis
+                            </h3>
+                          </div>
+
+                          <div
+                            className={`analysis-score ${getScoreClass(
+                              selectedApplication.analysis
+                                .totalScore
+                            )}`}
+                          >
+                            {
+                              selectedApplication.analysis
+                                .totalScore
+                            }%
+                          </div>
+
+                        </div>
+
+                        <p className="analysis-summary">
+                          {
+                            selectedApplication.analysis
+                              .summary
+                          }
+                        </p>
+
+                        <div className="score-breakdown">
+
+                          <div className="score-row">
+
+                            <div>
+                              <span>
+                                Qualification
+                              </span>
+
+                              <small>
+                                Maximum 35%
+                              </small>
+                            </div>
+
+                            <strong>
+                              {
+                                selectedApplication.analysis
+                                  .qualificationScore
+                              }%
+                            </strong>
+
+                          </div>
+
+                          <div className="score-track">
+                            <div
+                              className="score-fill"
+                              style={{
+                                width: `${Math.min(
+                                  100,
+                                  (selectedApplication
+                                    .analysis
+                                    .qualificationScore /
+                                    35) *
+                                    100
+                                )}%`,
+                              }}
+                            />
+                          </div>
+
+                          <div className="score-row">
+
+                            <div>
+                              <span>
+                                Field of Study
+                              </span>
+
+                              <small>
+                                Maximum 35%
+                              </small>
+                            </div>
+
+                            <strong>
+                              {
+                                selectedApplication.analysis
+                                  .fieldScore
+                              }%
+                            </strong>
+
+                          </div>
+
+                          <div className="score-track">
+                            <div
+                              className="score-fill"
+                              style={{
+                                width: `${Math.min(
+                                  100,
+                                  (selectedApplication
+                                    .analysis
+                                    .fieldScore /
+                                    35) *
+                                    100
+                                )}%`,
+                              }}
+                            />
+                          </div>
+
+                          <div className="score-row">
+
+                            <div>
+                              <span>
+                                Skills
+                              </span>
+
+                              <small>
+                                Maximum 30%
+                              </small>
+                            </div>
+
+                            <strong>
+                              {
+                                selectedApplication.analysis
+                                  .skillScore
+                              }%
+                            </strong>
+
+                          </div>
+
+                          <div className="score-track">
+                            <div
+                              className="score-fill"
+                              style={{
+                                width: `${Math.min(
+                                  100,
+                                  (selectedApplication
+                                    .analysis
+                                    .skillScore /
+                                    30) *
+                                    100
+                                )}%`,
+                              }}
+                            />
+                          </div>
+
+                        </div>
+
+                        {/* MATCHED SKILLS */}
+
+                        {selectedApplication.analysis
+                          .matchedSkills.length > 0 && (
+                          <div className="analysis-block">
+
+                            <h4>
+                              Matched Skills
+                            </h4>
+
+                            <div className="analysis-tags">
+
+                              {selectedApplication.analysis.matchedSkills.map(
+                                (skill, index) => (
+                                  <span
+                                    className="matched-tag"
+                                    key={`${skill}-${index}`}
+                                  >
+                                    ✓ {skill}
+                                  </span>
+                                )
+                              )}
+
+                            </div>
+
+                          </div>
+                        )}
+
+                        {/* MISSING SKILLS */}
+
+                        {selectedApplication.analysis
+                          .missingSkills.length > 0 && (
+                          <div className="analysis-block">
+
+                            <h4>
+                              Skills to Consider
+                            </h4>
+
+                            <div className="analysis-tags">
+
+                              {selectedApplication.analysis.missingSkills.map(
+                                (skill, index) => (
+                                  <span
+                                    className="missing-tag"
+                                    key={`${skill}-${index}`}
+                                  >
+                                    {skill}
+                                  </span>
+                                )
+                              )}
+
+                            </div>
+
+                          </div>
+                        )}
+
+                        {/* STRENGTHS */}
+
+                        {selectedApplication.analysis
+                          .strengths.length > 0 && (
+                          <div className="analysis-block">
+
+                            <h4>
+                              Strengths
+                            </h4>
+
+                            <ul className="analysis-list">
+
+                              {selectedApplication.analysis.strengths.map(
+                                (item, index) => (
+                                  <li key={index}>
+                                    ✓ {item}
+                                  </li>
+                                )
+                              )}
+
+                            </ul>
+
+                          </div>
+                        )}
+
+                        {/* IMPROVEMENTS */}
+
+                        {selectedApplication.analysis
+                          .improvements.length > 0 && (
+                          <div className="analysis-block">
+
+                            <h4>
+                              Areas to Review
+                            </h4>
+
+                            <ul className="analysis-list">
+
+                              {selectedApplication.analysis.improvements.map(
+                                (item, index) => (
+                                  <li key={index}>
+                                    • {item}
+                                  </li>
+                                )
+                              )}
+
+                            </ul>
+
+                          </div>
+                        )}
+
+                      </div>
+
+                      {/* =====================================
+                          DOCUMENTS
+                      ====================================== */}
+
+                      <div className="detail-section">
+
+                        <div className="detail-section-title">
+                          Documents
+                        </div>
+
+                        <div className="document-grid">
+
+                          <button
+                            type="button"
+                            className="document-button"
+                            onClick={async () => {
+                              if (
+                                !selectedApplication.cv_url
+                              ) {
+                                alert(
+                                  "No CV has been uploaded for this applicant."
+                                );
+                                return;
+                              }
+
+                              try {
+                                const newWindow =
+                                  window.open(
+                                    "",
+                                    "_blank"
+                                  );
+
+                                const {
+                                  data,
+                                  error:
+                                    signedUrlError,
+                                } =
+                                  await supabase.storage
+                                    .from("documents")
+                                    .createSignedUrl(
+                                      selectedApplication.cv_url,
+                                      600
+                                    );
+
+                                if (
+                                  signedUrlError ||
+                                  !data?.signedUrl
+                                ) {
+                                  if (newWindow) {
+                                    newWindow.close();
+                                  }
+
+                                  alert(
+                                    "Unable to open the CV."
+                                  );
+
+                                  return;
+                                }
+
+                                if (newWindow) {
+                                  newWindow.location.href =
+                                    data.signedUrl;
+                                } else {
+                                  window.location.href =
+                                    data.signedUrl;
+                                }
+                              } catch (err) {
+                                console.error(err);
+
+                                alert(
+                                  "Unable to open the CV."
+                                );
+                              }
+                            }}
+                          >
+                            <span className="document-icon">
+                              📄
+                            </span>
+
+                            <span>
+                              <strong>
+                                Review CV
+                              </strong>
+
+                              <small>
+                                View uploaded CV
+                              </small>
+                            </span>
+
+                            <span className="document-arrow">
+                              →
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            className="document-button"
+                            onClick={async () => {
+                              if (
+                                !selectedApplication
+                                  .qualification_url
+                              ) {
+                                alert(
+                                  "No qualification document has been uploaded for this applicant."
+                                );
+                                return;
+                              }
+
+                              try {
+                                const newWindow =
+                                  window.open(
+                                    "",
+                                    "_blank"
+                                  );
+
+                                const {
+                                  data,
+                                  error:
+                                    signedUrlError,
+                                } =
+                                  await supabase.storage
+                                    .from("documents")
+                                    .createSignedUrl(
+                                      selectedApplication.qualification_url,
+                                      600
+                                    );
+
+                                if (
+                                  signedUrlError ||
+                                  !data?.signedUrl
+                                ) {
+                                  if (newWindow) {
+                                    newWindow.close();
+                                  }
+
+                                  alert(
+                                    "Unable to open the qualification document."
+                                  );
+
+                                  return;
+                                }
+
+                                if (newWindow) {
+                                  newWindow.location.href =
+                                    data.signedUrl;
+                                } else {
+                                  window.location.href =
+                                    data.signedUrl;
+                                }
+                              } catch (err) {
+                                console.error(err);
+
+                                alert(
+                                  "Unable to open the qualification document."
+                                );
+                              }
+                            }}
+                          >
+                            <span className="document-icon">
+                              🎓
+                            </span>
+
+                            <span>
+                              <strong>
+                                Review Qualification
+                              </strong>
+
+                              <small>
+                                View qualification document
+                              </small>
+                            </span>
+
+                            <span className="document-arrow">
+                              →
+                            </span>
+                          </button>
+
+                        </div>
+
+                      </div>
+
+                    </>
+                  )}
+
+                </div>
 
               </div>
             )}
 
-          </div>
-        </section>
+          </section>
+        )}
 
+      </section>
 
-        {/* ======================================================
-            QUICK ACTIONS
-        ====================================================== */}
-
-        <section style={styles.section}>
-          <div style={styles.container}>
-
-            <div style={styles.quickActionsBox}>
-
-              <div style={styles.quickActionsIntro}>
-                <div style={styles.sectionEyebrow}>
-                  QUICK ACTIONS
-                </div>
-
-                <h2 style={styles.quickActionsTitle}>
-                  Keep your recruitment moving
-                </h2>
-
-                <p style={styles.quickActionsText}>
-                  Everything you need to manage your
-                  GradLink SA company account.
-                </p>
-              </div>
-
-              <div style={styles.quickActionsGrid}>
-
-                <QuickAction
-                  href="/internships"
-                  icon="＋"
-                  title="Post Internship"
-                  text="Create a new opportunity"
-                />
-
-                <QuickAction
-                  href="/company"
-                  icon="▣"
-                  title="Company Profile"
-                  text="Update your company details"
-                />
-
-                <QuickAction
-                  href="/company/pricing"
-                  icon="✦"
-                  title="Premium Plans"
-                  text="Explore recruitment features"
-                />
-
-                <QuickAction
-                  href="/"
-                  icon="⌂"
-                  title="Visit GradLink"
-                  text="Return to the main website"
-                />
-
-              </div>
-
-            </div>
-
-          </div>
-        </section>
-
-      </main>
-
-
-      {/* ========================================================
+      {/* =====================================================
           FOOTER
-      ======================================================== */}
+      ===================================================== */}
 
-      <footer style={styles.footer}>
-        <div style={styles.container}>
-
-          <div style={styles.footerMain}>
-
-            <div style={styles.footerBrand}>
-
-              <Link
-                href="/"
-                style={styles.footerLogo}
-              >
-                <span style={styles.footerLogoMark}>
-                  G
-                </span>
-
-                <span>
-                  GradLink{" "}
-                  <b>SA</b>
-                </span>
-              </Link>
-
-              <p style={styles.footerText}>
-                Connecting South African graduates
-                with meaningful career opportunities.
-              </p>
-
-            </div>
-
-            <div style={styles.footerLinks}>
-
-              <div>
-                <div style={styles.footerHeading}>
-                  COMPANY
-                </div>
-
-                <Link
-                  href="/company"
-                  style={styles.footerLink}
-                >
-                  Company Profile
-                </Link>
-
-                <Link
-                  href="/internships"
-                  style={styles.footerLink}
-                >
-                  Post Internship
-                </Link>
-
-                <Link
-                  href="/company/pricing"
-                  style={styles.footerLink}
-                >
-                  Premium
-                </Link>
-              </div>
-
-              <div>
-                <div style={styles.footerHeading}>
-                  GRADLINK SA
-                </div>
-
-                <Link
-                  href="/"
-                  style={styles.footerLink}
-                >
-                  Home
-                </Link>
-
-                <Link
-                  href="/internships"
-                  style={styles.footerLink}
-                >
-                  Internships
-                </Link>
-
-                <Link
-                  href="/jobs"
-                  style={styles.footerLink}
-                >
-                  Jobs
-                </Link>
-              </div>
-
-            </div>
-
-          </div>
-
-          <div style={styles.footerBottom}>
-            <span>
-              © {new Date().getFullYear()} GradLink SA.
-              All rights reserved.
-            </span>
-
-            <span>
-              Innovation. Opportunity. Growth.
-            </span>
-          </div>
-
+      <footer className="dashboard-footer">
+        <div>
+          <strong>GRADLINK SA</strong>
+          <span>
+            Connecting South African graduates with
+            internship opportunities.
+          </span>
         </div>
+
+        <span>
+          © {new Date().getFullYear()} GradLink SA
+        </span>
       </footer>
 
+      {/* =====================================================
+          STYLES
+      ===================================================== */}
 
-      {/* ========================================================
-          GLOBAL RESPONSIVE STYLES
-      ======================================================== */}
-
-      <style jsx global>{`
+      <style jsx>{`
 
         * {
           box-sizing: border-box;
         }
 
-        html {
-          scroll-behavior: smooth;
-        }
-
-        body {
-          margin: 0;
-          padding: 0;
+        .dashboard-page {
+          min-height: 100vh;
           background: #f5f8fc;
-          color: #10233f;
+          color: #102a43;
           font-family:
-            Inter,
-            ui-sans-serif,
-            system-ui,
-            -apple-system,
-            BlinkMacSystemFont,
-            "Segoe UI",
+            Arial,
+            Helvetica,
             sans-serif;
         }
 
-        a {
+        /* ================================================
+           HEADER
+        ================================================= */
+
+        .dashboard-header {
+          background: #ffffff;
+          border-bottom: 1px solid #e6edf5;
+        }
+
+        .header-inner {
+          width: min(1400px, calc(100% - 40px));
+          margin: 0 auto;
+          min-height: 78px;
+
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 24px;
+        }
+
+        .brand {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+
           text-decoration: none;
+          color: inherit;
+
+          min-width: 0;
         }
 
-        button,
-        a {
-          -webkit-tap-highlight-color: transparent;
+        .brand-mark {
+          width: 42px;
+          height: 42px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          flex-shrink: 0;
+
+          border-radius: 12px;
+
+          background: #1769aa;
+          color: #ffffff;
+
+          font-size: 21px;
+          font-weight: 800;
+
+          box-shadow:
+            0 7px 16px rgba(23, 105, 170, 0.22);
         }
 
-        @keyframes gradlinkSpin {
-          from {
-            transform: rotate(0deg);
-          }
-
-          to {
-            transform: rotate(360deg);
-          }
+        .brand-name {
+          font-size: 15px;
+          font-weight: 800;
+          letter-spacing: 0.8px;
+          color: #102a43;
         }
 
-        @media (max-width: 1100px) {
+        .brand-subtitle {
+          margin-top: 3px;
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: 1.5px;
+          color: #829ab1;
+        }
 
-          .gradlink-dashboard-placeholder {
-            display: none;
+        .header-actions {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+        }
+
+        .header-button,
+        .logout-button {
+          min-height: 40px;
+          padding: 0 15px;
+
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+
+          border-radius: 9px;
+
+          font-size: 13px;
+          font-weight: 700;
+
+          text-decoration: none;
+
+          cursor: pointer;
+
+          transition:
+            transform 0.18s ease,
+            box-shadow 0.18s ease,
+            background 0.18s ease;
+        }
+
+        .header-button {
+          background: #ffffff;
+          color: #1769aa;
+          border: 1px solid #cbd9e8;
+          box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
+        }
+
+        .header-button:hover {
+          transform: translateY(-1px);
+          background: #f7fbff;
+          border-color: #1769aa;
+          box-shadow: 0 5px 12px rgba(15, 23, 42, 0.07);
+        }
+
+        .logout-button {
+          border: 1px solid #d7e0ea;
+          background: #f7f9fc;
+          color: #52667a;
+        }
+
+        .logout-button:hover {
+          background: #eef3f8;
+          transform: translateY(-1px);
+        }
+
+        /* ================================================
+           CONTENT
+        ================================================= */
+
+        .dashboard-content {
+          width: min(1400px, calc(100% - 40px));
+          margin: 0 auto;
+          padding: 42px 0 70px;
+        }
+
+        .welcome-section {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          gap: 30px;
+          margin-bottom: 30px;
+        }
+
+        .eyebrow {
+          color: #1769aa;
+          font-size: 10px;
+          font-weight: 800;
+          letter-spacing: 1.7px;
+          margin-bottom: 8px;
+        }
+
+        .welcome-section h1 {
+          margin: 0;
+          font-size: clamp(28px, 4vw, 42px);
+          line-height: 1.12;
+          letter-spacing: -1px;
+          color: #102a43;
+        }
+
+        .welcome-section p {
+          margin: 10px 0 0;
+          max-width: 680px;
+          color: #627d98;
+          font-size: 15px;
+          line-height: 1.6;
+        }
+
+        .post-button {
+          min-height: 46px;
+          padding: 0 19px;
+
+          flex-shrink: 0;
+
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+
+          border-radius: 10px;
+
+          background: #1769aa;
+          color: #ffffff;
+
+          text-decoration: none;
+          font-size: 13px;
+          font-weight: 800;
+
+          box-shadow:
+            0 8px 18px rgba(23, 105, 170, 0.18);
+
+          transition:
+            transform 0.18s ease,
+            box-shadow 0.18s ease,
+            background 0.18s ease;
+        }
+
+        .post-button:hover {
+          transform: translateY(-2px);
+          background: #12598f;
+          box-shadow:
+            0 12px 24px rgba(23, 105, 170, 0.22);
+        }
+
+        .post-button span {
+          font-size: 19px;
+          line-height: 1;
+        }
+
+        /* ================================================
+           MESSAGES
+        ================================================= */
+
+        .error-message,
+        .success-message {
+          padding: 14px 16px;
+          margin-bottom: 20px;
+
+          border-radius: 10px;
+
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .error-message {
+          background: #fff4f4;
+          border: 1px solid #f1c7c7;
+          color: #a33a3a;
+        }
+
+        .success-message {
+          background: #f1faf5;
+          border: 1px solid #c8ead7;
+          color: #24734a;
+        }
+
+        /* ================================================
+           STATS
+        ================================================= */
+
+        .stats-grid {
+          display: grid;
+          grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+          gap: 16px;
+          margin-bottom: 42px;
+        }
+
+        .stat-card {
+          min-width: 0;
+
+          display: flex;
+          align-items: center;
+          gap: 15px;
+
+          padding: 20px;
+
+          background: #ffffff;
+          border: 1px solid #e3ebf4;
+          border-radius: 14px;
+
+          box-shadow:
+            0 5px 18px rgba(15, 23, 42, 0.045);
+        }
+
+        .stat-icon {
+          width: 44px;
+          height: 44px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          flex-shrink: 0;
+
+          border-radius: 11px;
+          background: #edf6ff;
+
+          font-size: 20px;
+        }
+
+        .stat-number {
+          font-size: 25px;
+          font-weight: 800;
+          color: #102a43;
+          line-height: 1.1;
+        }
+
+        .stat-label {
+          margin-top: 5px;
+          color: #829ab1;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        /* ================================================
+           SECTIONS
+        ================================================= */
+
+        .section {
+          margin-bottom: 42px;
+        }
+
+        .section-heading {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          gap: 20px;
+
+          margin-bottom: 20px;
+        }
+
+        .section-heading h2 {
+          margin: 0;
+          color: #102a43;
+          font-size: 25px;
+          letter-spacing: -0.4px;
+        }
+
+        .section-heading p {
+          margin: 7px 0 0;
+          color: #829ab1;
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        /* ================================================
+           INTERNSHIPS
+        ================================================= */
+
+        .internship-grid {
+          display: grid;
+          grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+          gap: 18px;
+        }
+
+        .internship-card {
+          min-width: 0;
+
+          background: #ffffff;
+          border: 1px solid #e2eaf3;
+          border-radius: 15px;
+
+          padding: 21px;
+
+          box-shadow:
+            0 6px 20px rgba(15, 23, 42, 0.045);
+
+          transition:
+            border-color 0.18s ease,
+            box-shadow 0.18s ease,
+            transform 0.18s ease;
+        }
+
+        .internship-card:hover {
+          transform: translateY(-2px);
+          border-color: #c9d9e9;
+          box-shadow:
+            0 10px 26px rgba(15, 23, 42, 0.07);
+        }
+
+        .internship-card.selected {
+          border-color: #1769aa;
+          box-shadow:
+            0 0 0 2px rgba(23, 105, 170, 0.08),
+            0 10px 25px rgba(15, 23, 42, 0.07);
+        }
+
+        .card-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+
+          margin-bottom: 17px;
+        }
+
+        .company-badge {
+          width: 42px;
+          height: 42px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border-radius: 11px;
+
+          background: #edf6ff;
+          color: #1769aa;
+
+          font-size: 17px;
+          font-weight: 800;
+        }
+
+        .card-status {
+          padding: 6px 9px;
+          border-radius: 20px;
+
+          background: #eef9f3;
+          color: #287a50;
+
+          font-size: 10px;
+          font-weight: 800;
+        }
+
+        .internship-card h3 {
+          margin: 0;
+
+          color: #102a43;
+
+          font-size: 18px;
+          line-height: 1.35;
+        }
+
+        .company-name {
+          margin: 5px 0 17px;
+
+          color: #627d98;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .details-list {
+          display: flex;
+          flex-direction: column;
+          gap: 9px;
+
+          padding: 14px 0;
+
+          border-top: 1px solid #edf1f5;
+          border-bottom: 1px solid #edf1f5;
+        }
+
+        .detail {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+
+          color: #52667a;
+
+          font-size: 12px;
+          line-height: 1.4;
+        }
+
+        .detail span:first-child {
+          width: 20px;
+          flex-shrink: 0;
+        }
+
+        .card-actions {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 9px;
+
+          margin-top: 16px;
+        }
+
+        .view-button,
+        .applicants-button {
+          min-height: 40px;
+          padding: 8px 10px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border-radius: 8px;
+
+          font-size: 11px;
+          font-weight: 800;
+
+          text-align: center;
+          text-decoration: none;
+
+          cursor: pointer;
+
+          transition:
+            background 0.18s ease,
+            border-color 0.18s ease,
+            transform 0.18s ease;
+        }
+
+        .view-button {
+          border: 1px solid #cbd9e8;
+          background: #ffffff;
+          color: #1769aa;
+        }
+
+        .view-button:hover {
+          background: #f5faff;
+          border-color: #1769aa;
+        }
+
+        .applicants-button {
+          border: 1px solid #1769aa;
+          background: #1769aa;
+          color: #ffffff;
+        }
+
+        .applicants-button:hover {
+          background: #12598f;
+          border-color: #12598f;
+          transform: translateY(-1px);
+        }
+
+        /* ================================================
+           EMPTY
+        ================================================= */
+
+        .empty-card {
+          padding: 45px 25px;
+
+          background: #ffffff;
+          border: 1px solid #e3ebf4;
+          border-radius: 15px;
+
+          text-align: center;
+
+          box-shadow:
+            0 5px 18px rgba(15, 23, 42, 0.04);
+        }
+
+        .empty-icon {
+          width: 54px;
+          height: 54px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          margin: 0 auto 15px;
+
+          border-radius: 14px;
+          background: #edf6ff;
+
+          font-size: 23px;
+        }
+
+        .empty-card h3 {
+          margin: 0;
+          color: #102a43;
+          font-size: 18px;
+        }
+
+        .empty-card p {
+          max-width: 520px;
+          margin: 8px auto 20px;
+
+          color: #829ab1;
+          font-size: 13px;
+          line-height: 1.6;
+        }
+
+        .empty-button {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+
+          min-height: 40px;
+          padding: 0 15px;
+
+          border-radius: 8px;
+
+          background: #1769aa;
+          color: white;
+
+          text-decoration: none;
+
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        /* ================================================
+           APPLICATIONS
+        ================================================= */
+
+        .applications-section {
+          scroll-margin-top: 20px;
+        }
+
+        .close-selection {
+          min-height: 38px;
+          padding: 0 14px;
+
+          border: 1px solid #d4dfeb;
+          border-radius: 8px;
+
+          background: #ffffff;
+          color: #52667a;
+
+          font-size: 12px;
+          font-weight: 800;
+
+          cursor: pointer;
+        }
+
+        .close-selection:hover {
+          background: #f5f8fc;
+        }
+
+        .applications-layout {
+          display: grid;
+          grid-template-columns:
+            minmax(290px, 0.8fr)
+            minmax(0, 1.7fr);
+
+          gap: 18px;
+
+          align-items: start;
+        }
+
+        .applications-list {
+          min-width: 0;
+
+          display: flex;
+          flex-direction: column;
+          gap: 9px;
+        }
+
+        .application-card {
+          width: 100%;
+          min-width: 0;
+
+          display: flex;
+          align-items: center;
+          gap: 12px;
+
+          padding: 13px;
+
+          border: 1px solid #e2eaf3;
+          border-radius: 11px;
+
+          background: #ffffff;
+
+          text-align: left;
+
+          cursor: pointer;
+
+          box-shadow:
+            0 3px 10px rgba(15, 23, 42, 0.035);
+
+          transition:
+            border-color 0.18s ease,
+            background 0.18s ease;
+        }
+
+        .application-card:hover {
+          border-color: #b9cee1;
+          background: #fbfdff;
+        }
+
+        .application-card.active {
+          border-color: #1769aa;
+          background: #f5faff;
+        }
+
+        .applicant-avatar {
+          width: 42px;
+          height: 42px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          flex-shrink: 0;
+
+          border-radius: 11px;
+
+          background: #edf6ff;
+          color: #1769aa;
+
+          font-size: 15px;
+          font-weight: 800;
+        }
+
+        .applicant-main {
+          min-width: 0;
+          flex: 1;
+        }
+
+        .applicant-name {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+
+          color: #102a43;
+          font-size: 13px;
+          font-weight: 800;
+        }
+
+        .applicant-field {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+
+          margin-top: 3px;
+
+          color: #829ab1;
+          font-size: 11px;
+        }
+
+        .applicant-status {
+          display: inline-block;
+
+          margin-top: 6px;
+
+          color: #627d98;
+          font-size: 9px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.4px;
+        }
+
+        .match-score {
+          min-width: 53px;
+
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+
+          flex-shrink: 0;
+        }
+
+        .match-score strong {
+          font-size: 15px;
+        }
+
+        .match-score span {
+          margin-top: 2px;
+          font-size: 8px;
+          font-weight: 800;
+          text-transform: uppercase;
+        }
+
+        .score-strong {
+          color: #218553;
+        }
+
+        .score-good {
+          color: #2875a9;
+        }
+
+        .score-possible {
+          color: #a4771d;
+        }
+
+        .score-weak {
+          color: #a34b4b;
+        }
+
+        /* ================================================
+           APPLICATION DETAILS
+        ================================================= */
+
+        .application-details {
+          min-width: 0;
+
+          background: #ffffff;
+          border: 1px solid #e2eaf3;
+          border-radius: 15px;
+
+          padding: 22px;
+
+          box-shadow:
+            0 5px 18px rgba(15, 23, 42, 0.045);
+        }
+
+        .details-placeholder {
+          min-height: 430px;
+
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+
+          padding: 30px;
+
+          text-align: center;
+        }
+
+        .placeholder-icon {
+          width: 58px;
+          height: 58px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          margin-bottom: 15px;
+
+          border-radius: 15px;
+          background: #edf6ff;
+
+          font-size: 24px;
+        }
+
+        .details-placeholder h3 {
+          margin: 0;
+          color: #102a43;
+          font-size: 18px;
+        }
+
+        .details-placeholder p {
+          max-width: 390px;
+
+          margin: 8px 0 0;
+
+          color: #829ab1;
+          font-size: 13px;
+          line-height: 1.6;
+        }
+
+        .applicant-detail-header {
+          display: flex;
+          align-items: center;
+          gap: 15px;
+
+          padding-bottom: 20px;
+
+          border-bottom: 1px solid #edf1f5;
+        }
+
+        .large-avatar {
+          width: 58px;
+          height: 58px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          flex-shrink: 0;
+
+          border-radius: 15px;
+
+          background: #edf6ff;
+          color: #1769aa;
+
+          font-size: 22px;
+          font-weight: 800;
+        }
+
+        .detail-header-info {
+          min-width: 0;
+          flex: 1;
+        }
+
+        .detail-header-info .eyebrow {
+          margin-bottom: 4px;
+        }
+
+        .detail-header-info h2 {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+
+          margin: 0;
+
+          color: #102a43;
+          font-size: 21px;
+        }
+
+        .detail-header-info p {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+
+          margin: 4px 0 0;
+
+          color: #829ab1;
+          font-size: 12px;
+        }
+
+        .large-score {
+          min-width: 75px;
+
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+
+          padding: 9px;
+
+          border-radius: 10px;
+          background: #f7f9fc;
+        }
+
+        .large-score strong {
+          font-size: 21px;
+        }
+
+        .large-score span {
+          margin-top: 2px;
+
+          font-size: 8px;
+          font-weight: 800;
+          text-transform: uppercase;
+        }
+
+        /* ================================================
+           STATUS
+        ================================================= */
+
+        .status-section {
+          padding: 18px 0;
+
+          border-bottom: 1px solid #edf1f5;
+        }
+
+        .status-title {
+          margin-bottom: 9px;
+
+          color: #52667a;
+
+          font-size: 11px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .status-buttons {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .status-button {
+          min-height: 36px;
+          padding: 0 13px;
+
+          border-radius: 8px;
+
+          font-size: 11px;
+          font-weight: 800;
+
+          cursor: pointer;
+
+          transition:
+            transform 0.18s ease,
+            background 0.18s ease;
+        }
+
+        .status-button:hover {
+          transform: translateY(-1px);
+        }
+
+        .status-button.shortlist {
+          border: 1px solid #a9d7bd;
+          background: #f5fcf8;
+          color: #287a50;
+        }
+
+        .status-button.shortlist.current {
+          background: #dff3e8;
+        }
+
+        .status-button.reject {
+          border: 1px solid #e6bcbc;
+          background: #fff8f8;
+          color: #a33a3a;
+        }
+
+        .status-button.reject.current {
+          background: #f8e3e3;
+        }
+
+        .status-button.reset {
+          border: 1px solid #d4dfeb;
+          background: #ffffff;
+          color: #627d98;
+        }
+
+        .status-button.reset.current {
+          background: #eef3f8;
+        }
+
+        /* ================================================
+           DETAIL SECTIONS
+        ================================================= */
+
+        .detail-section {
+          padding: 19px 0;
+
+          border-bottom: 1px solid #edf1f5;
+        }
+
+        .detail-section-title {
+          margin-bottom: 13px;
+
+          color: #102a43;
+
+          font-size: 13px;
+          font-weight: 800;
+        }
+
+        .info-grid {
+          display: grid;
+          grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+          gap: 9px;
+        }
+
+        .info-box {
+          min-width: 0;
+
+          padding: 11px 12px;
+
+          border: 1px solid #edf1f5;
+          border-radius: 9px;
+
+          background: #fbfcfe;
+        }
+
+        .info-box span {
+          display: block;
+
+          margin-bottom: 5px;
+
+          color: #829ab1;
+
+          font-size: 9px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.4px;
+        }
+
+        .info-box strong {
+          display: block;
+
+          overflow-wrap: anywhere;
+
+          color: #334e68;
+
+          font-size: 11px;
+          line-height: 1.4;
+        }
+
+        .skills-list {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 7px;
+        }
+
+        .skill-tag {
+          padding: 6px 9px;
+
+          border-radius: 20px;
+
+          background: #edf6ff;
+          color: #1769aa;
+
+          font-size: 10px;
+          font-weight: 700;
+        }
+
+        .muted {
+          margin: 0;
+          color: #829ab1;
+          font-size: 12px;
+        }
+
+        /* ================================================
+           AI ANALYSIS
+        ================================================= */
+
+        .match-analysis {
+          margin: 19px 0;
+
+          padding: 18px;
+
+          border: 1px solid #dbe7f2;
+          border-radius: 12px;
+
+          background: #f8fbfe;
+        }
+
+        .analysis-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 15px;
+        }
+
+        .analysis-header .eyebrow {
+          margin-bottom: 3px;
+        }
+
+        .analysis-header h3 {
+          margin: 0;
+
+          color: #102a43;
+          font-size: 18px;
+        }
+
+        .analysis-score {
+          min-width: 62px;
+          height: 62px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border-radius: 50%;
+
+          background: #ffffff;
+
+          font-size: 18px;
+          font-weight: 900;
+
+          box-shadow:
+            inset 0 0 0 4px #edf2f7;
+        }
+
+        .analysis-summary {
+          margin: 12px 0 17px;
+
+          color: #52667a;
+
+          font-size: 12px;
+          line-height: 1.6;
+        }
+
+        .score-breakdown {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .score-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+        }
+
+        .score-row div {
+          min-width: 0;
+
+          display: flex;
+          flex-direction: column;
+        }
+
+        .score-row span {
+          color: #52667a;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        .score-row small {
+          margin-top: 2px;
+          color: #9aaabd;
+          font-size: 8px;
+        }
+
+        .score-row strong {
+          flex-shrink: 0;
+
+          color: #334e68;
+          font-size: 11px;
+        }
+
+        .score-track {
+          height: 5px;
+
+          overflow: hidden;
+
+          border-radius: 10px;
+
+          background: #e7eef5;
+
+          margin-bottom: 7px;
+        }
+
+        .score-fill {
+          height: 100%;
+
+          border-radius: inherit;
+
+          background: #1769aa;
+        }
+
+        .analysis-block {
+          margin-top: 17px;
+        }
+
+        .analysis-block h4 {
+          margin: 0 0 8px;
+
+          color: #334e68;
+          font-size: 11px;
+        }
+
+        .analysis-tags {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+        }
+
+        .matched-tag,
+        .missing-tag {
+          padding: 6px 8px;
+
+          border-radius: 7px;
+
+          font-size: 9px;
+          font-weight: 700;
+        }
+
+        .matched-tag {
+          background: #eaf8f0;
+          color: #287a50;
+        }
+
+        .missing-tag {
+          background: #fff7e7;
+          color: #936b1d;
+        }
+
+        .analysis-list {
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+
+          margin: 0;
+          padding: 0;
+
+          list-style: none;
+
+          color: #627d98;
+
+          font-size: 10px;
+          line-height: 1.5;
+        }
+
+        /* ================================================
+           DOCUMENTS
+        ================================================= */
+
+        .document-grid {
+          display: grid;
+          grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+          gap: 9px;
+        }
+
+        .document-button {
+          width: 100%;
+          min-width: 0;
+
+          display: flex;
+          align-items: center;
+          gap: 10px;
+
+          padding: 12px;
+
+          border: 1px solid #dce6ef;
+          border-radius: 9px;
+
+          background: #ffffff;
+
+          text-align: left;
+
+          cursor: pointer;
+
+          transition:
+            border-color 0.18s ease,
+            background 0.18s ease;
+        }
+
+        .document-button:hover {
+          border-color: #1769aa;
+          background: #f7fbff;
+        }
+
+        .document-icon {
+          width: 35px;
+          height: 35px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          flex-shrink: 0;
+
+          border-radius: 8px;
+          background: #edf6ff;
+
+          font-size: 16px;
+        }
+
+        .document-button > span:nth-child(2) {
+          min-width: 0;
+          flex: 1;
+        }
+
+        .document-button strong {
+          display: block;
+
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+
+          color: #334e68;
+          font-size: 10px;
+        }
+
+        .document-button small {
+          display: block;
+
+          margin-top: 3px;
+
+          color: #829ab1;
+          font-size: 8px;
+        }
+
+        .document-arrow {
+          flex-shrink: 0;
+
+          color: #1769aa;
+
+          font-size: 15px;
+          font-weight: 800;
+        }
+
+        /* ================================================
+           LOADING
+        ================================================= */
+
+        .loading-applications {
+          min-height: 260px;
+
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+
+          background: #ffffff;
+          border: 1px solid #e3ebf4;
+          border-radius: 15px;
+        }
+
+        .small-spinner {
+          width: 32px;
+          height: 32px;
+
+          margin-bottom: 12px;
+
+          border: 3px solid #dbe7f5;
+          border-top-color: #1769aa;
+
+          border-radius: 50%;
+
+          animation: spin 0.8s linear infinite;
+        }
+
+        .loading-applications p {
+          margin: 0;
+
+          color: #829ab1;
+          font-size: 12px;
+        }
+
+        /* ================================================
+           FOOTER
+        ================================================= */
+
+        .dashboard-footer {
+          width: min(1400px, calc(100% - 40px));
+          margin: 0 auto;
+
+          padding: 25px 0;
+
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+
+          border-top: 1px solid #e1e9f1;
+
+          color: #829ab1;
+          font-size: 10px;
+        }
+
+        .dashboard-footer div {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .dashboard-footer strong {
+          color: #52667a;
+          font-size: 10px;
+          letter-spacing: 0.6px;
+        }
+
+        /* ================================================
+           TABLET
+        ================================================= */
+
+        @media (max-width: 1050px) {
+
+          .internship-grid {
+            grid-template-columns:
+              repeat(2, minmax(0, 1fr));
+          }
+
+          .applications-layout {
+            grid-template-columns:
+              1fr;
+          }
+
+          .application-details {
+            margin-top: 2px;
           }
 
         }
 
-        @media (max-width: 900px) {
-
-          .gradlink-stats-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-          }
-
-          .gradlink-premium-header {
-            grid-template-columns: 1fr;
-          }
-
-          .gradlink-premium-plan {
-            width: 100%;
-          }
-
-        }
+        /* ================================================
+           MOBILE
+        ================================================= */
 
         @media (max-width: 720px) {
 
-          .gradlink-container {
-            width: 100%;
-            padding-left: 18px;
-            padding-right: 18px;
+          .header-inner,
+          .dashboard-content,
+          .dashboard-footer {
+            width: min(100% - 24px, 1400px);
           }
 
-          .gradlink-header-inner {
-            min-height: auto;
-            padding-top: 12px;
-            padding-bottom: 12px;
+          .header-inner {
+            min-height: 70px;
+
             align-items: flex-start;
+            padding: 13px 0;
+
+            flex-direction: column;
+            gap: 11px;
           }
 
-          .gradlink-nav {
+          .header-actions {
             width: 100%;
-            overflow-x: auto;
-            padding-bottom: 2px;
-            scrollbar-width: none;
+
+            display: grid;
+            grid-template-columns:
+              repeat(3, minmax(0, 1fr));
+
+            gap: 7px;
           }
 
-          .gradlink-nav::-webkit-scrollbar {
-            display: none;
+          .header-button,
+          .logout-button {
+            width: 100%;
+            min-height: 38px;
+            padding: 0 7px;
+
+            font-size: 10px;
           }
 
-          .gradlink-nav-button {
-            flex: 0 0 auto;
+          .dashboard-content {
+            padding-top: 28px;
           }
 
-          .gradlink-hero {
-            padding-top: 145px;
-            padding-bottom: 55px;
+          .welcome-section {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 17px;
           }
 
-          .gradlink-hero-title {
-            font-size: 42px !important;
-            line-height: 1.02 !important;
+          .welcome-section h1 {
+            font-size: 29px;
           }
 
-          .gradlink-section-heading {
-            align-items: flex-start !important;
-            flex-direction: column !important;
+          .welcome-section p {
+            font-size: 13px;
           }
 
-          .gradlink-heading-button {
+          .post-button {
             width: 100%;
           }
 
-          .gradlink-stats-grid {
+          .stats-grid {
+            grid-template-columns: 1fr;
+            gap: 9px;
+
+            margin-bottom: 32px;
+          }
+
+          .stat-card {
+            padding: 15px;
+          }
+
+          .section-heading {
+            align-items: flex-start;
+            flex-direction: column;
+          }
+
+          .section-heading h2 {
+            font-size: 21px;
+          }
+
+          .internship-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+
+          .internship-card {
+            padding: 17px;
+          }
+
+          .card-actions {
             grid-template-columns: 1fr;
           }
 
-          .gradlink-premium-features {
-            grid-template-columns: 1fr !important;
+          .applications-layout {
+            grid-template-columns: 1fr;
           }
 
-          .gradlink-internship-details {
-            grid-template-columns: 1fr 1fr !important;
+          .application-details {
+            padding: 16px;
           }
 
-          .gradlink-internship-actions {
-            grid-template-columns: 1fr !important;
+          .applicant-detail-header {
+            align-items: flex-start;
           }
 
-          .gradlink-application-card {
-            grid-template-columns: auto 1fr auto !important;
+          .large-score {
+            min-width: 62px;
           }
 
-          .gradlink-application-match {
-            display: none;
+          .large-score strong {
+            font-size: 17px;
           }
 
-          .gradlink-application-meta {
-            grid-template-columns: 1fr !important;
+          .detail-header-info h2 {
+            font-size: 17px;
           }
 
-          .gradlink-quick-actions-grid {
-            grid-template-columns: 1fr !important;
+          .info-grid {
+            grid-template-columns: 1fr;
           }
 
-          .gradlink-footer-main {
-            grid-template-columns: 1fr !important;
+          .document-grid {
+            grid-template-columns: 1fr;
           }
 
-          .gradlink-footer-bottom {
-            flex-direction: column !important;
-            align-items: flex-start !important;
+          .status-buttons {
+            display: grid;
+            grid-template-columns:
+              repeat(3, minmax(0, 1fr));
+          }
+
+          .status-button {
+            padding: 0 5px;
+            font-size: 9px;
+          }
+
+          .dashboard-footer {
+            align-items: flex-start;
+            flex-direction: column;
           }
 
         }
 
-        @media (max-width: 480px) {
+        /* ================================================
+           SMALL PHONES
+        ================================================= */
 
-          .gradlink-container {
-            padding-left: 14px;
-            padding-right: 14px;
+        @media (max-width: 420px) {
+
+          .brand-name {
+            font-size: 13px;
           }
 
-          .gradlink-hero {
-            padding-top: 150px;
+          .brand-subtitle {
+            font-size: 8px;
           }
 
-          .gradlink-hero-title {
-            font-size: 35px !important;
+          .brand-mark {
+            width: 38px;
+            height: 38px;
           }
 
-          .gradlink-hero-actions {
-            grid-template-columns: 1fr !important;
+          .welcome-section h1 {
+            font-size: 26px;
           }
 
-          .gradlink-premium-card {
-            padding: 22px !important;
+          .application-card {
+            padding: 10px;
+            gap: 8px;
           }
 
-          .gradlink-premium-title {
-            font-size: 25px !important;
+          .applicant-avatar {
+            width: 37px;
+            height: 37px;
           }
 
-          .gradlink-internship-details {
-            grid-template-columns: 1fr !important;
+          .match-score {
+            min-width: 44px;
           }
 
-          .gradlink-internship-top {
-            flex-direction: column !important;
-            align-items: flex-start !important;
+          .match-score strong {
+            font-size: 13px;
           }
 
-          .gradlink-application-card {
-            grid-template-columns: auto 1fr !important;
+          .match-score span {
+            font-size: 7px;
           }
 
-          .gradlink-application-arrow {
-            display: none;
+          .application-details {
+            padding: 13px;
           }
 
-          .gradlink-section {
-            padding-top: 38px !important;
-            padding-bottom: 38px !important;
+          .applicant-detail-header {
+            gap: 10px;
+          }
+
+          .large-avatar {
+            width: 48px;
+            height: 48px;
+            font-size: 18px;
+          }
+
+          .large-score {
+            min-width: 55px;
+            padding: 7px;
+          }
+
+          .large-score strong {
+            font-size: 15px;
+          }
+
+          .status-button {
+            min-height: 34px;
           }
 
         }
 
       `}</style>
 
-    </div>
+    </main>
   );
 }
-
-
-/* ==============================================================
-   STAT CARD
-   ============================================================== */
-
-function StatCard({
-  icon,
-  number,
-  label,
-  description,
-}) {
-  return (
-    <div
-      style={styles.statCard}
-      className="gradlink-stat-card"
-    >
-
-      <div style={styles.statIcon}>
-        {icon}
-      </div>
-
-      <div style={styles.statNumber}>
-        {number}
-      </div>
-
-      <div style={styles.statLabel}>
-        {label}
-      </div>
-
-      <div style={styles.statDescription}>
-        {description}
-      </div>
-
-    </div>
-  );
-}
-
-
-/* ==============================================================
-   PREMIUM FEATURE
-   ============================================================== */
-
-function PremiumFeature({
-  icon,
-  title,
-  text,
-}) {
-  return (
-    <div
-      style={styles.premiumFeature}
-      className="gradlink-premium-feature"
-    >
-
-      <div style={styles.premiumFeatureIcon}>
-        {icon}
-      </div>
-
-      <div>
-        <h3 style={styles.premiumFeatureTitle}>
-          {title}
-        </h3>
-
-        <p style={styles.premiumFeatureText}>
-          {text}
-        </p>
-      </div>
-
-    </div>
-  );
-}
-
-
-/* ==============================================================
-   QUICK ACTION
-   ============================================================== */
-
-function QuickAction({
-  href,
-  icon,
-  title,
-  text,
-}) {
-  return (
-    <Link
-      href={href}
-      style={styles.quickAction}
-      className="gradlink-quick-action"
-    >
-
-      <div style={styles.quickActionIcon}>
-        {icon}
-      </div>
-
-      <div style={styles.quickActionContent}>
-        <strong style={styles.quickActionTitle}>
-          {title}
-        </strong>
-
-        <span style={styles.quickActionText}>
-          {text}
-        </span>
-      </div>
-
-      <span style={styles.quickActionArrow}>
-        →
-      </span>
-
-    </Link>
-  );
-}
-
-
-/* ==============================================================
-   APPLICATION STATUS
-   ============================================================== */
-
-function getStatusStyle(status) {
-  const value =
-    String(status || "Pending").toLowerCase();
-
-  if (value === "shortlisted") {
-    return {
-      ...styles.statusBadge,
-      background: "#e8f8ef",
-      color: "#147a45",
-      border: "1px solid #c8edd8",
-    };
-  }
-
-  if (value === "rejected") {
-    return {
-      ...styles.statusBadge,
-      background: "#fff0f0",
-      color: "#b42318",
-      border: "1px solid #f4cccc",
-    };
-  }
-
-  return {
-    ...styles.statusBadge,
-    background: "#fff6e5",
-    color: "#9a5b00",
-    border: "1px solid #f4dfb1",
-  };
-}
-
-
-/* ==============================================================
-   STYLES
-   ============================================================== */
-
-const styles = {
-
-  page: {
-    minHeight: "100vh",
-    background: "#f5f8fc",
-    color: "#10233f",
-    overflowX: "hidden",
-  },
-
-  container: {
-    width: "100%",
-    maxWidth: "1180px",
-    margin: "0 auto",
-    paddingLeft: "24px",
-    paddingRight: "24px",
-  },
-
-  /* ----------------------------------------------------------
-     LOADING
-     ---------------------------------------------------------- */
-
-  loadingPage: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "24px",
-    background: "#f5f8fc",
-  },
-
-  loadingCard: {
-    width: "100%",
-    maxWidth: "430px",
-    padding: "42px 30px",
-    background: "#ffffff",
-    border: "1px solid #dfe7f2",
-    borderRadius: "18px",
-    textAlign: "center",
-  },
-
-  spinner: {
-    width: "44px",
-    height: "44px",
-    margin: "0 auto 20px",
-    border: "4px solid #dce6f4",
-    borderTopColor: "#1769e0",
-    borderRadius: "50%",
-    animation: "gradlinkSpin 0.8s linear infinite",
-  },
-
-  loadingTitle: {
-    margin: "0 0 8px",
-    fontSize: "22px",
-    fontWeight: 800,
-    color: "#10233f",
-  },
-
-  loadingText: {
-    margin: 0,
-    fontSize: "14px",
-    lineHeight: 1.6,
-    color: "#6a7b91",
-  },
-
-  /* ----------------------------------------------------------
-     ERROR
-     ---------------------------------------------------------- */
-
-  errorPage: {
-    minHeight: "100vh",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: "24px",
-    background: "#f5f8fc",
-  },
-
-  errorCard: {
-    width: "100%",
-    maxWidth: "520px",
-    padding: "40px 30px",
-    background: "#ffffff",
-    border: "1px solid #dfe7f2",
-    borderRadius: "18px",
-    textAlign: "center",
-  },
-
-  errorIcon: {
-    width: "54px",
-    height: "54px",
-    margin: "0 auto 18px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "50%",
-    background: "#fff0f0",
-    color: "#c62828",
-    fontSize: "25px",
-    fontWeight: 900,
-  },
-
-  errorTitle: {
-    margin: "0 0 10px",
-    fontSize: "26px",
-    fontWeight: 850,
-  },
-
-  errorText: {
-    margin: "0 auto 24px",
-    maxWidth: "420px",
-    color: "#697b91",
-    lineHeight: 1.6,
-    fontSize: "15px",
-  },
-
-  errorActions: {
-    display: "flex",
-    justifyContent: "center",
-    gap: "10px",
-    flexWrap: "wrap",
-  },
-
-  /* ----------------------------------------------------------
-     HEADER
-     ---------------------------------------------------------- */
-
-  header: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    background: "rgba(255,255,255,0.98)",
-    borderBottom: "1px solid #dfe7f2",
-    boxShadow: "0 5px 20px rgba(16,35,63,0.07)",
-    transition: "transform 0.28s ease",
-  },
-
-  headerInner: {
-    width: "100%",
-    maxWidth: "1220px",
-    minHeight: "78px",
-    margin: "0 auto",
-    padding: "12px 24px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "18px",
-  },
-
-  logo: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "10px",
-    color: "#10233f",
-    flexShrink: 0,
-  },
-
-  logoMark: {
-    width: "38px",
-    height: "38px",
-    borderRadius: "10px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#1769e0",
-    color: "#ffffff",
-    fontSize: "20px",
-    fontWeight: 900,
-  },
-
-  logoText: {
-    fontSize: "21px",
-    fontWeight: 850,
-    letterSpacing: "-0.5px",
-  },
-
-  logoAccent: {
-    color: "#1769e0",
-  },
-
-  nav: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    overflowX: "auto",
-    scrollbarWidth: "none",
-  },
-
-  navButton: {
-    minHeight: "42px",
-    padding: "0 13px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "7px",
-    border: "1px solid #ccd8e8",
-    borderRadius: "9px",
-    background: "#ffffff",
-    color: "#253b57",
-    fontSize: "13px",
-    fontWeight: 750,
-    whiteSpace: "nowrap",
-  },
-
-  navPrimaryButton: {
-    minHeight: "42px",
-    padding: "0 15px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "7px",
-    border: "1px solid #1769e0",
-    borderRadius: "9px",
-    background: "#1769e0",
-    color: "#ffffff",
-    fontSize: "13px",
-    fontWeight: 800,
-    whiteSpace: "nowrap",
-  },
-
-  navPremiumButton: {
-    minHeight: "42px",
-    padding: "0 15px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "7px",
-    border: "1px solid #d9b54a",
-    borderRadius: "9px",
-    background: "#fff9e7",
-    color: "#7a5900",
-    fontSize: "13px",
-    fontWeight: 800,
-    whiteSpace: "nowrap",
-  },
-
-  logoutButton: {
-    minHeight: "42px",
-    padding: "0 13px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "7px",
-    border: "1px solid #e2c7c7",
-    borderRadius: "9px",
-    background: "#ffffff",
-    color: "#9b3030",
-    fontSize: "13px",
-    fontWeight: 750,
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-  },
-
-  /* ----------------------------------------------------------
-     HERO
-     ---------------------------------------------------------- */
-
-  hero: {
-    paddingTop: "150px",
-    paddingBottom: "76px",
-    background:
-      "linear-gradient(135deg, #eef5ff 0%, #ffffff 58%, #f7fbff 100%)",
-    borderBottom: "1px solid #e0e8f3",
-  },
-
-  heroContent: {
-    maxWidth: "850px",
-  },
-
-  eyebrow: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "9px",
-    marginBottom: "18px",
-    padding: "8px 12px",
-    border: "1px solid #cbdcf4",
-    borderRadius: "999px",
-    background: "#ffffff",
-    color: "#1769e0",
-    fontSize: "11px",
-    fontWeight: 850,
-    letterSpacing: "1.2px",
-  },
-
-  eyebrowDot: {
-    width: "7px",
-    height: "7px",
-    borderRadius: "50%",
-    background: "#18a957",
-  },
-
-  heroTitle: {
-    margin: 0,
-    fontSize: "58px",
-    lineHeight: 1.03,
-    letterSpacing: "-2.5px",
-    fontWeight: 900,
-    color: "#10233f",
-  },
-
-  heroText: {
-    maxWidth: "720px",
-    margin: "22px 0 0",
-    color: "#61738a",
-    fontSize: "17px",
-    lineHeight: 1.7,
-  },
-
-  heroActions: {
-    marginTop: "30px",
-    display: "flex",
-    gap: "12px",
-    flexWrap: "wrap",
-  },
-
-  heroPrimaryButton: {
-    minHeight: "50px",
-    padding: "0 20px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "9px",
-    border: "1px solid #1769e0",
-    borderRadius: "10px",
-    background: "#1769e0",
-    color: "#ffffff",
-    fontSize: "14px",
-    fontWeight: 800,
-  },
-
-  heroSecondaryButton: {
-    minHeight: "50px",
-    padding: "0 20px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "9px",
-    border: "1px solid #cbd7e6",
-    borderRadius: "10px",
-    background: "#ffffff",
-    color: "#233b59",
-    fontSize: "14px",
-    fontWeight: 800,
-  },
-
-  /* ----------------------------------------------------------
-     SECTIONS
-     ---------------------------------------------------------- */
-
-  section: {
-    paddingTop: "68px",
-    paddingBottom: "68px",
-  },
-
-  sectionAlt: {
-    paddingTop: "68px",
-    paddingBottom: "68px",
-    background: "#eef3f9",
-    borderTop: "1px solid #e1e8f1",
-    borderBottom: "1px solid #e1e8f1",
-  },
-
-  overviewSection: {
-    paddingTop: "64px",
-    paddingBottom: "32px",
-    background: "#f5f8fc",
-  },
-
-  sectionHeading: {
-    marginBottom: "28px",
-    display: "flex",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: "20px",
-  },
-
-  sectionEyebrow: {
-    marginBottom: "8px",
-    color: "#1769e0",
-    fontSize: "11px",
-    fontWeight: 900,
-    letterSpacing: "1.3px",
-  },
-
-  sectionTitle: {
-    margin: 0,
-    color: "#10233f",
-    fontSize: "30px",
-    lineHeight: 1.15,
-    fontWeight: 850,
-    letterSpacing: "-0.7px",
-  },
-
-  sectionDescription: {
-    maxWidth: "650px",
-    margin: "9px 0 0",
-    color: "#708197",
-    fontSize: "14px",
-    lineHeight: 1.6,
-  },
-
-  overviewStatus: {
-    minHeight: "38px",
-    padding: "0 12px",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "8px",
-    border: "1px solid #d7e1ed",
-    borderRadius: "9px",
-    background: "#ffffff",
-    color: "#53677f",
-    fontSize: "12px",
-    fontWeight: 750,
-    whiteSpace: "nowrap",
-  },
-
-  statusDot: {
-    width: "8px",
-    height: "8px",
-    borderRadius: "50%",
-  },
-
-  headingButton: {
-    minHeight: "44px",
-    padding: "0 16px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    border: "1px solid #1769e0",
-    borderRadius: "9px",
-    background: "#1769e0",
-    color: "#ffffff",
-    fontSize: "13px",
-    fontWeight: 800,
-    whiteSpace: "nowrap",
-  },
-
-  /* ----------------------------------------------------------
-     STATS
-     ---------------------------------------------------------- */
-
-  statsGrid: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(4, minmax(0, 1fr))",
-    gap: "14px",
-  },
-
-  statCard: {
-    minWidth: 0,
-    padding: "24px",
-    background: "#ffffff",
-    border: "1px solid #dce5f0",
-    borderRadius: "14px",
-    boxShadow: "0 4px 14px rgba(16,35,63,0.045)",
-  },
-
-  statIcon: {
-    width: "40px",
-    height: "40px",
-    marginBottom: "18px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "9px",
-    background: "#edf4ff",
-    color: "#1769e0",
-    fontSize: "18px",
-    fontWeight: 900,
-  },
-
-  statNumber: {
-    fontSize: "34px",
-    lineHeight: 1,
-    fontWeight: 900,
-    color: "#10233f",
-  },
-
-  statLabel: {
-    marginTop: "9px",
-    color: "#263c58",
-    fontSize: "14px",
-    fontWeight: 800,
-  },
-
-  statDescription: {
-    marginTop: "5px",
-    color: "#8291a4",
-    fontSize: "12px",
-  },
-
-  /* ----------------------------------------------------------
-     PREMIUM
-     ---------------------------------------------------------- */
-
-  premiumCard: {
-    padding: "32px",
-    background:
-      "linear-gradient(135deg, #102b50 0%, #153d70 100%)",
-    borderRadius: "18px",
-    border: "1px solid #173e70",
-    boxShadow: "0 12px 28px rgba(16,43,80,0.15)",
-    color: "#ffffff",
-  },
-
-  premiumHeader: {
-    display: "grid",
-    gridTemplateColumns:
-      "minmax(0, 1fr) 300px",
-    gap: "30px",
-    alignItems: "start",
-  },
-
-  premiumBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    minHeight: "28px",
-    padding: "0 10px",
-    border: "1px solid rgba(255,255,255,0.18)",
-    borderRadius: "999px",
-    background: "rgba(255,255,255,0.08)",
-    color: "#d9e8ff",
-    fontSize: "10px",
-    fontWeight: 900,
-    letterSpacing: "1.1px",
-  },
-
-  premiumTitle: {
-    margin: "15px 0 0",
-    color: "#ffffff",
-    fontSize: "30px",
-    lineHeight: 1.15,
-    fontWeight: 850,
-  },
-
-  premiumText: {
-    maxWidth: "670px",
-    margin: "12px 0 0",
-    color: "#c5d5e9",
-    fontSize: "14px",
-    lineHeight: 1.7,
-  },
-
-  premiumPlanBox: {
-    padding: "22px",
-    background: "rgba(255,255,255,0.07)",
-    border: "1px solid rgba(255,255,255,0.16)",
-    borderRadius: "13px",
-  },
-
-  planLabel: {
-    color: "#9eb5d2",
-    fontSize: "9px",
-    fontWeight: 900,
-    letterSpacing: "1.2px",
-  },
-
-  planName: {
-    marginTop: "7px",
-    color: "#ffffff",
-    fontSize: "20px",
-    fontWeight: 850,
-  },
-
-  planPrice: {
-    marginTop: "4px",
-    color: "#ffffff",
-    fontSize: "25px",
-    fontWeight: 900,
-  },
-
-  planStatus: {
-    display: "inline-flex",
-    marginTop: "12px",
-    padding: "6px 9px",
-    borderRadius: "7px",
-    fontSize: "10px",
-    fontWeight: 900,
-    letterSpacing: "0.7px",
-  },
-
-  premiumButton: {
-    minHeight: "42px",
-    marginTop: "15px",
-    padding: "0 13px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "10px",
-    border: "1px solid #ffffff",
-    borderRadius: "8px",
-    background: "#ffffff",
-    color: "#153b6b",
-    fontSize: "12px",
-    fontWeight: 850,
-  },
-
-  premiumFeatures: {
-    marginTop: "30px",
-    paddingTop: "28px",
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(4, minmax(0, 1fr))",
-    gap: "18px",
-    borderTop:
-      "1px solid rgba(255,255,255,0.13)",
-  },
-
-  premiumFeature: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "12px",
-    minWidth: 0,
-  },
-
-  premiumFeatureIcon: {
-    width: "32px",
-    height: "32px",
-    flexShrink: 0,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "8px",
-    background: "rgba(255,255,255,0.1)",
-    color: "#dbeaff",
-    fontSize: "14px",
-    fontWeight: 900,
-  },
-
-  premiumFeatureTitle: {
-    margin: "0 0 5px",
-    color: "#ffffff",
-    fontSize: "13px",
-    lineHeight: 1.3,
-    fontWeight: 800,
-  },
-
-  premiumFeatureText: {
-    margin: 0,
-    color: "#afc3dd",
-    fontSize: "11px",
-    lineHeight: 1.5,
-  },
-
-  /* ----------------------------------------------------------
-     INTERNSHIPS
-     ---------------------------------------------------------- */
-
-  internshipList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-  },
-
-  internshipCard: {
-    width: "100%",
-    padding: "24px",
-    background: "#ffffff",
-    border: "1px solid #dce5f0",
-    borderRadius: "15px",
-    boxShadow: "0 4px 14px rgba(16,35,63,0.045)",
-  },
-
-  internshipTop: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: "20px",
-  },
-
-  internshipTitleArea: {
-    minWidth: 0,
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "13px",
-  },
-
-  internshipIcon: {
-    width: "44px",
-    height: "44px",
-    flexShrink: 0,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "10px",
-    background: "#edf4ff",
-    color: "#1769e0",
-    fontSize: "18px",
-    fontWeight: 900,
-  },
-
-  listingLabel: {
-    marginBottom: "4px",
-    color: "#8493a7",
-    fontSize: "9px",
-    fontWeight: 900,
-    letterSpacing: "1px",
-  },
-
-  internshipTitle: {
-    margin: 0,
-    color: "#10233f",
-    fontSize: "21px",
-    lineHeight: 1.25,
-    fontWeight: 850,
-  },
-
-  internshipCompany: {
-    margin: "5px 0 0",
-    color: "#61748c",
-    fontSize: "13px",
-  },
-
-  listingStatus: {
-    minHeight: "31px",
-    flexShrink: 0,
-    padding: "0 10px",
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "7px",
-    borderRadius: "7px",
-    fontSize: "11px",
-    fontWeight: 800,
-  },
-
-  listingStatusActive: {
-    background: "#eaf8f0",
-    color: "#157a45",
-    border: "1px solid #cbead8",
-  },
-
-  listingStatusExpired: {
-    background: "#fff0f0",
-    color: "#ad3333",
-    border: "1px solid #efcccc",
-  },
-
-  internshipDetails: {
-    marginTop: "24px",
-    paddingTop: "20px",
-    paddingBottom: "20px",
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(4, minmax(0, 1fr))",
-    gap: "16px",
-    borderTop: "1px solid #edf1f6",
-    borderBottom: "1px solid #edf1f6",
-  },
-
-  detailItem: {
-    minWidth: 0,
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "9px",
-  },
-
-  detailIcon: {
-    width: "28px",
-    height: "28px",
-    flexShrink: 0,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "7px",
-    background: "#f0f5fb",
-    color: "#50708f",
-    fontSize: "11px",
-    fontWeight: 900,
-  },
-
-  detailLabel: {
-    display: "block",
-    marginBottom: "3px",
-    color: "#8a98aa",
-    fontSize: "10px",
-    fontWeight: 700,
-  },
-
-  detailValue: {
-    display: "block",
-    color: "#344b66",
-    fontSize: "12px",
-    lineHeight: 1.35,
-    fontWeight: 800,
-    wordBreak: "break-word",
-  },
-
-  applicationSummary: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
-    gap: "12px",
-    paddingTop: "18px",
-  },
-
-  applicationSummaryItem: {
-    padding: "12px",
-    borderRadius: "9px",
-    background: "#f7f9fc",
-    border: "1px solid #e7edf4",
-  },
-
-  internshipActions: {
-    marginTop: "18px",
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "10px",
-  },
-
-  applicantsButton: {
-    minHeight: "46px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    border: "1px solid #1769e0",
-    borderRadius: "9px",
-    background: "#1769e0",
-    color: "#ffffff",
-    fontSize: "13px",
-    fontWeight: 800,
-  },
-
-  viewButton: {
-    minHeight: "46px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    border: "1px solid #ccd8e8",
-    borderRadius: "9px",
-    background: "#ffffff",
-    color: "#263e5b",
-    fontSize: "13px",
-    fontWeight: 800,
-  },
-
-  /* ----------------------------------------------------------
-     APPLICATIONS
-     ---------------------------------------------------------- */
-
-  applicationCount: {
-    padding: "7px 11px",
-    border: "1px solid #d5e0ed",
-    borderRadius: "8px",
-    background: "#ffffff",
-    color: "#536a84",
-    fontSize: "11px",
-    fontWeight: 800,
-  },
-
-  applicationList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-  },
-
-  applicationCard: {
-    minWidth: 0,
-    display: "grid",
-    gridTemplateColumns:
-      "44px minmax(0, 1fr) 70px 38px",
-    alignItems: "center",
-    gap: "15px",
-    padding: "17px",
-    background: "#ffffff",
-    border: "1px solid #dce5f0",
-    borderRadius: "13px",
-  },
-
-  applicationAvatar: {
-    width: "44px",
-    height: "44px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "50%",
-    background: "#eaf2ff",
-    color: "#1769e0",
-    fontSize: "16px",
-    fontWeight: 900,
-  },
-
-  applicationMain: {
-    minWidth: 0,
-  },
-
-  applicationNameRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "9px",
-    flexWrap: "wrap",
-  },
-
-  applicationName: {
-    margin: 0,
-    color: "#172f4d",
-    fontSize: "14px",
-    fontWeight: 850,
-  },
-
-  statusBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    minHeight: "23px",
-    padding: "0 7px",
-    borderRadius: "6px",
-    fontSize: "9px",
-    fontWeight: 850,
-  },
-
-  applicationRole: {
-    margin: "5px 0 0",
-    color: "#718299",
-    fontSize: "12px",
-  },
-
-  applicationMeta: {
-    marginTop: "9px",
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "7px 16px",
-    color: "#8a98aa",
-    fontSize: "10px",
-  },
-
-  matchScore: {
-    textAlign: "center",
-  },
-
-  matchNumber: {
-    color: "#1769e0",
-    fontSize: "18px",
-    lineHeight: 1,
-    fontWeight: 900,
-  },
-
-  applicationArrow: {
-    width: "36px",
-    height: "36px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    border: "1px solid #d5dfeb",
-    borderRadius: "8px",
-    background: "#ffffff",
-    color: "#1769e0",
-    fontSize: "17px",
-    fontWeight: 900,
-  },
-
-  /* ----------------------------------------------------------
-     EMPTY
-     ---------------------------------------------------------- */
-
-  emptyCard: {
-    padding: "46px 24px",
-    background: "#ffffff",
-    border: "1px solid #dce5f0",
-    borderRadius: "15px",
-    textAlign: "center",
-  },
-
-  emptyIcon: {
-    width: "50px",
-    height: "50px",
-    margin: "0 auto 15px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "12px",
-    background: "#edf4ff",
-    color: "#1769e0",
-    fontSize: "20px",
-    fontWeight: 900,
-  },
-
-  emptyTitle: {
-    margin: 0,
-    color: "#203752",
-    fontSize: "19px",
-    fontWeight: 850,
-  },
-
-  emptyText: {
-    maxWidth: "520px",
-    margin: "9px auto 20px",
-    color: "#74849a",
-    fontSize: "13px",
-    lineHeight: 1.65,
-  },
-
-  primaryButton: {
-    minHeight: "44px",
-    padding: "0 17px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    border: "1px solid #1769e0",
-    borderRadius: "9px",
-    background: "#1769e0",
-    color: "#ffffff",
-    fontSize: "13px",
-    fontWeight: 800,
-  },
-
-  secondaryButton: {
-    minHeight: "44px",
-    padding: "0 17px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    border: "1px solid #ccd8e8",
-    borderRadius: "9px",
-    background: "#ffffff",
-    color: "#263e5b",
-    fontSize: "13px",
-    fontWeight: 800,
-  },
-
-  /* ----------------------------------------------------------
-     QUICK ACTIONS
-     ---------------------------------------------------------- */
-
-  quickActionsBox: {
-    padding: "30px",
-    background: "#ffffff",
-    border: "1px solid #dce5f0",
-    borderRadius: "16px",
-  },
-
-  quickActionsIntro: {
-    marginBottom: "22px",
-  },
-
-  quickActionsTitle: {
-    margin: 0,
-    color: "#10233f",
-    fontSize: "25px",
-    fontWeight: 850,
-  },
-
-  quickActionsText: {
-    margin: "7px 0 0",
-    color: "#738399",
-    fontSize: "13px",
-    lineHeight: 1.6,
-  },
-
-  quickActionsGrid: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(4, minmax(0, 1fr))",
-    gap: "10px",
-  },
-
-  quickAction: {
-    minWidth: 0,
-    minHeight: "88px",
-    padding: "15px",
-    display: "flex",
-    alignItems: "center",
-    gap: "11px",
-    border: "1px solid #dbe4ef",
-    borderRadius: "10px",
-    background: "#f9fbfd",
-    color: "#203752",
-  },
-
-  quickActionIcon: {
-    width: "35px",
-    height: "35px",
-    flexShrink: 0,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "8px",
-    background: "#eaf2ff",
-    color: "#1769e0",
-    fontSize: "15px",
-    fontWeight: 900,
-  },
-
-  quickActionContent: {
-    minWidth: 0,
-    flex: 1,
-  },
-
-  quickActionTitle: {
-    display: "block",
-    color: "#233a57",
-    fontSize: "12px",
-    fontWeight: 850,
-  },
-
-  quickActionText: {
-    display: "block",
-    marginTop: "4px",
-    color: "#8593a5",
-    fontSize: "10px",
-    lineHeight: 1.35,
-  },
-
-  quickActionArrow: {
-    color: "#1769e0",
-    fontSize: "16px",
-    fontWeight: 900,
-  },
-
-  /* ----------------------------------------------------------
-     FOOTER
-     ---------------------------------------------------------- */
-
-  footer: {
-    background: "#0d1f36",
-    color: "#ffffff",
-    paddingTop: "46px",
-    paddingBottom: "22px",
-  },
-
-  footerMain: {
-    display: "grid",
-    gridTemplateColumns: "1.5fr 1fr",
-    gap: "60px",
-    paddingBottom: "35px",
-  },
-
-  footerBrand: {
-    maxWidth: "430px",
-  },
-
-  footerLogo: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "9px",
-    color: "#ffffff",
-    fontSize: "20px",
-    fontWeight: 850,
-  },
-
-  footerLogoMark: {
-    width: "34px",
-    height: "34px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "9px",
-    background: "#1769e0",
-    color: "#ffffff",
-    fontWeight: 900,
-  },
-
-  footerText: {
-    margin: "13px 0 0",
-    color: "#9db0c8",
-    fontSize: "12px",
-    lineHeight: 1.7,
-  },
-
-  footerLinks: {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "30px",
-  },
-
-  footerHeading: {
-    marginBottom: "12px",
-    color: "#dce8f6",
-    fontSize: "10px",
-    fontWeight: 900,
-    letterSpacing: "1px",
-  },
-
-  footerLink: {
-    display: "block",
-    marginBottom: "9px",
-    color: "#9db0c8",
-    fontSize: "11px",
-  },
-
-  footerBottom: {
-    paddingTop: "20px",
-    borderTop: "1px solid rgba(255,255,255,0.1)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "15px",
-    color: "#7f94ae",
-    fontSize: "10px",
-  },
-
-};
