@@ -17,51 +17,13 @@ const supabase = createClient(
 function getQualificationLevel(value) {
   const text = String(value || "").toLowerCase();
 
-  if (
-    text.includes("phd") ||
-    text.includes("doctorate")
-  ) {
-    return 6;
-  }
-
-  if (
-    text.includes("master") ||
-    text.includes("postgrad")
-  ) {
-    return 6;
-  }
-
-  if (
-    text.includes("honours") ||
-    text.includes("honors")
-  ) {
-    return 5;
-  }
-
-  if (
-    text.includes("degree") ||
-    text.includes("bachelor")
-  ) {
-    return 4;
-  }
-
-  if (
-    text.includes("diploma") ||
-    text.includes("national diploma")
-  ) {
-    return 3;
-  }
-
-  if (text.includes("certificate")) {
-    return 2;
-  }
-
-  if (
-    text.includes("matric") ||
-    text.includes("grade 12")
-  ) {
-    return 1;
-  }
+  if (text.includes("phd") || text.includes("doctorate")) return 6;
+  if (text.includes("master") || text.includes("postgrad")) return 6;
+  if (text.includes("honours") || text.includes("honors")) return 5;
+  if (text.includes("degree") || text.includes("bachelor")) return 4;
+  if (text.includes("diploma") || text.includes("national diploma")) return 3;
+  if (text.includes("certificate")) return 2;
+  if (text.includes("matric") || text.includes("grade 12")) return 1;
 
   return 0;
 }
@@ -91,32 +53,25 @@ function calculateMatch(application, internship) {
     internship?.field_of_study || ""
   ).toLowerCase();
 
-  const applicantSkills = String(
-    application?.skills || ""
-  )
+  const applicantSkills = String(application?.skills || "")
     .toLowerCase()
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const requiredSkills = String(
-    internship?.skills || ""
-  )
+  const requiredSkills = String(internship?.skills || "")
     .toLowerCase()
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
 
-  // Qualification
-  const applicantLevel =
-    getQualificationLevel(
-      applicantQualification
-    );
+  const applicantLevel = getQualificationLevel(
+    applicantQualification
+  );
 
-  const requiredLevel =
-    getQualificationLevel(
-      requiredQualification
-    );
+  const requiredLevel = getQualificationLevel(
+    requiredQualification
+  );
 
   if (requiredLevel === 0) {
     qualificationScore = 35;
@@ -126,7 +81,6 @@ function calculateMatch(application, internship) {
     qualificationScore = 10;
   }
 
-  // Field
   if (
     requiredField &&
     applicantField &&
@@ -136,44 +90,33 @@ function calculateMatch(application, internship) {
     )
   ) {
     fieldScore = 35;
-  } else if (
-    requiredField &&
-    applicantField
-  ) {
-    const requiredWords =
-      requiredField
-        .split(/\s+/)
-        .filter(
-          (word) => word.length > 3
-        );
+  } else if (requiredField && applicantField) {
+    const requiredWords = requiredField
+      .split(/\s+/)
+      .filter((word) => word.length > 3);
 
-    const matchedWords =
-      requiredWords.filter((word) =>
-        applicantField.includes(word)
-      );
+    const matchedWords = requiredWords.filter((word) =>
+      applicantField.includes(word)
+    );
 
     if (matchedWords.length > 0) {
       fieldScore = 20;
     }
   }
 
-  // Skills
   if (requiredSkills.length === 0) {
     skillsScore = 30;
   } else {
-    const matchedSkills =
-      requiredSkills.filter((skill) =>
-        applicantSkills.some(
-          (appSkill) =>
-            appSkill.includes(skill) ||
-            skill.includes(appSkill)
-        )
-      );
+    const matchedSkills = requiredSkills.filter((skill) =>
+      applicantSkills.some(
+        (appSkill) =>
+          appSkill.includes(skill) ||
+          skill.includes(appSkill)
+      )
+    );
 
     skillsScore = Math.round(
-      (matchedSkills.length /
-        requiredSkills.length) *
-        30
+      (matchedSkills.length / requiredSkills.length) * 30
     );
   }
 
@@ -199,7 +142,7 @@ function calculateMatch(application, internship) {
 }
 
 // ============================================================
-// COMPANY DASHBOARD
+// MAIN DASHBOARD
 // ============================================================
 
 export default function CompanyDashboard() {
@@ -207,12 +150,9 @@ export default function CompanyDashboard() {
 
   const [user, setUser] = useState(null);
   const [company, setCompany] = useState(null);
-
   const [internships, setInternships] = useState([]);
   const [applications, setApplications] = useState([]);
-
-  const [subscription, setSubscription] =
-    useState(null);
+  const [subscription, setSubscription] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [subscriptionLoading, setSubscriptionLoading] =
@@ -238,9 +178,7 @@ export default function CompanyDashboard() {
         error: authError,
       } = await supabase.auth.getUser();
 
-      if (authError) {
-        throw authError;
-      }
+      if (authError) throw authError;
 
       if (!user) {
         router.push("/login");
@@ -249,9 +187,9 @@ export default function CompanyDashboard() {
 
       setUser(user);
 
-      // ========================================================
+      // --------------------------------------------------------
       // COMPANY
-      // ========================================================
+      // --------------------------------------------------------
 
       const {
         data: companyData,
@@ -262,9 +200,7 @@ export default function CompanyDashboard() {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (companyError) {
-        throw companyError;
-      }
+      if (companyError) throw companyError;
 
       if (!companyData) {
         setError(
@@ -277,9 +213,9 @@ export default function CompanyDashboard() {
 
       setCompany(companyData);
 
-      // ========================================================
+      // --------------------------------------------------------
       // INTERNSHIPS
-      // ========================================================
+      // --------------------------------------------------------
 
       const {
         data: internshipData,
@@ -307,9 +243,9 @@ export default function CompanyDashboard() {
 
       setInternships(loadedInternships);
 
-      // ========================================================
+      // --------------------------------------------------------
       // APPLICATIONS
-      // ========================================================
+      // --------------------------------------------------------
 
       if (loadedInternships.length > 0) {
         const internshipIds =
@@ -345,9 +281,9 @@ export default function CompanyDashboard() {
         setApplications([]);
       }
 
-      // ========================================================
+      // --------------------------------------------------------
       // SUBSCRIPTION
-      // ========================================================
+      // --------------------------------------------------------
 
       await loadSubscription(
         companyData.id
@@ -365,12 +301,10 @@ export default function CompanyDashboard() {
   }
 
   // ==========================================================
-  // LOAD SUBSCRIPTION
+  // SUBSCRIPTION
   // ==========================================================
 
-  async function loadSubscription(
-    companyId
-  ) {
+  async function loadSubscription(companyId) {
     try {
       setSubscriptionLoading(true);
 
@@ -451,12 +385,25 @@ export default function CompanyDashboard() {
         "rejected"
     ).length;
 
+  const pending =
+    applications.filter(
+      (app) => {
+        const status =
+          String(
+            app.status || ""
+          ).toLowerCase();
+
+        return (
+          status !== "shortlisted" &&
+          status !== "rejected"
+        );
+      }
+    ).length;
+
   // ==========================================================
-  // PREMIUM STATUS
+  // PREMIUM
   // ==========================================================
 
-  // IMPORTANT:
-  // A company is Premium ONLY when status is exactly "active".
   const isPremiumActive =
     subscription?.status === "active";
 
@@ -469,27 +416,39 @@ export default function CompanyDashboard() {
       <main
         style={{
           minHeight: "100vh",
+          background:
+            "linear-gradient(135deg,#eef5ff,#ffffff)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#f5f8fc",
           padding: "20px",
         }}
       >
         <div
           style={{
+            width: "100%",
+            maxWidth: "430px",
             background: "#fff",
-            padding: "35px",
-            borderRadius: "20px",
-            boxShadow:
-              "0 10px 35px rgba(0,0,0,0.08)",
+            borderRadius: "26px",
+            padding: "40px 28px",
             textAlign: "center",
+            boxShadow:
+              "0 25px 70px rgba(18,97,255,0.12)",
           }}
         >
           <div
             style={{
-              fontSize: "42px",
-              marginBottom: "12px",
+              width: "70px",
+              height: "70px",
+              margin: "0 auto 18px",
+              borderRadius: "22px",
+              background:
+                "linear-gradient(135deg,#1261ff,#3d8bff)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+              fontSize: "32px",
             }}
           >
             🏢
@@ -498,18 +457,20 @@ export default function CompanyDashboard() {
           <h2
             style={{
               margin: 0,
-              color: "#123",
+              color: "#101828",
+              fontSize: "23px",
             }}
           >
-            Loading Company Dashboard...
+            Loading your dashboard
           </h2>
 
           <p
             style={{
               color: "#667085",
+              marginBottom: 0,
             }}
           >
-            Please wait.
+            Preparing your recruitment portal...
           </p>
         </div>
       </main>
@@ -531,22 +492,37 @@ export default function CompanyDashboard() {
       >
         <div
           style={{
-            maxWidth: "700px",
-            margin: "60px auto",
+            maxWidth: "650px",
+            margin: "70px auto",
             background: "#fff",
-            padding: "35px",
-            borderRadius: "20px",
+            padding: "40px",
+            borderRadius: "24px",
             boxShadow:
-              "0 10px 35px rgba(0,0,0,0.08)",
+              "0 20px 60px rgba(0,0,0,0.08)",
           }}
         >
-          <h2>
+          <div
+            style={{
+              fontSize: "40px",
+              marginBottom: "15px",
+            }}
+          >
+            ⚠️
+          </div>
+
+          <h2
+            style={{
+              marginTop: 0,
+              color: "#101828",
+            }}
+          >
             Dashboard Error
           </h2>
 
           <p
             style={{
               color: "#b42318",
+              lineHeight: 1.6,
             }}
           >
             {error}
@@ -557,12 +533,12 @@ export default function CompanyDashboard() {
             style={{
               display: "inline-block",
               marginTop: "15px",
-              padding: "12px 20px",
+              padding: "13px 20px",
               background: "#1261ff",
               color: "#fff",
-              borderRadius: "10px",
+              borderRadius: "11px",
               textDecoration: "none",
-              fontWeight: "700",
+              fontWeight: "800",
             }}
           >
             Company Profile
@@ -581,101 +557,147 @@ export default function CompanyDashboard() {
       style={{
         minHeight: "100vh",
         background:
-          "linear-gradient(180deg, #f5f9ff 0%, #ffffff 55%)",
-        color: "#122033",
+          "linear-gradient(180deg,#f4f8ff 0%,#ffffff 38%,#f8fafc 100%)",
+        color: "#101828",
       }}
     >
       {/* ======================================================
-          HEADER
+          TOP NAVIGATION
       ====================================================== */}
 
       <header
         style={{
-          background: "#ffffff",
+          background:
+            "rgba(255,255,255,0.94)",
+          backdropFilter: "blur(14px)",
           borderBottom:
             "1px solid #e7edf5",
           position: "sticky",
           top: 0,
-          zIndex: 50,
+          zIndex: 100,
         }}
       >
         <div
           style={{
-            maxWidth: "1200px",
+            maxWidth: "1240px",
             margin: "auto",
-            padding: "16px 20px",
+            padding:
+              "15px 20px",
             display: "flex",
             justifyContent:
               "space-between",
             alignItems: "center",
-            gap: "15px",
+            gap: "20px",
           }}
         >
-          <div>
-            <div
-              style={{
-                fontWeight: "900",
-                color: "#1261ff",
-                fontSize: "20px",
-              }}
-            >
-              GRADLINK SA
-            </div>
+          {/* BRAND */}
 
+          <Link
+            href="/company-dashboard"
+            style={{
+              textDecoration: "none",
+              color: "inherit",
+              minWidth: "170px",
+            }}
+          >
             <div
               style={{
-                fontSize: "11px",
-                color: "#667085",
-                fontWeight: "700",
-                letterSpacing: "1px",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
               }}
             >
-              RECRUITMENT PORTAL
+              <div
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "12px",
+                  background:
+                    "linear-gradient(135deg,#1261ff,#4b91ff)",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: "900",
+                  fontSize: "18px",
+                  boxShadow:
+                    "0 7px 18px rgba(18,97,255,0.25)",
+                }}
+              >
+                G
+              </div>
+
+              <div>
+                <div
+                  style={{
+                    fontWeight: "950",
+                    color: "#1261ff",
+                    fontSize: "17px",
+                    lineHeight: 1,
+                  }}
+                >
+                  GRADLINK SA
+                </div>
+
+                <div
+                  style={{
+                    fontSize: "9px",
+                    color: "#667085",
+                    fontWeight: "800",
+                    letterSpacing: "1.3px",
+                    marginTop: "4px",
+                  }}
+                >
+                  RECRUITMENT PORTAL
+                </div>
+              </div>
             </div>
-          </div>
+          </Link>
+
+          {/* NAV */}
 
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "8px",
+              gap: "5px",
               flexWrap: "wrap",
               justifyContent: "flex-end",
             }}
           >
             <Link
               href="/"
-              style={{
-                textDecoration: "none",
-                color: "#344054",
-                fontWeight: "600",
-                padding: "9px 12px",
-              }}
+              style={navLinkStyle}
             >
               Home
             </Link>
 
             <Link
               href="/company"
-              style={{
-                textDecoration: "none",
-                color: "#344054",
-                fontWeight: "600",
-                padding: "9px 12px",
-              }}
+              style={navLinkStyle}
             >
               Company Profile
+            </Link>
+
+            <Link
+              href="/company-pricing"
+              style={{
+                ...navLinkStyle,
+                color: "#1261ff",
+              }}
+            >
+              💎 Premium
             </Link>
 
             <button
               onClick={logout}
               style={{
-                border: "none",
-                background: "#eef4ff",
-                color: "#1261ff",
+                border: "1px solid #dce5f2",
+                background: "#f7faff",
+                color: "#344054",
                 padding: "9px 14px",
-                borderRadius: "9px",
-                fontWeight: "700",
+                borderRadius: "10px",
+                fontWeight: "800",
                 cursor: "pointer",
               }}
             >
@@ -687,114 +709,159 @@ export default function CompanyDashboard() {
 
       <div
         style={{
-          maxWidth: "1200px",
+          maxWidth: "1240px",
           margin: "auto",
-          padding: "35px 20px 70px",
+          padding:
+            "32px 20px 70px",
         }}
       >
         {/* ====================================================
-            TITLE
+            HERO
         ==================================================== */}
 
         <section
           style={{
-            marginBottom: "25px",
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: "28px",
+            padding:
+              "34px 32px",
+            marginBottom: "22px",
+            background:
+              "linear-gradient(135deg,#071b3d 0%,#0d3f8f 58%,#1261ff 100%)",
+            color: "#fff",
+            boxShadow:
+              "0 22px 55px rgba(18,61,135,0.20)",
           }}
         >
           <div
             style={{
-              color: "#1261ff",
-              fontSize: "13px",
-              fontWeight: "800",
-              letterSpacing: "1px",
-              marginBottom: "8px",
+              position: "absolute",
+              width: "260px",
+              height: "260px",
+              borderRadius: "50%",
+              background:
+                "rgba(255,255,255,0.07)",
+              right: "-70px",
+              top: "-110px",
+            }}
+          />
+
+          <div
+            style={{
+              position: "absolute",
+              width: "180px",
+              height: "180px",
+              borderRadius: "50%",
+              background:
+                "rgba(255,255,255,0.05)",
+              right: "130px",
+              bottom: "-110px",
+            }}
+          />
+
+          <div
+            style={{
+              position: "relative",
+              zIndex: 2,
             }}
           >
-            COMPANY DASHBOARD
+            <div
+              style={{
+                display: "inline-flex",
+                padding:
+                  "7px 11px",
+                borderRadius: "999px",
+                background:
+                  "rgba(255,255,255,0.10)",
+                border:
+                  "1px solid rgba(255,255,255,0.15)",
+                fontSize: "11px",
+                fontWeight: "900",
+                letterSpacing: "1px",
+                marginBottom: "13px",
+              }}
+            >
+              COMPANY DASHBOARD
+            </div>
+
+            <h1
+              style={{
+                margin: 0,
+                fontSize:
+                  "clamp(28px,5vw,42px)",
+                lineHeight: 1.1,
+                fontWeight: "950",
+                maxWidth: "800px",
+              }}
+            >
+              Welcome,{" "}
+              {company?.company_name ||
+                "Company"}{" "}
+              👋
+            </h1>
+
+            <p
+              style={{
+                color:
+                  "rgba(255,255,255,0.78)",
+                margin:
+                  "12px 0 0",
+                fontSize: "16px",
+                lineHeight: 1.6,
+                maxWidth: "650px",
+              }}
+            >
+              Manage your internship
+              opportunities, review applicants
+              and build your future talent
+              pipeline from one place.
+            </p>
+
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "10px",
+                marginTop: "23px",
+              }}
+            >
+              <Link
+                href="/internships"
+                style={{
+                  background: "#fff",
+                  color: "#1261ff",
+                  padding:
+                    "12px 18px",
+                  borderRadius: "11px",
+                  textDecoration:
+                    "none",
+                  fontWeight: "900",
+                }}
+              >
+                + Post Internship
+              </Link>
+
+              <Link
+                href="/company"
+                style={{
+                  background:
+                    "rgba(255,255,255,0.10)",
+                  color: "#fff",
+                  border:
+                    "1px solid rgba(255,255,255,0.18)",
+                  padding:
+                    "12px 18px",
+                  borderRadius: "11px",
+                  textDecoration:
+                    "none",
+                  fontWeight: "800",
+                }}
+              >
+                Edit Company Profile
+              </Link>
+            </div>
           </div>
-
-          <h1
-            style={{
-              fontSize:
-                "clamp(28px, 5vw, 42px)",
-              margin: 0,
-              fontWeight: "900",
-            }}
-          >
-            Welcome,{" "}
-            {company?.company_name ||
-              "Company"}{" "}
-            👋
-          </h1>
-
-          <p
-            style={{
-              color: "#667085",
-              marginTop: "10px",
-              fontSize: "16px",
-            }}
-          >
-            Manage your internships and
-            discover talented graduates.
-          </p>
-        </section>
-
-        {/* ====================================================
-            QUICK ACTIONS
-        ==================================================== */}
-
-        <section
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "12px",
-            marginBottom: "25px",
-          }}
-        >
-          <Link
-            href="/internships"
-            style={{
-              textDecoration: "none",
-              background: "#1261ff",
-              color: "#fff",
-              padding: "13px 20px",
-              borderRadius: "11px",
-              fontWeight: "800",
-            }}
-          >
-            + Post Internship
-          </Link>
-
-          <Link
-            href="/company"
-            style={{
-              textDecoration: "none",
-              background: "#fff",
-              color: "#1261ff",
-              border:
-                "1px solid #d6e1f0",
-              padding: "13px 20px",
-              borderRadius: "11px",
-              fontWeight: "800",
-            }}
-          >
-            Edit Company Profile
-          </Link>
-
-          {/* CORRECT PRICING ROUTE */}
-          <Link
-            href="/company-pricing"
-            style={{
-              textDecoration: "none",
-              background: "#111827",
-              color: "#fff",
-              padding: "13px 20px",
-              borderRadius: "11px",
-              fontWeight: "800",
-            }}
-          >
-            💎 View Premium Plans
-          </Link>
         </section>
 
         {/* ====================================================
@@ -805,71 +872,84 @@ export default function CompanyDashboard() {
           style={{
             display: "grid",
             gridTemplateColumns:
-              "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: "16px",
-            marginBottom: "25px",
+              "repeat(auto-fit,minmax(190px,1fr))",
+            gap: "14px",
+            marginBottom: "22px",
           }}
         >
           <StatCard
             icon="💼"
             title="Internships"
             value={internships.length}
+            description="Posted opportunities"
+            accent="#1261ff"
           />
 
           <StatCard
             icon="👥"
             title="Applications"
             value={totalApplications}
+            description="Total candidates"
+            accent="#7c3aed"
           />
 
           <StatCard
             icon="⭐"
             title="Shortlisted"
             value={shortlisted}
+            description="Candidates selected"
+            accent="#059669"
           />
 
           <StatCard
-            icon="❌"
-            title="Rejected"
-            value={rejected}
+            icon="⏳"
+            title="Pending Review"
+            value={pending}
+            description="Need your attention"
+            accent="#d97706"
           />
         </section>
 
         {/* ====================================================
-            GRADLINK PREMIUM
+            PREMIUM
         ==================================================== */}
 
         <section
           style={{
-            marginBottom: "35px",
-            borderRadius: "22px",
+            marginBottom: "28px",
+            borderRadius: "25px",
             overflow: "hidden",
-            background:
-              "linear-gradient(135deg, #07152f, #123f88)",
-            color: "#fff",
+            background: "#fff",
+            border:
+              "1px solid #e4eaf3",
             boxShadow:
-              "0 18px 45px rgba(18, 61, 135, 0.20)",
+              "0 16px 45px rgba(15,42,80,0.08)",
           }}
         >
           <div
             style={{
-              padding: "28px",
+              padding:
+                "25px",
+              background:
+                "linear-gradient(135deg,#07152f,#0d397f)",
+              color: "#fff",
             }}
           >
             <div
               style={{
                 display: "flex",
-                flexWrap: "wrap",
                 justifyContent:
                   "space-between",
-                gap: "20px",
                 alignItems:
                   "flex-start",
+                flexWrap: "wrap",
+                gap: "20px",
               }}
             >
               <div
                 style={{
-                  flex: "1 1 400px",
+                  flex:
+                    "1 1 500px",
                 }}
               >
                 <div
@@ -880,17 +960,19 @@ export default function CompanyDashboard() {
                       "center",
                     gap: "7px",
                     background:
-                      "rgba(255,255,255,0.12)",
+                      "rgba(255,255,255,0.10)",
                     border:
-                      "1px solid rgba(255,255,255,0.18)",
+                      "1px solid rgba(255,255,255,0.15)",
                     padding:
                       "7px 11px",
                     borderRadius:
                       "999px",
-                    fontSize: "12px",
-                    fontWeight: "800",
-                    marginBottom:
-                      "12px",
+                    fontSize:
+                      "11px",
+                    fontWeight:
+                      "900",
+                    letterSpacing:
+                      "0.5px",
                   }}
                 >
                   💎 GRADLINK PREMIUM
@@ -898,67 +980,87 @@ export default function CompanyDashboard() {
 
                 <h2
                   style={{
-                    fontSize: "28px",
                     margin:
-                      "0 0 8px",
+                      "13px 0 7px",
+                    fontSize:
+                      "27px",
+                    fontWeight:
+                      "950",
                   }}
                 >
-                  Premium Recruitment Tools
+                  Your Recruitment Advantage
                 </h2>
 
                 <p
                   style={{
-                    color:
-                      "rgba(255,255,255,0.78)",
                     margin: 0,
+                    color:
+                      "rgba(255,255,255,0.72)",
                     lineHeight: 1.6,
+                    maxWidth:
+                      "650px",
                   }}
                 >
-                  Unlock advanced tools
-                  designed to help your
-                  company screen and
-                  evaluate applicants
-                  more efficiently.
+                  Powerful tools to help
+                  your company verify,
+                  screen and evaluate
+                  graduate applications.
                 </p>
               </div>
 
-              {/* STATUS */}
-
               <div
                 style={{
-                  minWidth: "180px",
+                  minWidth:
+                    "175px",
+                  borderRadius:
+                    "16px",
+                  padding:
+                    "17px",
                   background:
-                    "rgba(255,255,255,0.10)",
+                    "rgba(255,255,255,0.09)",
                   border:
-                    "1px solid rgba(255,255,255,0.16)",
-                  borderRadius: "16px",
-                  padding: "18px",
+                    "1px solid rgba(255,255,255,0.14)",
                 }}
               >
                 <div
                   style={{
-                    fontSize: "12px",
-                    opacity: 0.75,
-                    marginBottom:
-                      "6px",
+                    fontSize:
+                      "10px",
+                    letterSpacing:
+                      "1px",
+                    fontWeight:
+                      "800",
+                    opacity:
+                      0.65,
                   }}
                 >
-                  CURRENT STATUS
+                  SUBSCRIPTION
                 </div>
 
                 {subscriptionLoading ? (
-                  <strong>
+                  <div
+                    style={{
+                      marginTop:
+                        "9px",
+                      fontWeight:
+                        "800",
+                    }}
+                  >
                     Checking...
-                  </strong>
+                  </div>
                 ) : (
                   <>
                     <div
                       style={{
-                        fontSize: "20px",
-                        fontWeight: "900",
+                        marginTop:
+                          "8px",
+                        fontSize:
+                          "20px",
+                        fontWeight:
+                          "950",
                         color:
                           isPremiumActive
-                            ? "#7ff0b0"
+                            ? "#72f2a8"
                             : "#ffd27a",
                       }}
                     >
@@ -970,11 +1072,11 @@ export default function CompanyDashboard() {
                     <div
                       style={{
                         marginTop:
-                          "8px",
+                          "5px",
+                        color:
+                          "rgba(255,255,255,0.70)",
                         fontSize:
-                          "14px",
-                        opacity:
-                          0.8,
+                          "13px",
                       }}
                     >
                       {subscription?.plan ||
@@ -984,61 +1086,58 @@ export default function CompanyDashboard() {
                 )}
               </div>
             </div>
+          </div>
 
-            <div
-              style={{
-                height: "1px",
-                background:
-                  "rgba(255,255,255,0.13)",
-                margin:
-                  "25px 0",
-              }}
-            />
-
-            {/* PREMIUM FEATURES */}
-
+          <div
+            style={{
+              padding:
+                "22px 25px 25px",
+            }}
+          >
             <div
               style={{
                 display: "grid",
                 gridTemplateColumns:
-                  "repeat(auto-fit, minmax(210px, 1fr))",
-                gap: "14px",
+                  "repeat(auto-fit,minmax(210px,1fr))",
+                gap: "12px",
               }}
             >
               <PremiumFeature
                 icon="🤖"
                 title="AI Document Verification"
-                text="Advanced document verification tools."
+                text="Help verify submitted applicant documents."
               />
 
               <PremiumFeature
                 icon="📄"
                 title="CV & Qualification Checks"
-                text="Review submitted applicant documents."
+                text="Review applicant documentation more efficiently."
               />
 
               <PremiumFeature
                 icon="🔎"
                 title="Advanced Applicant Screening"
-                text="More powerful applicant analysis."
+                text="Use deeper applicant analysis tools."
               />
             </div>
-
-            {/* SUBSCRIPTION DETAILS */}
 
             {subscription && (
               <div
                 style={{
-                  marginTop: "22px",
-                  background:
-                    "rgba(255,255,255,0.08)",
+                  marginTop:
+                    "18px",
+                  padding:
+                    "17px",
                   borderRadius:
-                    "14px",
-                  padding: "16px",
+                    "15px",
+                  background:
+                    "#f7faff",
+                  border:
+                    "1px solid #e4ebf6",
                   display: "grid",
                   gridTemplateColumns:
-                    "repeat(auto-fit, minmax(160px, 1fr))",
-                  gap: "15px",
+                    "repeat(auto-fit,minmax(150px,1fr))",
+                  gap: "16px",
                 }}
               >
                 <SubscriptionDetail
@@ -1083,78 +1182,125 @@ export default function CompanyDashboard() {
               </div>
             )}
 
-            {/* CORRECT PRICING ROUTE */}
-
             <div
               style={{
-                marginTop: "25px",
+                marginTop:
+                  "19px",
+                display: "flex",
+                alignItems:
+                  "center",
+                justifyContent:
+                  "space-between",
+                flexWrap: "wrap",
+                gap: "12px",
               }}
             >
+              <div>
+                {!isPremiumActive && (
+                  <div
+                    style={{
+                      color:
+                        "#667085",
+                      fontSize:
+                        "12px",
+                      lineHeight:
+                        1.5,
+                    }}
+                  >
+                    Premium activates only after
+                    a verified subscription payment.
+                  </div>
+                )}
+              </div>
+
               <Link
                 href="/company-pricing"
                 style={{
                   display:
-                    "inline-block",
-                  background: "#fff",
-                  color: "#123f88",
-                  textDecoration:
-                    "none",
+                    "inline-flex",
+                  alignItems:
+                    "center",
+                  justifyContent:
+                    "center",
+                  gap: "7px",
+                  background:
+                    isPremiumActive
+                      ? "#eef4ff"
+                      : "#1261ff",
+                  color:
+                    isPremiumActive
+                      ? "#1261ff"
+                      : "#fff",
                   padding:
-                    "13px 21px",
+                    "12px 18px",
                   borderRadius:
                     "11px",
-                  fontWeight: "900",
+                  textDecoration:
+                    "none",
+                  fontWeight:
+                    "900",
+                  border:
+                    isPremiumActive
+                      ? "1px solid #d6e4ff"
+                      : "none",
                 }}
               >
                 {isPremiumActive
-                  ? "Manage Premium"
-                  : "View Plans / Upgrade"}
+                  ? "Manage Premium →"
+                  : "View Plans / Upgrade →"}
               </Link>
             </div>
-
-            {!isPremiumActive && (
-              <p
-                style={{
-                  fontSize: "12px",
-                  color:
-                    "rgba(255,255,255,0.62)",
-                  marginTop: "14px",
-                  marginBottom: 0,
-                }}
-              >
-                Selecting a plan does
-                not automatically
-                activate Premium.
-                Premium features require
-                an active verified
-                subscription.
-              </p>
-            )}
           </div>
         </section>
 
         {/* ====================================================
-            INTERNSHIPS
+            INTERNSHIPS HEADER
         ==================================================== */}
 
-        <section>
+        <section
+          style={{
+            marginTop:
+              "8px",
+          }}
+        >
           <div
             style={{
               display: "flex",
+              alignItems:
+                "flex-end",
               justifyContent:
                 "space-between",
-              alignItems: "center",
-              gap: "15px",
-              marginBottom:
-                "18px",
+              gap: "20px",
               flexWrap: "wrap",
+              marginBottom:
+                "15px",
             }}
           >
             <div>
+              <div
+                style={{
+                  color:
+                    "#1261ff",
+                  fontSize:
+                    "11px",
+                  fontWeight:
+                    "900",
+                  letterSpacing:
+                    "1px",
+                  marginBottom:
+                    "5px",
+                }}
+              >
+                RECRUITMENT PIPELINE
+              </div>
+
               <h2
                 style={{
                   margin: 0,
-                  fontSize: "25px",
+                  fontSize:
+                    "27px",
+                  fontWeight:
+                    "950",
                 }}
               >
                 Your Internships
@@ -1163,13 +1309,13 @@ export default function CompanyDashboard() {
               <p
                 style={{
                   margin:
-                    "5px 0 0",
-                  color: "#667085",
+                    "6px 0 0",
+                  color:
+                    "#667085",
                 }}
               >
-                Manage your posted
-                internship
-                opportunities.
+                Track your opportunities
+                and manage applicants.
               </p>
             </div>
 
@@ -1178,41 +1324,76 @@ export default function CompanyDashboard() {
               style={{
                 textDecoration:
                   "none",
-                color: "#1261ff",
-                fontWeight: "800",
+                color:
+                  "#1261ff",
+                fontWeight:
+                  "900",
+                padding:
+                  "10px 14px",
+                borderRadius:
+                  "10px",
+                background:
+                  "#eef4ff",
               }}
             >
-              + Post New
+              + Post New Internship
             </Link>
           </div>
 
-          {internships.length ===
-          0 ? (
+          {/* ==================================================
+              INTERNSHIP LIST
+          ================================================== */}
+
+          {internships.length === 0 ? (
             <div
               style={{
-                background: "#fff",
+                background:
+                  "#fff",
                 border:
                   "1px dashed #cbd5e1",
                 borderRadius:
-                  "18px",
+                  "22px",
                 padding:
-                  "40px 20px",
+                  "55px 25px",
                 textAlign:
                   "center",
+                boxShadow:
+                  "0 10px 30px rgba(0,0,0,0.03)",
               }}
             >
               <div
                 style={{
+                  width:
+                    "70px",
+                  height:
+                    "70px",
+                  margin:
+                    "0 auto 15px",
+                  borderRadius:
+                    "20px",
+                  background:
+                    "#eef4ff",
+                  display:
+                    "flex",
+                  alignItems:
+                    "center",
+                  justifyContent:
+                    "center",
                   fontSize:
-                    "42px",
-                  marginBottom:
-                    "10px",
+                    "32px",
                 }}
               >
                 💼
               </div>
 
-              <h3>
+              <h3
+                style={{
+                  margin:
+                    "0 0 8px",
+                  fontSize:
+                    "21px",
+                }}
+              >
                 No internships yet
               </h3>
 
@@ -1220,12 +1401,17 @@ export default function CompanyDashboard() {
                 style={{
                   color:
                     "#667085",
+                  maxWidth:
+                    "480px",
+                  margin:
+                    "0 auto 20px",
+                  lineHeight:
+                    1.6,
                 }}
               >
-                Post your first
-                internship and
-                start receiving
-                applications.
+                Post your first internship
+                and start building your
+                graduate talent pipeline.
               </p>
 
               <Link
@@ -1235,18 +1421,19 @@ export default function CompanyDashboard() {
                     "inline-block",
                   background:
                     "#1261ff",
-                  color: "#fff",
+                  color:
+                    "#fff",
                   padding:
-                    "12px 18px",
+                    "12px 19px",
                   borderRadius:
-                    "10px",
+                    "11px",
                   textDecoration:
                     "none",
                   fontWeight:
-                    "800",
+                    "900",
                 }}
               >
-                Post Internship
+                Post Internship →
               </Link>
             </div>
           ) : (
@@ -1254,7 +1441,8 @@ export default function CompanyDashboard() {
               style={{
                 display:
                   "grid",
-                gap: "16px",
+                gap:
+                  "15px",
               }}
             >
               {internships.map(
@@ -1270,6 +1458,21 @@ export default function CompanyDashboard() {
                         )
                     ).length;
 
+                  const shortlistedForJob =
+                    applications.filter(
+                      (app) =>
+                        String(
+                          app.internship_id
+                        ) ===
+                          String(
+                            internship.id
+                          ) &&
+                        String(
+                          app.status || ""
+                        ).toLowerCase() ===
+                          "shortlisted"
+                    ).length;
+
                   return (
                     <div
                       key={
@@ -1279,38 +1482,108 @@ export default function CompanyDashboard() {
                         background:
                           "#fff",
                         border:
-                          "1px solid #e6ebf2",
+                          "1px solid #e5eaf2",
                         borderRadius:
-                          "18px",
+                          "20px",
                         padding:
                           "22px",
                         boxShadow:
-                          "0 8px 25px rgba(0,0,0,0.04)",
+                          "0 9px 30px rgba(15,42,80,0.045)",
+                        transition:
+                          "transform .2s ease, box-shadow .2s ease",
                       }}
                     >
                       <div
                         style={{
                           display:
                             "flex",
-                          flexWrap:
-                            "wrap",
                           justifyContent:
                             "space-between",
-                          gap: "18px",
+                          alignItems:
+                            "flex-start",
+                          gap:
+                            "20px",
+                          flexWrap:
+                            "wrap",
                         }}
                       >
                         <div
                           style={{
                             flex:
                               "1 1 450px",
+                            minWidth:
+                              0,
                           }}
                         >
+                          <div
+                            style={{
+                              display:
+                                "flex",
+                              alignItems:
+                                "center",
+                              gap:
+                                "9px",
+                              flexWrap:
+                                "wrap",
+                              marginBottom:
+                                "8px",
+                            }}
+                          >
+                            <span
+                              style={{
+                                background:
+                                  "#eef4ff",
+                                color:
+                                  "#1261ff",
+                                padding:
+                                  "5px 9px",
+                                borderRadius:
+                                  "999px",
+                                fontSize:
+                                  "10px",
+                                fontWeight:
+                                  "900",
+                                textTransform:
+                                  "uppercase",
+                              }}
+                            >
+                              Internship
+                            </span>
+
+                            {internship.internship_type && (
+                              <span
+                                style={{
+                                  background:
+                                    "#f2f4f7",
+                                  color:
+                                    "#475467",
+                                  padding:
+                                    "5px 9px",
+                                  borderRadius:
+                                    "999px",
+                                  fontSize:
+                                    "10px",
+                                  fontWeight:
+                                    "800",
+                                }}
+                              >
+                                {
+                                  internship.internship_type
+                                }
+                              </span>
+                            )}
+                          </div>
+
                           <h3
                             style={{
                               margin:
-                                "0 0 8px",
+                                "0 0 7px",
                               fontSize:
                                 "21px",
+                              fontWeight:
+                                "900",
+                              color:
+                                "#101828",
                             }}
                           >
                             {internship.job_title ||
@@ -1319,39 +1592,49 @@ export default function CompanyDashboard() {
 
                           <div
                             style={{
+                              display:
+                                "flex",
+                              flexWrap:
+                                "wrap",
+                              gap:
+                                "7px 14px",
                               color:
                                 "#667085",
                               fontSize:
-                                "14px",
+                                "13px",
                               lineHeight:
-                                1.8,
+                                1.6,
                             }}
                           >
-                            📍{" "}
-                            {internship.location ||
-                              internship.province ||
-                              "Location not specified"}
+                            <span>
+                              📍{" "}
+                              {internship.location ||
+                                internship.province ||
+                                "Location not specified"}
+                            </span>
 
-                            <br />
+                            <span>
+                              💰{" "}
+                              {internship.stipend ||
+                                "Stipend not specified"}
+                            </span>
 
-                            💰{" "}
-                            {internship.stipend ||
-                              "Stipend not specified"}
+                            <span>
+                              🎓{" "}
+                              {internship.qualification ||
+                                "Qualification not specified"}
+                            </span>
 
-                            <br />
-
-                            🎓{" "}
-                            {internship.qualification ||
-                              "Qualification not specified"}
-
-                            <br />
-
-                            📅 Deadline:{" "}
-                            {formatDate(
-                              internship.deadline
-                            )}
+                            <span>
+                              📅{" "}
+                              {formatDate(
+                                internship.deadline
+                              )}
+                            </span>
                           </div>
                         </div>
+
+                        {/* RIGHT SIDE */}
 
                         <div
                           style={{
@@ -1361,31 +1644,43 @@ export default function CompanyDashboard() {
                               "column",
                             alignItems:
                               "flex-end",
-                            gap: "10px",
+                            gap:
+                              "9px",
+                            minWidth:
+                              "185px",
                           }}
                         >
                           <div
                             style={{
-                              background:
-                                "#eef4ff",
-                              color:
-                                "#1261ff",
-                              padding:
-                                "9px 13px",
-                              borderRadius:
-                                "999px",
-                              fontWeight:
-                                "800",
-                              fontSize:
-                                "13px",
+                              display:
+                                "flex",
+                              gap:
+                                "7px",
+                              flexWrap:
+                                "wrap",
+                              justifyContent:
+                                "flex-end",
                             }}
                           >
-                            👥 {count}{" "}
-                            Application
-                            {count !==
-                            1
-                              ? "s"
-                              : ""}
+                            <MiniBadge
+                              icon="👥"
+                              value={
+                                `${count} Application${
+                                  count !== 1
+                                    ? "s"
+                                    : ""
+                                }`
+                              }
+                            />
+
+                            {shortlistedForJob >
+                              0 && (
+                              <MiniBadge
+                                icon="⭐"
+                                value={`${shortlistedForJob} Shortlisted`}
+                                green
+                              />
+                            )}
                           </div>
 
                           <Link
@@ -1402,7 +1697,11 @@ export default function CompanyDashboard() {
                               borderRadius:
                                 "10px",
                               fontWeight:
-                                "800",
+                                "900",
+                              fontSize:
+                                "13px",
+                              boxShadow:
+                                "0 7px 18px rgba(18,97,255,0.20)",
                             }}
                           >
                             View Applicants →
@@ -1418,30 +1717,142 @@ export default function CompanyDashboard() {
         </section>
 
         {/* ====================================================
+            PREMIUM CALL TO ACTION
+        ==================================================== */}
+
+        {!isPremiumActive && (
+          <section
+            style={{
+              marginTop:
+                "25px",
+              borderRadius:
+                "20px",
+              padding:
+                "22px",
+              background:
+                "linear-gradient(135deg,#eef5ff,#f8fbff)",
+              border:
+                "1px solid #dce8fa",
+              display:
+                "flex",
+              alignItems:
+                "center",
+              justifyContent:
+                "space-between",
+              gap:
+                "18px",
+              flexWrap:
+                "wrap",
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontWeight:
+                    "950",
+                  fontSize:
+                    "18px",
+                  color:
+                    "#123f88",
+                }}
+              >
+                Ready to upgrade your recruitment?
+              </div>
+
+              <div
+                style={{
+                  color:
+                    "#667085",
+                  fontSize:
+                    "13px",
+                  marginTop:
+                    "4px",
+                }}
+              >
+                Unlock GradLink Premium
+                tools for your company.
+              </div>
+            </div>
+
+            <Link
+              href="/company-pricing"
+              style={{
+                background:
+                  "#1261ff",
+                color:
+                  "#fff",
+                textDecoration:
+                  "none",
+                padding:
+                  "12px 18px",
+                borderRadius:
+                  "10px",
+                fontWeight:
+                  "900",
+              }}
+            >
+              Explore Premium →
+            </Link>
+          </section>
+        )}
+
+        {/* ====================================================
             FOOTER
         ==================================================== */}
 
         <footer
           style={{
-            marginTop: "60px",
-            paddingTop: "25px",
+            marginTop:
+              "55px",
+            paddingTop:
+              "25px",
             borderTop:
-              "1px solid #e7edf5",
-            color: "#667085",
-            fontSize: "13px",
-            textAlign: "center",
+              "1px solid #e6ebf2",
+            color:
+              "#667085",
+            fontSize:
+              "12px",
+            textAlign:
+              "center",
           }}
         >
-          ©{" "}
-          {new Date().getFullYear()}{" "}
-          GradLink SA — Connecting
-          South African graduates
-          with opportunities.
+          <strong
+            style={{
+              color:
+                "#1261ff",
+            }}
+          >
+            GRADLINK SA
+          </strong>{" "}
+          — Connecting South African
+          graduates with opportunities.
+          <div
+            style={{
+              marginTop:
+                "6px",
+            }}
+          >
+            ©{" "}
+            {new Date().getFullYear()}{" "}
+            GradLink SA
+          </div>
         </footer>
       </div>
     </main>
   );
 }
+
+// ============================================================
+// NAV LINK
+// ============================================================
+
+const navLinkStyle = {
+  textDecoration: "none",
+  color: "#344054",
+  fontWeight: "800",
+  padding: "9px 11px",
+  borderRadius: "9px",
+};
 
 // ============================================================
 // STAT CARD
@@ -1451,45 +1862,142 @@ function StatCard({
   icon,
   title,
   value,
+  description,
+  accent,
 }) {
   return (
     <div
       style={{
-        background: "#fff",
+        background:
+          "#ffffff",
         border:
-          "1px solid #e6ebf2",
-        borderRadius: "18px",
-        padding: "22px",
+          "1px solid #e5eaf2",
+        borderRadius:
+          "19px",
+        padding:
+          "19px",
         boxShadow:
-          "0 8px 25px rgba(0,0,0,0.04)",
+          "0 8px 28px rgba(15,42,80,0.045)",
+        position:
+          "relative",
+        overflow:
+          "hidden",
       }}
     >
       <div
         style={{
-          fontSize: "28px",
-          marginBottom: "10px",
+          position:
+            "absolute",
+          width:
+            "70px",
+          height:
+            "70px",
+          borderRadius:
+            "50%",
+          background:
+            `${accent}12`,
+          right:
+            "-20px",
+          top:
+            "-20px",
         }}
-      >
-        {icon}
-      </div>
+      />
 
       <div
         style={{
-          fontSize: "30px",
-          fontWeight: "900",
+          position:
+            "relative",
+          zIndex:
+            2,
         }}
       >
-        {value}
-      </div>
+        <div
+          style={{
+            display:
+              "flex",
+            alignItems:
+              "center",
+            justifyContent:
+              "space-between",
+          }}
+        >
+          <div
+            style={{
+              width:
+                "43px",
+              height:
+                "43px",
+              borderRadius:
+                "13px",
+              background:
+                `${accent}12`,
+              display:
+                "flex",
+              alignItems:
+                "center",
+              justifyContent:
+                "center",
+              fontSize:
+                "21px",
+            }}
+          >
+            {icon}
+          </div>
 
-      <div
-        style={{
-          color: "#667085",
-          fontSize: "14px",
-          marginTop: "4px",
-        }}
-      >
-        {title}
+          <div
+            style={{
+              width:
+                "7px",
+              height:
+                "7px",
+              borderRadius:
+                "50%",
+              background:
+                accent,
+            }}
+          />
+        </div>
+
+        <div
+          style={{
+            fontSize:
+              "30px",
+            fontWeight:
+              "950",
+            marginTop:
+              "15px",
+            lineHeight:
+              1,
+          }}
+        >
+          {value}
+        </div>
+
+        <div
+          style={{
+            fontSize:
+              "14px",
+            fontWeight:
+              "850",
+            marginTop:
+              "7px",
+          }}
+        >
+          {title}
+        </div>
+
+        <div
+          style={{
+            color:
+              "#98a2b3",
+            fontSize:
+              "11px",
+            marginTop:
+              "4px",
+          }}
+        >
+          {description}
+        </div>
       </div>
     </div>
   );
@@ -1507,38 +2015,73 @@ function PremiumFeature({
   return (
     <div
       style={{
-        background:
-          "rgba(255,255,255,0.08)",
         border:
-          "1px solid rgba(255,255,255,0.12)",
-        borderRadius: "14px",
-        padding: "17px",
+          "1px solid #e7edf5",
+        borderRadius:
+          "15px",
+        padding:
+          "15px",
+        background:
+          "#fbfdff",
       }}
     >
       <div
         style={{
-          fontSize: "25px",
-          marginBottom: "8px",
+          display:
+            "flex",
+          alignItems:
+            "center",
+          gap:
+            "10px",
+          marginBottom:
+            "7px",
         }}
       >
-        {icon}
-      </div>
+        <div
+          style={{
+            width:
+              "36px",
+            height:
+              "36px",
+            borderRadius:
+              "10px",
+            background:
+              "#eef4ff",
+            display:
+              "flex",
+            alignItems:
+              "center",
+            justifyContent:
+              "center",
+            fontSize:
+              "18px",
+          }}
+        >
+          {icon}
+        </div>
 
-      <div
-        style={{
-          fontWeight: "900",
-          marginBottom: "5px",
-        }}
-      >
-        {title}
+        <div
+          style={{
+            fontWeight:
+              "900",
+            color:
+              "#101828",
+            fontSize:
+              "13px",
+          }}
+        >
+          {title}
+        </div>
       </div>
 
       <div
         style={{
           color:
-            "rgba(255,255,255,0.70)",
-          fontSize: "13px",
-          lineHeight: 1.5,
+            "#667085",
+          fontSize:
+            "12px",
+          lineHeight:
+            1.5,
         }}
       >
         {text}
@@ -1559,13 +2102,16 @@ function SubscriptionDetail({
     <div>
       <div
         style={{
-          fontSize: "11px",
+          color:
+            "#98a2b3",
+          fontSize:
+            "10px",
+          fontWeight:
+            "800",
           textTransform:
             "uppercase",
           letterSpacing:
             "0.5px",
-          color:
-            "rgba(255,255,255,0.55)",
           marginBottom:
             "5px",
         }}
@@ -1575,12 +2121,53 @@ function SubscriptionDetail({
 
       <div
         style={{
-          fontWeight: "800",
-          fontSize: "14px",
+          color:
+            "#344054",
+          fontWeight:
+            "850",
+          fontSize:
+            "13px",
         }}
       >
         {value || "—"}
       </div>
+    </div>
+  );
+}
+
+// ============================================================
+// MINI BADGE
+// ============================================================
+
+function MiniBadge({
+  icon,
+  value,
+  green = false,
+}) {
+  return (
+    <div
+      style={{
+        background:
+          green
+            ? "#ecfdf3"
+            : "#eef4ff",
+        color:
+          green
+            ? "#027a48"
+            : "#1261ff",
+        padding:
+          "7px 9px",
+        borderRadius:
+          "999px",
+        fontSize:
+          "11px",
+        fontWeight:
+          "850",
+        whiteSpace:
+          "nowrap",
+      }}
+    >
+      {icon} {value}
     </div>
   );
 }
@@ -1595,9 +2182,7 @@ function formatDate(value) {
   }
 
   try {
-    return new Date(
-      value
-    ).toLocaleDateString(
+    return new Date(value).toLocaleDateString(
       "en-ZA",
       {
         day: "2-digit",
