@@ -163,13 +163,17 @@ function calculateMatch(internship, application) {
 
   let skillsScore = 0;
 
-  if (requiredSkills.length > 0 && applicantSkills.length > 0) {
-    const matchedSkills = requiredSkills.filter((requiredSkill) =>
-      applicantSkills.some(
-        (applicantSkill) =>
-          applicantSkill.includes(requiredSkill) ||
-          requiredSkill.includes(applicantSkill)
-      )
+  if (
+    requiredSkills.length > 0 &&
+    applicantSkills.length > 0
+  ) {
+    const matchedSkills = requiredSkills.filter(
+      (requiredSkill) =>
+        applicantSkills.some(
+          (applicantSkill) =>
+            applicantSkill.includes(requiredSkill) ||
+            requiredSkill.includes(applicantSkill)
+        )
     );
 
     skillsScore =
@@ -210,12 +214,56 @@ export default function CompanyDashboard() {
   const [subscription, setSubscription] = useState(null);
 
   const [loading, setLoading] = useState(true);
-  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  const [subscriptionLoading, setSubscriptionLoading] =
+    useState(true);
   const [error, setError] = useState("");
 
-  // ============================================================
+  // ==========================================================
+  // HEADER SCROLL BEHAVIOUR
+  // ==========================================================
+
+  const [showHeader, setShowHeader] = useState(true);
+
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+    let ticking = false;
+
+    function handleScroll() {
+      const currentScrollY = window.scrollY;
+
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          // Always show header at the very top
+          if (currentScrollY <= 20) {
+            setShowHeader(true);
+          } else if (currentScrollY < lastScrollY) {
+            // Scrolling UP
+            setShowHeader(true);
+          } else if (currentScrollY > lastScrollY) {
+            // Scrolling DOWN
+            setShowHeader(false);
+          }
+
+          lastScrollY = currentScrollY;
+          ticking = false;
+        });
+
+        ticking = true;
+      }
+    }
+
+    window.addEventListener("scroll", handleScroll, {
+      passive: true,
+    });
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+    };
+  }, []);
+
+  // ==========================================================
   // LOAD DASHBOARD
-  // ============================================================
+  // ==========================================================
 
   useEffect(() => {
     loadDashboard();
@@ -246,12 +294,14 @@ export default function CompanyDashboard() {
       // LOAD COMPANY
       // --------------------------------------------------------
 
-      const { data: companyData, error: companyError } =
-        await supabase
-          .from("companies")
-          .select("*")
-          .eq("user_id", authUser.id)
-          .maybeSingle();
+      const {
+        data: companyData,
+        error: companyError,
+      } = await supabase
+        .from("companies")
+        .select("*")
+        .eq("user_id", authUser.id)
+        .maybeSingle();
 
       if (companyError) {
         throw companyError;
@@ -321,7 +371,10 @@ export default function CompanyDashboard() {
 
       await loadSubscription(companyData.id);
     } catch (err) {
-      console.error("Dashboard loading error:", err);
+      console.error(
+        "Dashboard loading error:",
+        err
+      );
 
       setError(
         err?.message ||
@@ -363,7 +416,11 @@ export default function CompanyDashboard() {
 
       setSubscription(data || null);
     } catch (err) {
-      console.error("Subscription error:", err);
+      console.error(
+        "Subscription error:",
+        err
+      );
+
       setSubscription(null);
     } finally {
       setSubscriptionLoading(false);
@@ -392,28 +449,33 @@ export default function CompanyDashboard() {
 
   const totalApplications = applications.length;
 
-  const shortlistedApplications = applications.filter(
-    (application) =>
-      String(application.status || "").toLowerCase() ===
-      "shortlisted"
-  ).length;
+  const shortlistedApplications =
+    applications.filter(
+      (application) =>
+        String(
+          application.status || ""
+        ).toLowerCase() === "shortlisted"
+    ).length;
 
-  const rejectedApplications = applications.filter(
-    (application) =>
-      String(application.status || "").toLowerCase() ===
-      "rejected"
-  ).length;
+  const rejectedApplications =
+    applications.filter(
+      (application) =>
+        String(
+          application.status || ""
+        ).toLowerCase() === "rejected"
+    ).length;
 
-  const pendingApplications = applications.filter((application) => {
-    const status = String(
-      application.status || "pending"
-    ).toLowerCase();
+  const pendingApplications =
+    applications.filter((application) => {
+      const status = String(
+        application.status || "pending"
+      ).toLowerCase();
 
-    return (
-      status !== "shortlisted" &&
-      status !== "rejected"
-    );
-  }).length;
+      return (
+        status !== "shortlisted" &&
+        status !== "rejected"
+      );
+    }).length;
 
   const premiumActive =
     subscription?.status === "active";
@@ -437,7 +499,8 @@ export default function CompanyDashboard() {
           </h2>
 
           <p style={styles.loadingText}>
-            Preparing your GradLink SA recruitment workspace...
+            Preparing your GradLink SA recruitment
+            workspace...
           </p>
         </div>
       </main>
@@ -452,13 +515,17 @@ export default function CompanyDashboard() {
     return (
       <main style={styles.page}>
         <div style={styles.errorCard}>
-          <div style={styles.errorIcon}>!</div>
+          <div style={styles.errorIcon}>
+            !
+          </div>
 
           <h1 style={styles.errorTitle}>
             Something went wrong
           </h1>
 
-          <p style={styles.errorText}>{error}</p>
+          <p style={styles.errorText}>
+            {error}
+          </p>
 
           <div style={styles.errorActions}>
             <button
@@ -486,15 +553,27 @@ export default function CompanyDashboard() {
 
   return (
     <main style={styles.page}>
+
       {/* ======================================================
           TOP NAVIGATION
       ====================================================== */}
 
-      <header style={styles.header}>
+      <header
+        style={{
+          ...styles.header,
+          transform: showHeader
+            ? "translateY(0)"
+            : "translateY(-110%)",
+        }}
+      >
         <div style={styles.headerInner}>
+
           {/* LOGO */}
 
-          <Link href="/" style={styles.logoLink}>
+          <Link
+            href="/"
+            style={styles.logoLink}
+          >
             <div style={styles.logoMark}>
               GL
             </div>
@@ -513,6 +592,7 @@ export default function CompanyDashboard() {
           {/* NAVIGATION */}
 
           <nav style={styles.nav}>
+
             <Link
               href="/"
               style={{
@@ -520,7 +600,10 @@ export default function CompanyDashboard() {
                 ...styles.navButtonHome,
               }}
             >
-              <span style={styles.navIcon}>⌂</span>
+              <span style={styles.navIcon}>
+                ⌂
+              </span>
+
               <span>Home</span>
             </Link>
 
@@ -531,7 +614,10 @@ export default function CompanyDashboard() {
                 ...styles.navButtonProfile,
               }}
             >
-              <span style={styles.navIcon}>▣</span>
+              <span style={styles.navIcon}>
+                ▣
+              </span>
+
               <span>Company Profile</span>
             </Link>
 
@@ -542,7 +628,10 @@ export default function CompanyDashboard() {
                 ...styles.navButtonPost,
               }}
             >
-              <span style={styles.navPlus}>＋</span>
+              <span style={styles.navPlus}>
+                ＋
+              </span>
+
               <span>Post Internship</span>
             </Link>
 
@@ -553,7 +642,10 @@ export default function CompanyDashboard() {
                 ...styles.navButtonPremium,
               }}
             >
-              <span style={styles.navIcon}>✦</span>
+              <span style={styles.navIcon}>
+                ✦
+              </span>
+
               <span>GradLink Premium</span>
             </Link>
 
@@ -564,9 +656,13 @@ export default function CompanyDashboard() {
                 ...styles.navButtonLogout,
               }}
             >
-              <span style={styles.navIcon}>↪</span>
+              <span style={styles.navIcon}>
+                ↪
+              </span>
+
               <span>Logout</span>
             </button>
+
           </nav>
         </div>
       </header>
@@ -580,7 +676,9 @@ export default function CompanyDashboard() {
 
         <div style={styles.container}>
           <div style={styles.heroGrid}>
+
             <div style={styles.heroContent}>
+
               <div style={styles.heroEyebrow}>
                 <span style={styles.liveDot}></span>
                 COMPANY WORKSPACE
@@ -589,6 +687,7 @@ export default function CompanyDashboard() {
               <h1 style={styles.heroTitle}>
                 Welcome back,
                 <br />
+
                 <span>
                   {company?.company_name ||
                     "Your Company"}
@@ -602,6 +701,7 @@ export default function CompanyDashboard() {
               </p>
 
               <div style={styles.heroActions}>
+
                 <Link
                   href="/internships"
                   style={styles.heroPrimaryButton}
@@ -617,10 +717,12 @@ export default function CompanyDashboard() {
                   View Company Profile
                   <span>→</span>
                 </Link>
+
               </div>
             </div>
 
             <div style={styles.heroPanel}>
+
               <div style={styles.heroPanelTop}>
                 <div>
                   <div style={styles.heroPanelLabel}>
@@ -638,6 +740,7 @@ export default function CompanyDashboard() {
               </div>
 
               <div style={styles.heroPanelStats}>
+
                 <div>
                   <div style={styles.heroNumber}>
                     {internships.length}
@@ -657,6 +760,7 @@ export default function CompanyDashboard() {
                     Applications
                   </div>
                 </div>
+
               </div>
 
               <div style={styles.heroPanelBottom}>
@@ -665,7 +769,9 @@ export default function CompanyDashboard() {
                   Recruitment workspace active
                 </span>
               </div>
+
             </div>
+
           </div>
         </div>
       </section>
@@ -676,7 +782,9 @@ export default function CompanyDashboard() {
 
       <section style={styles.statsSection}>
         <div style={styles.container}>
+
           <div style={styles.statsGrid}>
+
             <StatCard
               icon="▤"
               label="Internship Listings"
@@ -704,6 +812,7 @@ export default function CompanyDashboard() {
               value={pendingApplications}
               description="Applications awaiting review"
             />
+
           </div>
         </div>
       </section>
@@ -714,6 +823,7 @@ export default function CompanyDashboard() {
 
       <section style={styles.premiumSection}>
         <div style={styles.container}>
+
           <div
             style={{
               ...styles.premiumCard,
@@ -722,9 +832,11 @@ export default function CompanyDashboard() {
                 : {}),
             }}
           >
+
             <div style={styles.premiumGlow}></div>
 
             <div style={styles.premiumContent}>
+
               <div style={styles.premiumBadge}>
                 <span>✦</span>
                 GRADLINK PREMIUM
@@ -744,6 +856,7 @@ export default function CompanyDashboard() {
               </p>
 
               <div style={styles.premiumFeatures}>
+
                 <PremiumFeature
                   icon="✦"
                   title="Advanced Recruitment Tools"
@@ -758,26 +871,38 @@ export default function CompanyDashboard() {
                   icon="◈"
                   title="Premium Verification Features"
                 />
+
               </div>
             </div>
 
             <div style={styles.subscriptionBox}>
+
               {subscriptionLoading ? (
                 <div style={styles.subscriptionLoading}>
                   Checking subscription...
                 </div>
               ) : (
                 <>
-                  <div style={styles.subscriptionStatusRow}>
+
+                  <div
+                    style={
+                      styles.subscriptionStatusRow
+                    }
+                  >
+
                     <div>
                       <div
-                        style={styles.subscriptionSmallLabel}
+                        style={
+                          styles.subscriptionSmallLabel
+                        }
                       >
                         CURRENT PLAN
                       </div>
 
                       <div
-                        style={styles.subscriptionPlan}
+                        style={
+                          styles.subscriptionPlan
+                        }
                       >
                         {subscription?.plan ||
                           "No active plan"}
@@ -793,10 +918,12 @@ export default function CompanyDashboard() {
                       }}
                     >
                       <span></span>
+
                       {premiumActive
                         ? "ACTIVE"
                         : "INACTIVE"}
                     </div>
+
                   </div>
 
                   {subscription?.monthly_price != null && (
@@ -824,21 +951,28 @@ export default function CompanyDashboard() {
                     {premiumActive
                       ? "Manage Premium"
                       : "View Plans & Upgrade"}
+
                     <span>→</span>
                   </Link>
+
                 </>
               )}
+
             </div>
+
           </div>
         </div>
       </section>
-            {/* ======================================================
+
+      {/* ======================================================
           INTERNSHIPS
       ====================================================== */}
 
       <section style={styles.internshipsSection}>
         <div style={styles.container}>
+
           <div style={styles.sectionHeader}>
+
             <div>
               <div style={styles.sectionEyebrow}>
                 YOUR OPPORTUNITIES
@@ -861,10 +995,12 @@ export default function CompanyDashboard() {
               <span>＋</span>
               Post Internship
             </Link>
+
           </div>
 
           {internships.length === 0 ? (
             <div style={styles.emptyState}>
+
               <div style={styles.emptyIcon}>
                 +
               </div>
@@ -886,10 +1022,14 @@ export default function CompanyDashboard() {
                 Create Internship
                 <span>→</span>
               </Link>
+
             </div>
           ) : (
+
             <div style={styles.internshipGrid}>
+
               {internships.map((internship) => {
+
                 const internshipApplications =
                   applications.filter(
                     (application) =>
@@ -926,9 +1066,11 @@ export default function CompanyDashboard() {
                     key={internship.id}
                     style={styles.internshipCard}
                   >
+
                     {/* CARD TOP */}
 
                     <div style={styles.cardTop}>
+
                       <div style={styles.cardIcon}>
                         ◈
                       </div>
@@ -938,6 +1080,7 @@ export default function CompanyDashboard() {
                           internshipApplications.length
                         }
                       />
+
                     </div>
 
                     {/* TITLE */}
@@ -956,6 +1099,7 @@ export default function CompanyDashboard() {
                     {/* DETAILS */}
 
                     <div style={styles.detailsList}>
+
                       <div style={styles.detailRow}>
                         <span style={styles.detailIcon}>
                           ◎
@@ -990,6 +1134,7 @@ export default function CompanyDashboard() {
                           )}
                         </span>
                       </div>
+
                     </div>
 
                     {/* APPLICATION PIPELINE */}
@@ -999,6 +1144,7 @@ export default function CompanyDashboard() {
                         styles.applicationPipeline
                       }
                     >
+
                       <div
                         style={
                           styles.pipelineHeader
@@ -1020,6 +1166,7 @@ export default function CompanyDashboard() {
                           styles.pipelineStats
                         }
                       >
+
                         <div
                           style={
                             styles.pipelineItem
@@ -1034,7 +1181,9 @@ export default function CompanyDashboard() {
                           ></span>
 
                           <span>
-                            {internshipApplications.length}{" "}
+                            {
+                              internshipApplications.length
+                            }{" "}
                             Total
                           </span>
                         </div>
@@ -1076,12 +1225,14 @@ export default function CompanyDashboard() {
                             Pending
                           </span>
                         </div>
+
                       </div>
                     </div>
 
                     {/* ACTIONS */}
 
                     <div style={styles.cardActions}>
+
                       <Link
                         href={`/company/internships/${internship.id}/applicants`}
                         style={
@@ -1089,8 +1240,12 @@ export default function CompanyDashboard() {
                         }
                       >
                         <span>◉</span>
+
                         View Applicants
-                        <span style={styles.arrow}>
+
+                        <span
+                          style={styles.arrow}
+                        >
                           →
                         </span>
                       </Link>
@@ -1103,12 +1258,16 @@ export default function CompanyDashboard() {
                       >
                         View Internship
                       </Link>
+
                     </div>
+
                   </article>
                 );
               })}
+
             </div>
           )}
+
         </div>
       </section>
 
@@ -1118,15 +1277,19 @@ export default function CompanyDashboard() {
 
       <section style={styles.ctaSection}>
         <div style={styles.container}>
+
           <div style={styles.ctaCard}>
+
             <div style={styles.ctaPattern}></div>
 
             <div style={styles.ctaContent}>
+
               <div style={styles.ctaIcon}>
                 ✦
               </div>
 
               <div>
+
                 <div style={styles.ctaEyebrow}>
                   GRADLINK SA
                 </div>
@@ -1140,7 +1303,9 @@ export default function CompanyDashboard() {
                   connect with graduates looking for their
                   next career opportunity.
                 </p>
+
               </div>
+
             </div>
 
             <Link
@@ -1150,6 +1315,7 @@ export default function CompanyDashboard() {
               Post an Internship
               <span>→</span>
             </Link>
+
           </div>
         </div>
       </section>
@@ -1160,13 +1326,17 @@ export default function CompanyDashboard() {
 
       <footer style={styles.footer}>
         <div style={styles.container}>
+
           <div style={styles.footerInner}>
+
             <div style={styles.footerBrand}>
+
               <div style={styles.footerLogo}>
                 GL
               </div>
 
               <div>
+
                 <div style={styles.footerName}>
                   GradLink SA
                 </div>
@@ -1175,10 +1345,12 @@ export default function CompanyDashboard() {
                   Connecting South African graduates
                   with opportunity.
                 </div>
+
               </div>
             </div>
 
             <div style={styles.footerLinks}>
+
               <Link
                 href="/"
                 style={styles.footerLink}
@@ -1199,10 +1371,13 @@ export default function CompanyDashboard() {
               >
                 Premium
               </Link>
+
             </div>
+
           </div>
 
           <div style={styles.footerBottom}>
+
             <span>
               © {new Date().getFullYear()} GradLink SA.
               All rights reserved.
@@ -1211,9 +1386,12 @@ export default function CompanyDashboard() {
             <span>
               Built for South African talent.
             </span>
+
           </div>
+
         </div>
       </footer>
+
     </main>
   );
 }
@@ -1230,7 +1408,9 @@ function StatCard({
 }) {
   return (
     <div style={styles.statCard}>
+
       <div style={styles.statTop}>
+
         <div style={styles.statIcon}>
           {icon}
         </div>
@@ -1238,6 +1418,7 @@ function StatCard({
         <div style={styles.statArrow}>
           ↗
         </div>
+
       </div>
 
       <div style={styles.statValue}>
@@ -1251,6 +1432,7 @@ function StatCard({
       <div style={styles.statDescription}>
         {description}
       </div>
+
     </div>
   );
 }
@@ -1259,14 +1441,19 @@ function StatCard({
 // PREMIUM FEATURE
 // ============================================================
 
-function PremiumFeature({ icon, title }) {
+function PremiumFeature({
+  icon,
+  title,
+}) {
   return (
     <div style={styles.premiumFeature}>
+
       <div style={styles.premiumFeatureIcon}>
         {icon}
       </div>
 
       <span>{title}</span>
+
     </div>
   );
 }
@@ -1281,9 +1468,11 @@ function SubscriptionDetail({
 }) {
   return (
     <div style={styles.subscriptionDetail}>
+
       <span>{label}</span>
 
       <strong>{value}</strong>
+
     </div>
   );
 }
@@ -1295,11 +1484,14 @@ function SubscriptionDetail({
 function PipelineBadge({ count }) {
   return (
     <div style={styles.pipelineBadge}>
+
       <span></span>
+
       {count}{" "}
       {count === 1
         ? "Application"
         : "Applications"}
+
     </div>
   );
 }
@@ -1354,24 +1546,29 @@ const styles = {
   // ==========================================================
 
   header: {
-    position: "sticky",
+    position: "fixed",
     top: 0,
-    zIndex: 50,
+    left: 0,
+    right: 0,
+    zIndex: 100,
     background:
-      "rgba(255,255,255,0.94)",
-    backdropFilter: "blur(18px)",
-    WebkitBackdropFilter: "blur(18px)",
+      "rgba(255,255,255,0.97)",
+    backdropFilter: "blur(20px)",
+    WebkitBackdropFilter: "blur(20px)",
     borderBottom:
-      "1px solid rgba(15,23,42,0.08)",
+      "1px solid rgba(15,23,42,0.09)",
     boxShadow:
-      "0 6px 25px rgba(15,23,42,0.05)",
+      "0 8px 28px rgba(15,23,42,0.07)",
+    transition:
+      "transform 0.28s cubic-bezier(0.4,0,0.2,1)",
+    willChange: "transform",
   },
 
   headerInner: {
     width: "100%",
     maxWidth: "1220px",
     margin: "0 auto",
-    padding: "13px 22px",
+    padding: "12px 22px",
     boxSizing: "border-box",
     display: "flex",
     alignItems: "center",
@@ -1412,10 +1609,6 @@ const styles = {
     letterSpacing: "-0.7px",
   },
 
-  logoText span: {
-    color: "#1261ff",
-  },
-
   logoSubtext: {
     marginTop: "5px",
     fontSize: "8px",
@@ -1428,51 +1621,56 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "flex-end",
-    gap: "8px",
-    flexWrap: "wrap",
+    gap: "7px",
+    padding: "5px",
+    borderRadius: "16px",
+    background: "#f5f8fc",
+    border:
+      "1px solid rgba(15,23,42,0.08)",
+    boxShadow:
+      "inset 0 1px 2px rgba(15,23,42,0.035)",
   },
 
-  /*
-   * IMPORTANT:
-   * Home and Company Profile are now real visible buttons.
-   * They have borders, background, rounded corners and shadows
-   * instead of looking like floating text links.
-   */
+  // ==========================================================
+  // NAV BUTTONS
+  // ==========================================================
 
   navButton: {
-    minHeight: "42px",
-    padding: "0 14px",
-    borderRadius: "12px",
+    minHeight: "40px",
+    padding: "0 13px",
+    borderRadius: "11px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     gap: "7px",
     textDecoration: "none",
-    fontSize: "13px",
-    fontWeight: 750,
+    fontSize: "12px",
+    fontWeight: 780,
     cursor: "pointer",
     boxSizing: "border-box",
     whiteSpace: "nowrap",
     transition:
-      "transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease",
+      "all 0.18s ease",
+    fontFamily: "inherit",
+    outline: "none",
   },
 
   navButtonHome: {
-    color: "#183153",
+    color: "#1e3a5f",
     background: "#ffffff",
     border:
-      "1px solid rgba(37,99,235,0.22)",
+      "1px solid rgba(37,99,235,0.18)",
     boxShadow:
-      "0 4px 12px rgba(15,23,42,0.07)",
+      "0 3px 8px rgba(15,23,42,0.07)",
   },
 
   navButtonProfile: {
-    color: "#183153",
+    color: "#1e3a5f",
     background: "#ffffff",
     border:
-      "1px solid rgba(37,99,235,0.22)",
+      "1px solid rgba(37,99,235,0.18)",
     boxShadow:
-      "0 4px 12px rgba(15,23,42,0.07)",
+      "0 3px 8px rgba(15,23,42,0.07)",
   },
 
   navButtonPost: {
@@ -1482,7 +1680,7 @@ const styles = {
     border:
       "1px solid rgba(18,97,255,0.55)",
     boxShadow:
-      "0 8px 18px rgba(18,97,255,0.24)",
+      "0 6px 13px rgba(18,97,255,0.22)",
   },
 
   navButtonPremium: {
@@ -1492,25 +1690,25 @@ const styles = {
     border:
       "1px solid rgba(245,158,11,0.35)",
     boxShadow:
-      "0 5px 15px rgba(245,158,11,0.12)",
+      "0 4px 10px rgba(245,158,11,0.11)",
   },
 
   navButtonLogout: {
     color: "#475569",
     background: "#ffffff",
     border:
-      "1px solid rgba(100,116,139,0.22)",
+      "1px solid rgba(100,116,139,0.20)",
     boxShadow:
-      "0 4px 12px rgba(15,23,42,0.05)",
+      "0 3px 8px rgba(15,23,42,0.05)",
   },
 
   navIcon: {
-    fontSize: "15px",
+    fontSize: "14px",
     lineHeight: 1,
   },
 
   navPlus: {
-    fontSize: "17px",
+    fontSize: "16px",
     lineHeight: 1,
     fontWeight: 500,
   },
@@ -1523,7 +1721,7 @@ const styles = {
     position: "relative",
     overflow: "hidden",
     padding:
-      "74px 0 70px",
+      "125px 0 70px",
     background:
       "radial-gradient(circle at 15% 20%, rgba(37,99,235,0.12), transparent 35%), radial-gradient(circle at 90% 20%, rgba(14,165,233,0.10), transparent 32%), linear-gradient(135deg, #eef6ff, #ffffff 58%, #f5f9ff)",
     borderBottom:
@@ -1588,13 +1786,6 @@ const styles = {
     letterSpacing: "-3px",
     fontWeight: 900,
     color: "#0f172a",
-  },
-
-  heroTitle span: {
-    background:
-      "linear-gradient(90deg, #1261ff, #0b7cff)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
   },
 
   heroDescription: {
@@ -2000,10 +2191,6 @@ const styles = {
     fontSize: "10px",
   },
 
-  subscriptionDetailStrong: {
-    color: "#ffffff",
-  },
-
   premiumButton: {
     marginTop: "18px",
     width: "100%",
@@ -2135,13 +2322,6 @@ const styles = {
     fontWeight: 800,
   },
 
-  pipelineBadge span: {
-    width: "6px",
-    height: "6px",
-    borderRadius: "50%",
-    background: "#1261ff",
-  },
-
   internshipTitle: {
     margin:
       "20px 0 5px",
@@ -2202,10 +2382,6 @@ const styles = {
     fontWeight: 750,
   },
 
-  pipelineHeaderStrong: {
-    color: "#0f172a",
-  },
-
   pipelineStats: {
     display: "flex",
     flexWrap: "wrap",
@@ -2226,6 +2402,10 @@ const styles = {
     height: "6px",
     borderRadius: "50%",
   },
+
+  // ==========================================================
+  // CARD BUTTONS
+  // ==========================================================
 
   cardActions: {
     display: "grid",
@@ -2250,6 +2430,8 @@ const styles = {
     fontWeight: 850,
     boxShadow:
       "0 8px 17px rgba(18,97,255,0.18)",
+    border:
+      "1px solid rgba(18,97,255,0.35)",
   },
 
   arrow: {
@@ -2267,11 +2449,17 @@ const styles = {
     background: "#ffffff",
     color: "#334155",
     border:
-      "1px solid rgba(15,23,42,0.10)",
+      "1px solid rgba(15,23,42,0.12)",
     textDecoration: "none",
     fontSize: "10px",
     fontWeight: 750,
+    boxShadow:
+      "0 3px 8px rgba(15,23,42,0.04)",
   },
+
+  // ==========================================================
+  // EMPTY STATE
+  // ==========================================================
 
   emptyState: {
     padding: "60px 25px",
@@ -2326,8 +2514,10 @@ const styles = {
       "linear-gradient(135deg, #1261ff, #0b4fd7)",
     color: "#ffffff",
     textDecoration: "none",
-    fontSize: "11px",
-    fontWeight: 850,
+        fontSize: "11px",
+    fontWeight: 800,
+    boxShadow:
+      "0 8px 18px rgba(18,97,255,0.18)",
   },
 
   // ==========================================================
@@ -2335,7 +2525,7 @@ const styles = {
   // ==========================================================
 
   ctaSection: {
-    padding: "25px 0 65px",
+    padding: "35px 0 60px",
   },
 
   ctaCard: {
@@ -2345,89 +2535,93 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     gap: "25px",
-    padding: "27px 30px",
-    borderRadius: "22px",
+    padding: "30px",
+    borderRadius: "24px",
     background:
-      "linear-gradient(135deg, #eaf3ff, #f8fbff)",
-    border:
-      "1px solid rgba(37,99,235,0.10)",
+      "linear-gradient(135deg, #0b4fd7, #1261ff 58%, #1687ff)",
+    color: "#ffffff",
+    boxShadow:
+      "0 22px 48px rgba(18,97,255,0.20)",
   },
 
   ctaPattern: {
     position: "absolute",
-    width: "180px",
-    height: "180px",
-    right: "-60px",
-    top: "-70px",
+    width: "280px",
+    height: "280px",
+    right: "-100px",
+    top: "-130px",
     borderRadius: "50%",
     border:
-      "25px solid rgba(37,99,235,0.05)",
+      "55px solid rgba(255,255,255,0.06)",
+    boxSizing: "border-box",
   },
 
   ctaContent: {
     position: "relative",
+    zIndex: 1,
     display: "flex",
     alignItems: "center",
-    gap: "17px",
+    gap: "18px",
+    minWidth: 0,
   },
 
   ctaIcon: {
-    width: "47px",
-    height: "47px",
+    width: "52px",
+    height: "52px",
     flexShrink: 0,
-    borderRadius: "14px",
+    borderRadius: "15px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "#ffffff",
-    color: "#1261ff",
+    background:
+      "rgba(255,255,255,0.13)",
     border:
-      "1px solid rgba(18,97,255,0.10)",
-    boxShadow:
-      "0 8px 18px rgba(15,23,42,0.05)",
-    fontSize: "18px",
+      "1px solid rgba(255,255,255,0.16)",
+    fontSize: "20px",
   },
 
   ctaEyebrow: {
-    fontSize: "8px",
-    letterSpacing: "1.5px",
+    fontSize: "9px",
     fontWeight: 900,
-    color: "#1261ff",
+    letterSpacing: "1.6px",
+    opacity: 0.75,
   },
 
   ctaTitle: {
     margin:
-      "5px 0 4px",
-    fontSize: "20px",
+      "7px 0 6px",
+    fontSize: "25px",
+    lineHeight: 1.15,
     fontWeight: 900,
-    letterSpacing: "-0.6px",
+    letterSpacing: "-1px",
   },
 
   ctaText: {
+    maxWidth: "650px",
     margin: 0,
-    color: "#64748b",
-    fontSize: "11px",
-    lineHeight: 1.55,
+    color: "rgba(255,255,255,0.76)",
+    fontSize: "12px",
+    lineHeight: 1.6,
   },
 
   ctaButton: {
     position: "relative",
+    zIndex: 2,
     flexShrink: 0,
     minHeight: "46px",
-    padding: "0 16px",
+    padding: "0 17px",
     borderRadius: "12px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     gap: "9px",
-    background:
-      "linear-gradient(135deg, #1261ff, #0b4fd7)",
-    color: "#ffffff",
+    background: "#ffffff",
+    color: "#0b4fd7",
     textDecoration: "none",
-    fontSize: "11px",
+    fontSize: "12px",
     fontWeight: 850,
     boxShadow:
-      "0 10px 22px rgba(18,97,255,0.20)",
+      "0 9px 22px rgba(0,0,0,0.13)",
   },
 
   // ==========================================================
@@ -2435,61 +2629,69 @@ const styles = {
   // ==========================================================
 
   footer: {
-    padding: "28px 0 20px",
-    background: "#ffffff",
-    borderTop:
-      "1px solid rgba(15,23,42,0.07)",
+    padding:
+      "30px 0 20px",
+    background: "#081426",
+    color: "#ffffff",
   },
 
   footerInner: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: "20px",
+    gap: "25px",
+    paddingBottom: "25px",
+    borderBottom:
+      "1px solid rgba(255,255,255,0.08)",
   },
 
   footerBrand: {
     display: "flex",
     alignItems: "center",
-    gap: "10px",
+    gap: "12px",
   },
 
   footerLogo: {
-    width: "34px",
-    height: "34px",
-    borderRadius: "10px",
+    width: "39px",
+    height: "39px",
+    borderRadius: "11px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     background:
-      "linear-gradient(135deg, #1261ff, #0b4fd7)",
+      "linear-gradient(135deg, #1261ff, #1687ff)",
     color: "#ffffff",
-    fontSize: "11px",
+    fontSize: "12px",
     fontWeight: 900,
+    boxShadow:
+      "0 7px 18px rgba(18,97,255,0.22)",
   },
 
   footerName: {
-    fontSize: "12px",
+    fontSize: "15px",
     fontWeight: 850,
+    letterSpacing: "-0.4px",
   },
 
   footerTagline: {
-    marginTop: "3px",
+    marginTop: "4px",
     color: "#94a3b8",
-    fontSize: "9px",
+    fontSize: "10px",
   },
 
   footerLinks: {
     display: "flex",
     alignItems: "center",
-    gap: "16px",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    gap: "18px",
   },
 
   footerLink: {
-    color: "#64748b",
+    color: "#cbd5e1",
     textDecoration: "none",
-    fontSize: "10px",
-    fontWeight: 650,
+    fontSize: "11px",
+    fontWeight: 700,
   },
 
   footerBottom: {
@@ -2497,11 +2699,8 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     gap: "15px",
-    marginTop: "22px",
-    paddingTop: "17px",
-    borderTop:
-      "1px solid rgba(15,23,42,0.06)",
-    color: "#94a3b8",
+    paddingTop: "18px",
+    color: "#64748b",
     fontSize: "9px",
   },
 
@@ -2515,63 +2714,67 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     padding: "25px",
+    boxSizing: "border-box",
     background:
       "linear-gradient(135deg, #eef6ff, #ffffff)",
     fontFamily:
-      "Inter, ui-sans-serif, system-ui, sans-serif",
+      "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
   },
 
   loadingCard: {
     width: "100%",
-    maxWidth: "390px",
+    maxWidth: "420px",
     padding: "40px 28px",
     textAlign: "center",
-    borderRadius: "25px",
+    borderRadius: "24px",
     background: "#ffffff",
     border:
       "1px solid rgba(15,23,42,0.07)",
     boxShadow:
-      "0 20px 55px rgba(15,23,42,0.09)",
+      "0 20px 55px rgba(15,23,42,0.08)",
   },
 
   loadingLogo: {
-    width: "52px",
-    height: "52px",
+    width: "56px",
+    height: "56px",
     margin: "0 auto",
-    borderRadius: "16px",
+    borderRadius: "17px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     background:
       "linear-gradient(135deg, #1261ff, #0b4fd7)",
     color: "#ffffff",
+    fontSize: "17px",
     fontWeight: 900,
     boxShadow:
-      "0 10px 25px rgba(18,97,255,0.22)",
+      "0 12px 25px rgba(18,97,255,0.22)",
   },
 
   spinner: {
-    width: "28px",
-    height: "28px",
-    margin: "25px auto 18px",
+    width: "30px",
+    height: "30px",
+    margin: "24px auto 0",
     borderRadius: "50%",
     border:
       "3px solid #e2e8f0",
-    borderTop:
-      "3px solid #1261ff",
+    borderTopColor: "#1261ff",
     animation:
-      "spin 0.9s linear infinite",
+      "gradlinkSpin 0.8s linear infinite",
   },
 
   loadingTitle: {
-    margin: 0,
+    margin:
+      "20px 0 7px",
     fontSize: "19px",
     fontWeight: 850,
+    letterSpacing: "-0.5px",
+    color: "#0f172a",
   },
 
   loadingText: {
-    margin:
-      "8px 0 0",
+    maxWidth: "320px",
+    margin: "0 auto",
     color: "#64748b",
     fontSize: "12px",
     lineHeight: 1.6,
@@ -2582,17 +2785,17 @@ const styles = {
   // ==========================================================
 
   errorCard: {
-    width: "100%",
-    maxWidth: "500px",
-    margin: "100px auto",
+    width: "calc(100% - 40px)",
+    maxWidth: "520px",
+    margin: "120px auto 50px",
     padding: "35px 28px",
     textAlign: "center",
-    borderRadius: "24px",
+    borderRadius: "22px",
     background: "#ffffff",
     border:
-      "1px solid rgba(239,68,68,0.12)",
+      "1px solid rgba(15,23,42,0.08)",
     boxShadow:
-      "0 20px 50px rgba(15,23,42,0.08)",
+      "0 18px 45px rgba(15,23,42,0.08)",
     boxSizing: "border-box",
   },
 
@@ -2606,22 +2809,25 @@ const styles = {
     justifyContent: "center",
     background: "#fff1f2",
     color: "#dc2626",
-    fontSize: "24px",
+    border:
+      "1px solid rgba(220,38,38,0.10)",
+    fontSize: "22px",
     fontWeight: 900,
   },
 
   errorTitle: {
     margin:
       "18px 0 8px",
-    fontSize: "23px",
+    fontSize: "22px",
     fontWeight: 900,
+    letterSpacing: "-0.8px",
   },
 
   errorText: {
     margin: 0,
     color: "#64748b",
     fontSize: "13px",
-    lineHeight: 1.6,
+    lineHeight: 1.65,
   },
 
   errorActions: {
@@ -2634,32 +2840,38 @@ const styles = {
   },
 
   primaryButton: {
-    minHeight: "44px",
+    minHeight: "43px",
     padding: "0 16px",
-    border: "none",
     borderRadius: "11px",
+    border:
+      "1px solid rgba(18,97,255,0.45)",
     background:
       "linear-gradient(135deg, #1261ff, #0b4fd7)",
     color: "#ffffff",
-    fontSize: "12px",
-    fontWeight: 800,
+    fontFamily: "inherit",
+    fontSize: "11px",
+    fontWeight: 850,
     cursor: "pointer",
+    boxShadow:
+      "0 8px 18px rgba(18,97,255,0.18)",
   },
 
   secondaryButton: {
-    minHeight: "44px",
+    minHeight: "43px",
     padding: "0 16px",
+    borderRadius: "11px",
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: "11px",
     background: "#ffffff",
     color: "#334155",
     border:
-      "1px solid rgba(15,23,42,0.10)",
+      "1px solid rgba(15,23,42,0.12)",
     textDecoration: "none",
-    fontSize: "12px",
+    fontSize: "11px",
     fontWeight: 800,
+    boxShadow:
+      "0 3px 8px rgba(15,23,42,0.04)",
   },
 };
 
@@ -2668,20 +2880,19 @@ const styles = {
 // ============================================================
 
 if (typeof document !== "undefined") {
-  const styleId =
-    "gradlink-company-dashboard-responsive";
+  const styleId = "gradlink-company-dashboard-styles";
 
   if (!document.getElementById(styleId)) {
-    const style =
-      document.createElement("style");
+    const style = document.createElement("style");
 
     style.id = styleId;
 
     style.innerHTML = `
-      @keyframes spin {
+      @keyframes gradlinkSpin {
         from {
           transform: rotate(0deg);
         }
+
         to {
           transform: rotate(360deg);
         }
@@ -2696,6 +2907,12 @@ if (typeof document !== "undefined") {
       @media (max-width: 900px) {
         body {
           overflow-x: hidden;
+        }
+      }
+
+      @media (max-width: 760px) {
+        header {
+          transform-origin: top center;
         }
       }
     `;
