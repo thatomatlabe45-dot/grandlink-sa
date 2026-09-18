@@ -435,7 +435,7 @@ function findQualificationDocument(
 // OPEN SUPABASE DOCUMENT
 // ============================================================
 
-async function openStorageDocument(
+   async function openStorageDocument(
   value,
   documentName
 ) {
@@ -445,6 +445,155 @@ async function openStorageDocument(
     );
     return;
   }
+
+  const cleanPath = getStoragePath(value);
+
+  if (!cleanPath) {
+    alert(
+      `The ${documentName} file path could not be found.`
+    );
+    return;
+  }
+
+  // Open immediately so Safari does not block it
+  const newWindow = window.open(
+    "about:blank",
+    "_blank"
+  );
+
+  if (!newWindow) {
+    alert(
+      "Safari blocked the document window. Please allow pop-ups and try again."
+    );
+    return;
+  }
+
+  try {
+    // Show a temporary loading screen
+    newWindow.document.open();
+
+    newWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>GradLink SA - Opening Document</title>
+          <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1"
+          >
+          <style>
+            body {
+              margin: 0;
+              min-height: 100vh;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              background: #f4f8fc;
+              font-family: Arial, sans-serif;
+              text-align: center;
+              color: #222;
+            }
+
+            .box {
+              background: white;
+              padding: 32px;
+              margin: 20px;
+              border-radius: 18px;
+              box-shadow: 0 10px 35px rgba(0,0,0,0.08);
+              max-width: 420px;
+            }
+
+            .icon {
+              font-size: 48px;
+              margin-bottom: 12px;
+            }
+
+            h2 {
+              margin: 0 0 10px;
+              color: #0057B8;
+            }
+
+            p {
+              margin: 0;
+              color: #666;
+              line-height: 1.6;
+            }
+          </style>
+        </head>
+
+        <body>
+          <div class="box">
+            <div class="icon">📄</div>
+
+            <h2>
+              Opening ${documentName}
+            </h2>
+
+            <p>
+              GradLink SA is securely preparing the document.
+            </p>
+          </div>
+        </body>
+      </html>
+    `);
+
+    newWindow.document.close();
+
+    console.log(
+      `${documentName} storage path:`,
+      cleanPath
+    );
+
+    // Create signed URL
+    const {
+      data,
+      error,
+    } = await supabase.storage
+      .from("documents")
+      .createSignedUrl(
+        cleanPath,
+        600
+      );
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data?.signedUrl) {
+      throw new Error(
+        `Could not create a secure link for this ${documentName}.`
+      );
+    }
+
+    console.log(
+      `${documentName} signed URL created successfully`
+    );
+
+    // Navigate ONLY the new document window.
+    // This does NOT navigate/reload the applicants page.
+    newWindow.location.replace(
+      data.signedUrl
+    );
+
+  } catch (error) {
+    console.error(
+      `${documentName} opening error:`,
+      error
+    );
+
+    try {
+      newWindow.close();
+    } catch {
+      // Ignore
+    }
+
+    alert(
+      error?.message ||
+        `Could not open the ${documentName}.`
+    );
+  }
+}
+
 
   // ----------------------------------------------------------
   // Open window immediately.
@@ -2301,57 +2450,81 @@ function ApplicantCard({
 
         {/* CV */}
 
-        <button
-          type="button"
-          onClick={() =>
-            onReviewCV(
-              application
-            )
-          }
-          style={{
-            ...actionButton(
-              hasCV
-                ? "#174ea6"
-                : "#9aa5b1"
-            ),
-            cursor: hasCV
-              ? "pointer"
-              : "not-allowed",
-            opacity: hasCV
-              ? 1
-              : 0.7,
-          }}
-        >
-          📄 Review CV
-        </button>
+       <button
+  type="button"
+  onMouseDown={(event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  }}
+  onClick={async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!hasCV) {
+      alert(
+        "This applicant has not uploaded a CV."
+      );
+      return;
+    }
+
+    await onReviewCV(application);
+  }}
+  disabled={!hasCV}
+  style={{
+    ...actionButton(
+      hasCV
+        ? "#174ea6"
+        : "#9aa5b1"
+    ),
+    cursor: hasCV
+      ? "pointer"
+      : "not-allowed",
+    opacity: hasCV
+      ? 1
+      : 0.7,
+  }}
+>
+  📄 Review CV
+</button>
 
         {/* QUALIFICATION */}
 
         <button
-          type="button"
-          onClick={() =>
-            onViewQualification(
-              application
-            )
-          }
-          style={{
-            ...actionButton(
-              hasQualification
-                ? "#6b46c1"
-                : "#9aa5b1"
-            ),
-            cursor:
-              hasQualification
-                ? "pointer"
-                : "not-allowed",
-            opacity:
-              hasQualification
-                ? 1
-                : 0.7,
-          }}
-        >
-          🎓 View Qualification
-        </button>
+  type="button"
+  onMouseDown={(event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  }}
+  onClick={async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!hasQualification) {
+      alert(
+        "This applicant has not uploaded a qualification document."
+      );
+      return;
+    }
+
+    await onViewQualification(application);
+  }}
+  disabled={!hasQualification}
+  style={{
+    ...actionButton(
+      hasQualification
+        ? "#6b46c1"
+        : "#9aa5b1"
+    ),
+    cursor: hasQualification
+      ? "pointer"
+      : "not-allowed",
+    opacity: hasQualification
+      ? 1
+      : 0.7,
+  }}
+>
+  🎓 View Qualification
+</button>
 
         {/* SHORTLIST */}
 
