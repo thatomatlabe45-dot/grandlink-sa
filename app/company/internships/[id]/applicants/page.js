@@ -430,15 +430,13 @@ function findQualificationDocument(
     null
   );
 }
-
-// ============================================================
+  
+  
+  // ============================================================
 // OPEN SUPABASE DOCUMENT
 // ============================================================
 
-   async function openStorageDocument(
-  value,
-  documentName
-) {
+async function openStorageDocument(value, documentName) {
   if (!value) {
     alert(
       `This applicant has not uploaded a ${documentName}.`
@@ -455,7 +453,8 @@ function findQualificationDocument(
     return;
   }
 
-  // Open immediately so Safari does not block it
+  // Open the new window immediately.
+  // This helps prevent Safari from blocking the popup.
   const newWindow = window.open(
     "about:blank",
     "_blank"
@@ -469,7 +468,6 @@ function findQualificationDocument(
   }
 
   try {
-    // Show a temporary loading screen
     newWindow.document.open();
 
     newWindow.document.write(`
@@ -477,10 +475,12 @@ function findQualificationDocument(
       <html>
         <head>
           <title>GradLink SA - Opening Document</title>
+
           <meta
             name="viewport"
             content="width=device-width, initial-scale=1"
           >
+
           <style>
             body {
               margin: 0;
@@ -544,148 +544,8 @@ function findQualificationDocument(
       cleanPath
     );
 
-    // Create signed URL
-    const {
-      data,
-      error,
-    } = await supabase.storage
-      .from("documents")
-      .createSignedUrl(
-        cleanPath,
-        600
-      );
-
-    if (error) {
-      throw error;
-    }
-
-    if (!data?.signedUrl) {
-      throw new Error(
-        `Could not create a secure link for this ${documentName}.`
-      );
-    }
-
-    console.log(
-      `${documentName} signed URL created successfully`
-    );
-
-    // Navigate ONLY the new document window.
-    // This does NOT navigate/reload the applicants page.
-    newWindow.location.replace(
-      data.signedUrl
-    );
-
-  } catch (error) {
-    console.error(
-      `${documentName} opening error:`,
-      error
-    );
-
-    try {
-      newWindow.close();
-    } catch {
-      // Ignore
-    }
-
-    alert(
-      error?.message ||
-        `Could not open the ${documentName}.`
-    );
-  }
-}
-
-
-  // ----------------------------------------------------------
-  // Open window immediately.
-  // This prevents Safari from blocking the popup.
-  // ----------------------------------------------------------
-
-  const newWindow = window.open(
-    "",
-    "_blank"
-  );
-
-  if (!newWindow) {
-    alert(
-      "Please allow pop-ups in Safari to view this document."
-    );
-    return;
-  }
-
-  try {
-    newWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Opening ${documentName}</title>
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <style>
-            body {
-              margin: 0;
-              min-height: 100vh;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-family: Arial, sans-serif;
-              background: #f4f8fc;
-              color: #0057B8;
-              text-align: center;
-            }
-
-            .box {
-              background: white;
-              padding: 35px;
-              border-radius: 18px;
-              box-shadow: 0 10px 35px rgba(0,0,0,0.08);
-              max-width: 420px;
-              margin: 20px;
-            }
-
-            .icon {
-              font-size: 45px;
-              margin-bottom: 15px;
-            }
-
-            h2 {
-              margin: 0 0 10px;
-            }
-
-            p {
-              color: #666;
-              line-height: 1.5;
-            }
-          </style>
-        </head>
-
-        <body>
-          <div class="box">
-            <div class="icon">📄</div>
-            <h2>Opening document...</h2>
-            <p>
-              Please wait while GradLink SA securely
-              prepares the document.
-            </p>
-          </div>
-        </body>
-      </html>
-    `);
-
-    const cleanPath =
-      getStoragePath(value);
-
-    if (!cleanPath) {
-      throw new Error(
-        `The ${documentName} file path could not be found.`
-      );
-    }
-
-    console.log(
-      `${documentName} storage path:`,
-      cleanPath
-    );
-
     // --------------------------------------------------------
-    // CREATE SECURE SIGNED URL
+    // CREATE SIGNED URL
     // --------------------------------------------------------
 
     const {
@@ -708,12 +568,18 @@ function findQualificationDocument(
       );
     }
 
+    console.log(
+      `${documentName} signed URL created successfully`
+    );
+
     // --------------------------------------------------------
-    // SEND DOCUMENT TO NEW WINDOW
+    // ONLY THE NEW WINDOW NAVIGATES
     // --------------------------------------------------------
 
-    newWindow.location.href =
-      data.signedUrl;
+    newWindow.location.replace(
+      data.signedUrl
+    );
+
   } catch (error) {
     console.error(
       `${documentName} opening error:`,
@@ -732,6 +598,9 @@ function findQualificationDocument(
     );
   }
 }
+
+
+
 
 // ============================================================
 // PAGE
