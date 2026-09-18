@@ -453,100 +453,11 @@ async function openStorageDocument(value, documentName) {
     return;
   }
 
-  // Open the new window immediately.
-  // This helps prevent Safari from blocking the popup.
-  const newWindow = window.open(
-    "about:blank",
-    "_blank"
-  );
-
-  if (!newWindow) {
-    alert(
-      "Safari blocked the document window. Please allow pop-ups and try again."
-    );
-    return;
-  }
-
   try {
-    newWindow.document.open();
-
-    newWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>GradLink SA - Opening Document</title>
-
-          <meta
-            name="viewport"
-            content="width=device-width, initial-scale=1"
-          >
-
-          <style>
-            body {
-              margin: 0;
-              min-height: 100vh;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              background: #f4f8fc;
-              font-family: Arial, sans-serif;
-              text-align: center;
-              color: #222;
-            }
-
-            .box {
-              background: white;
-              padding: 32px;
-              margin: 20px;
-              border-radius: 18px;
-              box-shadow: 0 10px 35px rgba(0,0,0,0.08);
-              max-width: 420px;
-            }
-
-            .icon {
-              font-size: 48px;
-              margin-bottom: 12px;
-            }
-
-            h2 {
-              margin: 0 0 10px;
-              color: #0057B8;
-            }
-
-            p {
-              margin: 0;
-              color: #666;
-              line-height: 1.6;
-            }
-          </style>
-        </head>
-
-        <body>
-          <div class="box">
-            <div class="icon">📄</div>
-
-            <h2>
-              Opening ${documentName}
-            </h2>
-
-            <p>
-              GradLink SA is securely preparing the document.
-            </p>
-          </div>
-        </body>
-      </html>
-    `);
-
-    newWindow.document.close();
-
     console.log(
       `${documentName} storage path:`,
       cleanPath
     );
-
-    // --------------------------------------------------------
-    // CREATE SIGNED URL
-    // --------------------------------------------------------
 
     const {
       data,
@@ -559,12 +470,17 @@ async function openStorageDocument(value, documentName) {
       );
 
     if (error) {
+      console.error(
+        "Supabase signed URL error:",
+        error
+      );
+
       throw error;
     }
 
     if (!data?.signedUrl) {
       throw new Error(
-        `Could not create a secure ${documentName} link.`
+        `Could not create a secure link for this ${documentName}.`
       );
     }
 
@@ -573,12 +489,29 @@ async function openStorageDocument(value, documentName) {
     );
 
     // --------------------------------------------------------
-    // ONLY THE NEW WINDOW NAVIGATES
+    // CREATE A TEMPORARY LINK
     // --------------------------------------------------------
 
-    newWindow.location.replace(
-      data.signedUrl
-    );
+    const link =
+      document.createElement("a");
+
+    link.href =
+      data.signedUrl;
+
+    link.target =
+      "_blank";
+
+    link.rel =
+      "noopener noreferrer";
+
+    // Add the link to the page temporarily
+    document.body.appendChild(link);
+
+    // Trigger the browser's normal link handling
+    link.click();
+
+    // Remove it afterwards
+    document.body.removeChild(link);
 
   } catch (error) {
     console.error(
@@ -586,19 +519,12 @@ async function openStorageDocument(value, documentName) {
       error
     );
 
-    try {
-      newWindow.close();
-    } catch {
-      // Ignore close error
-    }
-
     alert(
       error?.message ||
         `Could not open the ${documentName}.`
     );
   }
 }
-
 
 
 
