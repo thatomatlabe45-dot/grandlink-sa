@@ -10,11 +10,15 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
+// ============================================================
+// PRICING
+// ============================================================
+
 const PLANS = [
   {
     id: "starter",
     name: "Starter",
-    price: 500,
+    monthlyPrice: 500,
     description:
       "For businesses starting their graduate recruitment journey.",
     features: [
@@ -27,10 +31,11 @@ const PLANS = [
     ],
     popular: false,
   },
+
   {
     id: "professional",
     name: "Professional",
-    price: 1000,
+    monthlyPrice: 1000,
     description:
       "For companies actively recruiting South African graduates.",
     features: [
@@ -44,10 +49,11 @@ const PLANS = [
     ],
     popular: true,
   },
+
   {
     id: "premium",
     name: "Premium",
-    price: 2000,
+    monthlyPrice: 2000,
     description:
       "For companies wanting advanced AI-powered recruitment.",
     features: [
@@ -63,16 +69,47 @@ const PLANS = [
   },
 ];
 
+// ============================================================
+// BILLING HELPERS
+// ============================================================
+
+function getAnnualPrice(monthlyPrice) {
+  // 15% discount on the normal 12-month cost
+  return Math.round(monthlyPrice * 12 * 0.85);
+}
+
+function getAnnualSaving(monthlyPrice) {
+  const normalAnnualPrice = monthlyPrice * 12;
+  const discountedAnnualPrice = getAnnualPrice(monthlyPrice);
+
+  return normalAnnualPrice - discountedAnnualPrice;
+}
+
+function formatCurrency(amount) {
+  return `R${amount.toLocaleString("en-ZA")}`;
+}
+
+// ============================================================
+// PAGE
+// ============================================================
+
 export default function CompanyPricingPage() {
   const router = useRouter();
 
   const [billing, setBilling] = useState("monthly");
+
   const [user, setUser] = useState(null);
   const [currentPlan, setCurrentPlan] = useState(null);
+
   const [loadingUser, setLoadingUser] = useState(true);
   const [selectingPlan, setSelectingPlan] = useState(null);
+
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  // ==========================================================
+  // LOAD COMPANY
+  // ==========================================================
 
   useEffect(() => {
     loadCompany();
@@ -81,6 +118,7 @@ export default function CompanyPricingPage() {
   async function loadCompany() {
     try {
       setLoadingUser(true);
+      setError("");
 
       const {
         data: { user },
@@ -89,6 +127,7 @@ export default function CompanyPricingPage() {
 
       if (userError) {
         console.error(userError);
+        setError("We could not load your account.");
         return;
       }
 
@@ -98,15 +137,20 @@ export default function CompanyPricingPage() {
         return;
       }
 
-      const { data: subscription, error: subscriptionError } =
-        await supabase
-          .from("company_subscriptions")
-          .select("*")
-          .eq("company_id", user.id)
-          .maybeSingle();
+      const {
+        data: subscription,
+        error: subscriptionError,
+      } = await supabase
+        .from("company_subscriptions")
+        .select("*")
+        .eq("company_id", user.id)
+        .maybeSingle();
 
       if (subscriptionError) {
         console.error(subscriptionError);
+
+        // Don't block the pricing page if the subscription
+        // record does not exist yet.
         return;
       }
 
@@ -114,11 +158,16 @@ export default function CompanyPricingPage() {
         setCurrentPlan(subscription);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Load company error:", err);
+      setError("Something went wrong while loading your account.");
     } finally {
       setLoadingUser(false);
     }
   }
+
+  // ==========================================================
+  // CHOOSE PLAN
+  // ==========================================================
 
   async function choosePlan(plan) {
     setMessage("");
@@ -141,31 +190,71 @@ export default function CompanyPricingPage() {
         return;
       }
 
+      // --------------------------------------------------------
+      // CORRECT BILLING CALCULATION
+      // --------------------------------------------------------
+      //
+      // Monthly:
+      //   Starter       R500/month
+      //   Professional  R1,000/month
+      //   Premium       R2,000/month
+      //
+      // Annual:
+      //   12 months minus 15%
+      //
+      // Starter       R5,100/year
+      // Professional  R10,200/year
+      // Premium       R20,400/year
+      //
+      // --------------------------------------------------------
+
+      const monthlyPrice = plan.monthlyPrice;
+
+      const annualPrice = getAnnualPrice(monthlyPrice);
+
       const selectedPrice =
         billing === "annual"
-          ? Math.round(plan.price * 0.85)
-          : plan.price;
+          ? annualPrice
+          : monthlyPrice;
 
-      /*
-       * IMPORTANT:
-       * This only records the company's selected plan.
-       * It does NOT activate the subscription.
-       *
-       * Payment will be connected later.
-       */
+      // --------------------------------------------------------
+      // IMPORTANT
+      // --------------------------------------------------------
+      //
+      // Selecting a plan DOES NOT activate Premium.
+      //
+      // The subscription remains "inactive" until a real
+      // payment provider confirms successful payment.
+      //
+      // --------------------------------------------------------
 
-      const { data, error: saveError } = await supabase
+      const subscriptionData = {
+        company_id: user.id,
+
+        plan: plan.id,
+
+        billing_cycle: billing,
+
+        monthly_price: monthlyPrice,
+
+        annual_price: annualPrice,
+
+        status: "inactive",
+
+        payment_provider: null,
+
+        payment_reference: null,
+
+        updated_at: new Date().toISOString(),
+      };
+
+      const {
+        data,
+        error: saveError,
+      } = await supabase
         .from("company_subscriptions")
         .upsert(
-          {
-            company_id: user.id,
-            plan: plan.id,
-            status: "inactive",
-            monthly_price: selectedPrice,
-            payment_provider: null,
-            payment_reference: null,
-            updated_at: new Date().toISOString(),
-          },
+          subscriptionData,
           {
             onConflict: "company_id",
           }
@@ -179,15 +268,33 @@ export default function CompanyPricingPage() {
 
       setCurrentPlan(data);
 
+      // --------------------------------------------------------
+      // PAYMENT NOT CONNECTED YET
+      // --------------------------------------------------------
+
       setMessage(
-        `${plan.name} selected successfully. Payment setup is the next step.`
+        `${plan.name} selected at ${formatCurrency(
+          selectedPrice
+        )} ${
+          billing === "annual"
+            ? "per year"
+            : "per month"
+        }. Payment is required to activate the subscription.`
       );
 
-      /*
-       * We stay on this page for now.
-       * Once payment is connected, this button will
-       * send the company to the payment checkout.
-       */
+      // --------------------------------------------------------
+      // FUTURE PAYMENT FLOW
+      // --------------------------------------------------------
+      //
+      // Later this is where we will send the company to the
+      // real payment checkout.
+      //
+      // Example:
+      //
+      // router.push("/company-checkout");
+      //
+      // We are NOT activating the subscription here.
+      // --------------------------------------------------------
     } catch (err) {
       console.error("Plan selection error:", err);
 
@@ -200,413 +307,72 @@ export default function CompanyPricingPage() {
     }
   }
 
-  function getDisplayedPrice(price) {
+  // ==========================================================
+  // PRICE DISPLAY
+  // ==========================================================
+
+  function getDisplayedPrice(plan) {
     if (billing === "annual") {
-      return Math.round(price * 0.85);
+      return getAnnualPrice(plan.monthlyPrice);
     }
 
-    return price;
+    return plan.monthlyPrice;
   }
+
+  function getPricePeriod() {
+    return billing === "annual"
+      ? "/year"
+      : "/month";
+  }
+
+  // ==========================================================
+  // ANNUAL EQUIVALENT
+  // ==========================================================
+
+  function getMonthlyEquivalent(plan) {
+    if (billing !== "annual") {
+      return null;
+    }
+
+    return Math.round(
+      getAnnualPrice(plan.monthlyPrice) / 12
+    );
+  }
+
+  // ==========================================================
+  // SELECTED PLAN
+  // ==========================================================
+
+  function isPlanSelected(plan) {
+    return currentPlan?.plan === plan.id;
+  }
+
+  // ==========================================================
+  // PAYMENT STATUS
+  // ==========================================================
+
+  function isActiveSubscription() {
+    return (
+      currentPlan?.status?.toLowerCase() ===
+      "active"
+    );
+  }
+
+  // ==========================================================
+  // RENDER
+  // ==========================================================
 
   return (
     <main className="pricing-page">
-      {/* =====================================================
+
+      {/* ======================================================
           NAVBAR
-      ====================================================== */}
+      ======================================================= */}
 
       <nav className="navbar">
+
         <Link href="/" className="logo">
-          <span className="logo-icon">G</span>
 
-          <span>
-            GradLink <strong>SA</strong>
-          </span>
-        </Link>
-
-        <div className="nav-links">
-          <Link href="/">Home</Link>
-          <Link href="/internships">Internships</Link>
-          <Link href="/jobs">Jobs</Link>
-          <Link href="/company">Company</Link>
-        </div>
-
-        <div className="nav-actions">
-          <Link href="/login" className="login-btn">
-            Log In
-          </Link>
-
-          <Link href="/signup" className="signup-btn">
-            Get Started
-          </Link>
-        </div>
-      </nav>
-
-      {/* =====================================================
-          HERO
-      ====================================================== */}
-
-      <section className="hero">
-        <div className="badge">
-          🚀 Built for South African businesses
-        </div>
-
-        <h1>
-          Recruit better.
-          <br />
-          <span>Grow with GradLink SA.</span>
-        </h1>
-
-        <p>
-          Access talented South African graduates, manage
-          applications, and use AI-powered recruitment tools
-          to find the right candidates.
-        </p>
-
-        <div className="billing-toggle">
-          <button
-            className={billing === "monthly" ? "active" : ""}
-            onClick={() => setBilling("monthly")}
-          >
-            Monthly
-          </button>
-
-          <button
-            className={billing === "annual" ? "active" : ""}
-            onClick={() => setBilling("annual")}
-          >
-            Annual
-            <span className="save">Save 15%</span>
-          </button>
-        </div>
-      </section>
-
-      {/* =====================================================
-          LOGIN / STATUS MESSAGE
-      ====================================================== */}
-
-      {!loadingUser && !user && (
-        <div className="info-banner">
-          <strong>Company account required.</strong>
-
-          <span>
-            Log in or create a company account to select a
-            GradLink SA plan.
-          </span>
-        </div>
-      )}
-
-      {message && (
-        <div className="success-message">
-          ✓ {message}
-        </div>
-      )}
-
-      {error && (
-        <div className="error-message">
-          ⚠️ {error}
-        </div>
-      )}
-
-      {/* =====================================================
-          PRICING
-      ====================================================== */}
-
-      <section className="pricing-section">
-        <div className="pricing-grid">
-          {PLANS.map((plan) => {
-            const displayedPrice = getDisplayedPrice(plan.price);
-
-            const isSelected =
-              currentPlan?.plan === plan.id;
-
-            const isSelecting =
-              selectingPlan === plan.id;
-
-            return (
-              <div
-                key={plan.id}
-                className={`pricing-card ${
-                  plan.popular ? "popular" : ""
-                }`}
-              >
-                {plan.popular && (
-                  <div className="popular-label">
-                    MOST POPULAR
-                  </div>
-                )}
-
-                <div className="card-content">
-                  <div className="plan-heading">
-                    <h2>{plan.name}</h2>
-
-                    {isSelected && (
-                      <span className="selected-badge">
-                        Selected
-                      </span>
-                    )}
-                  </div>
-
-                  <p className="description">
-                    {plan.description}
-                  </p>
-
-                  <div className="price">
-                    <span className="currency">R</span>
-
-                    {displayedPrice.toLocaleString()}
-
-                    <span className="period">
-                      /month
-                    </span>
-                  </div>
-
-                  {billing === "annual" && (
-                    <p className="annual-note">
-                      15% annual saving applied
-                    </p>
-                  )}
-
-                  <button
-                    className={`plan-button ${
-                      plan.popular ? "primary" : ""
-                    }`}
-                    onClick={() => choosePlan(plan)}
-                    disabled={isSelecting}
-                  >
-                    {isSelecting
-                      ? "Saving..."
-                      : isSelected
-                      ? "Plan Selected"
-                      : `Choose ${plan.name}`}
-                  </button>
-
-                  <div className="divider"></div>
-
-                  <p className="includes">
-                    {plan.name === "Premium"
-                      ? "Everything you need for advanced recruitment:"
-                      : "What's included:"}
-                  </p>
-
-                  <ul>
-                    {plan.features.map(
-                      (feature, index) => (
-                        <li key={index}>
-                          <span className="check">
-                            ✓
-                          </span>
-
-                          {feature}
-                        </li>
-                      )
-                    )}
-                  </ul>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* =====================================================
-          PREMIUM AI VERIFICATION
-      ====================================================== */}
-
-      <section className="verification-section">
-        <div className="verification-content">
-          <div className="verification-badge">
-            ✨ PREMIUM AI
-          </div>
-
-          <h2>
-            Go beyond the CV.
-          </h2>
-
-          <p>
-            Premium gives companies access to GradLink's
-            AI-assisted document analysis tools.
-          </p>
-
-          <div className="verification-grid">
-            <div className="verification-item">
-              <span>📄</span>
-
-              <div>
-                <h3>Document Analysis</h3>
-
-                <p>
-                  Analyse submitted CVs and qualification
-                  documents.
-                </p>
-              </div>
-            </div>
-
-            <div className="verification-item">
-              <span>🔎</span>
-
-              <div>
-                <h3>Consistency Checks</h3>
-
-                <p>
-                  Identify information that may be
-                  inconsistent across submitted documents.
-                </p>
-              </div>
-            </div>
-
-            <div className="verification-item">
-              <span>🤖</span>
-
-              <div>
-                <h3>AI Candidate Analysis</h3>
-
-                <p>
-                  Get additional insights when reviewing
-                  applicants.
-                </p>
-              </div>
-            </div>
-
-            <div className="verification-item">
-              <span>📊</span>
-
-              <div>
-                <h3>Recruitment Insights</h3>
-
-                <p>
-                  Understand your applicant pipeline more
-                  easily.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <p className="important-note">
-            AI verification provides screening signals and
-            does not guarantee that a document is authentic.
-            Companies should perform appropriate final
-            verification where required.
-          </p>
-        </div>
-      </section>
-
-      {/* =====================================================
-          GRADUATES
-      ====================================================== */}
-
-      <section className="graduate-section">
-        <div className="graduate-box">
-          <div className="graduate-icon">
-            🎓
-          </div>
-
-          <h2>
-            Graduates don't pay to apply.
-          </h2>
-
-          <p>
-            GradLink SA keeps the core graduate experience
-            free, helping talented South Africans discover
-            opportunities without a subscription barrier.
-          </p>
-
-          <Link
-            href="/signup"
-            className="graduate-button"
-          >
-            Join GradLink SA
-          </Link>
-        </div>
-      </section>
-
-      {/* =====================================================
-          FAQ
-      ====================================================== */}
-
-      <section className="faq-section">
-        <h2>
-          Frequently Asked Questions
-        </h2>
-
-        <div className="faq-grid">
-          <div className="faq-card">
-            <h3>
-              Do companies have to pay?
-            </h3>
-
-            <p>
-              Yes. Company recruitment accounts require a
-              paid GradLink SA subscription.
-            </p>
-          </div>
-
-          <div className="faq-card">
-            <h3>
-              Can graduates use GradLink for free?
-            </h3>
-
-            <p>
-              Yes. Graduates can create profiles, discover
-              opportunities and apply using the core
-              platform without a subscription.
-            </p>
-          </div>
-
-          <div className="faq-card">
-            <h3>
-              What is AI document verification?
-            </h3>
-
-            <p>
-              It is an AI-assisted screening feature designed
-              to analyse submitted documents and identify
-              potential inconsistencies or verification
-              signals.
-            </p>
-          </div>
-
-          <div className="faq-card">
-            <h3>
-              Can I change my plan?
-            </h3>
-
-            <p>
-              Yes. Companies will be able to upgrade or
-              change their subscription as their recruitment
-              needs change.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* =====================================================
-          FINAL CTA
-      ====================================================== */}
-
-      <section className="final-cta">
-        <h2>
-          Ready to recruit your next graduate?
-        </h2>
-
-        <p>
-          Join businesses using GradLink SA to connect
-          with emerging South African talent.
-        </p>
-
-        <Link
-          href="/signup"
-          className="cta-button"
-        >
-          Create Company Account →
-        </Link>
-      </section>
-
-      {/* =====================================================
-          FOOTER
-      ====================================================== */}
-
-      <footer>
-        <div className="footer-logo">
           <span className="logo-icon">
             G
           </span>
@@ -614,14 +380,11 @@ export default function CompanyPricingPage() {
           <span>
             GradLink <strong>SA</strong>
           </span>
-        </div>
 
-        <p>
-          Connecting South African graduates with
-          opportunity.
-        </p>
+        </Link>
 
-        <div className="footer-links">
+        <div className="nav-links">
+
           <Link href="/">
             Home
           </Link>
@@ -635,701 +398,917 @@ export default function CompanyPricingPage() {
           </Link>
 
           <Link href="/company">
-            Companies
+            Company
           </Link>
+
         </div>
 
-        <p className="copyright">
-          © 2026 GradLink SA. All rights reserved.
+        <div className="nav-actions">
+
+          <Link
+            href="/login"
+            className="login-btn"
+          >
+            Log In
+          </Link>
+
+          <Link
+            href="/signup"
+            className="signup-btn"
+          >
+            Get Started
+          </Link>
+
+        </div>
+
+      </nav>
+
+      {/* ======================================================
+          HERO
+      ======================================================= */}
+
+      <section className="hero">
+
+        <div className="badge">
+          🚀 Built for South African businesses
+        </div>
+
+        <h1>
+          Recruit better.
+          <br />
+          <span>
+            Grow with GradLink SA.
+          </span>
+        </h1>
+
+        <p>
+          Access talented South African graduates,
+          manage applications, and use AI-powered
+          recruitment tools to find the right
+          candidates.
         </p>
+
+        {/* ==================================================
+            BILLING TOGGLE
+        =================================================== */}
+
+        <div className="billing-toggle">
+
+          <button
+            type="button"
+            className={
+              billing === "monthly"
+                ? "active"
+                : ""
+            }
+            onClick={() =>
+              setBilling("monthly")
+            }
+          >
+            Monthly
+          </button>
+
+          <button
+            type="button"
+            className={
+              billing === "annual"
+                ? "active"
+                : ""
+            }
+            onClick={() =>
+              setBilling("annual")
+            }
+          >
+            Annual
+
+            <span className="save">
+              Save 15%
+            </span>
+          </button>
+
+        </div>
+
+      </section>
+
+      {/* ======================================================
+          LOGIN MESSAGE
+      ======================================================= */}
+
+      {!loadingUser && !user && (
+
+        <div className="info-banner">
+
+          <strong>
+            Company account required.
+          </strong>
+
+          <span>
+            Log in or create a company account
+            to select a GradLink SA plan.
+          </span>
+
+        </div>
+
+      )}
+
+      {/* ======================================================
+          SUCCESS MESSAGE
+      ======================================================= */}
+
+      {message && (
+
+        <div className="success-message">
+
+          ✓ {message}
+
+        </div>
+
+      )}
+
+      {/* ======================================================
+          ERROR MESSAGE
+      ======================================================= */}
+
+      {error && (
+
+        <div className="error-message">
+
+          ⚠️ {error}
+
+        </div>
+
+      )}
+
+      {/* ======================================================
+          ACTIVE SUBSCRIPTION
+      ======================================================= */}
+
+      {isActiveSubscription() && (
+
+        <div className="active-banner">
+
+          <strong>
+            ✓ Premium subscription active
+          </strong>
+
+          <span>
+            Your {currentPlan.plan} plan is
+            currently active.
+          </span>
+
+        </div>
+
+      )}
+
+      {/* ======================================================
+          PRICING
+      ======================================================= */}
+
+      <section className="pricing-section">
+
+        <div className="pricing-grid">
+
+          {PLANS.map((plan) => {
+
+            const displayedPrice =
+              getDisplayedPrice(plan);
+
+            const monthlyEquivalent =
+              getMonthlyEquivalent(plan);
+
+            const annualSaving =
+              getAnnualSaving(
+                plan.monthlyPrice
+              );
+
+            const isSelected =
+              isPlanSelected(plan);
+
+            const isSelecting =
+              selectingPlan === plan.id;
+
+            return (
+
+              <div
+                key={plan.id}
+                className={`pricing-card ${
+                  plan.popular
+                    ? "popular"
+                    : ""
+                }`}
+              >
+
+                {plan.popular && (
+
+                  <div className="popular-label">
+                    MOST POPULAR
+                  </div>
+
+                )}
+
+                <div className="card-content">
+
+                  {/* PLAN NAME */}
+
+                  <div className="plan-heading">
+
+                    <h2>
+                      {plan.name}
+                    </h2>
+
+                    {isSelected && (
+
+                      <span className="selected-badge">
+                        Selected
+                      </span>
+
+                    )}
+
+                  </div>
+
+                  {/* DESCRIPTION */}
+
+                  <p className="description">
+                    {plan.description}
+                  </p>
+
+                  {/* PRICE */}
+
+                  <div className="price">
+
+                    <span className="currency">
+                      R
+                    </span>
+
+                    {displayedPrice
+                      .toLocaleString(
+                        "en-ZA"
+                      )}
+
+                    <span className="period">
+                      {getPricePeriod()}
+                    </span>
+
+                  </div>
+
+                  {/* ANNUAL DETAILS */}
+
+                  {billing === "annual" && (
+
+                    <div className="annual-details">
+
+                      <p className="annual-equivalent">
+
+                        ≈{" "}
+                        {formatCurrency(
+                          monthlyEquivalent
+                        )}
+                        /month equivalent
+
+                      </p>
+
+                      <p className="annual-saving">
+
+                        Save{" "}
+                        {formatCurrency(
+                          annualSaving
+                        )}
+                        per year
+
+                      </p>
+
+                    </div>
+
+                  )}
+
+                  {/* MONTHLY DETAILS */}
+
+                  {billing === "monthly" && (
+
+                    <p className="billing-note">
+                      Billed monthly
+                    </p>
+
+                  )}
+
+                  {/* PLAN BUTTON */}
+
+                  <button
+                    type="button"
+                    className={`plan-button ${
+                      plan.popular
+                        ? "primary"
+                        : ""
+                    }`}
+                    onClick={() =>
+                      choosePlan(plan)
+                    }
+                    disabled={isSelecting}
+                  >
+
+                    {isSelecting
+                      ? "Saving..."
+                      : isSelected
+                      ? "Plan Selected"
+                      : `Choose ${plan.name}`}
+
+                  </button>
+
+                  {/* DIVIDER */}
+
+                  <div className="divider"></div>
+
+                  {/* FEATURES */}
+
+                  <p className="includes">
+
+                    {plan.name ===
+                    "Premium"
+                      ? "Everything you need for advanced recruitment:"
+                      : "What's included:"}
+
+                  </p>
+
+                  <ul>
+
+                    {plan.features.map(
+                      (
+                        feature,
+                        index
+                      ) => (
+
+                        <li
+                          key={index}
+                        >
+
+                          <span className="check">
+                            ✓
+                          </span>
+
+                          {feature}
+
+                        </li>
+
+                      )
+                    )}
+
+                  </ul>
+
+                </div>
+
+              </div>
+
+            );
+          })}
+
+        </div>
+
+      </section>
+      
+           {/* PREMIUM UPGRADE */}
+      <section className="premium-section">
+        <div className="premium-content">
+          <div>
+            <span className="premium-badge">GRADLINK SA PREMIUM</span>
+
+            <h2>Recruit smarter with Premium</h2>
+
+            <p>
+              Unlock advanced applicant screening and document verification
+              tools designed to help your company manage applications more
+              efficiently.
+            </p>
+
+            <div className="premium-features">
+              <div className="premium-feature">
+                <span>✓</span>
+                <div>
+                  <strong>AI Applicant Screening</strong>
+                  <small>
+                    Quickly identify applicants whose qualifications,
+                    field of study and skills match your internship.
+                  </small>
+                </div>
+              </div>
+
+              <div className="premium-feature">
+                <span>✓</span>
+                <div>
+                  <strong>CV & Qualification Verification</strong>
+                  <small>
+                    Review submitted documents with advanced document
+                    authenticity checks.
+                  </small>
+                </div>
+              </div>
+
+              <div className="premium-feature">
+                <span>✓</span>
+                <div>
+                  <strong>Advanced Applicant Insights</strong>
+                  <small>
+                    Get clearer information when reviewing and comparing
+                    applicants.
+                  </small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="premium-action">
+            {isPremium ? (
+              <>
+                <div className="active-premium">
+                  <span>✓</span>
+                  Premium Active
+                </div>
+
+                <p>
+                  Your company currently has access to Premium features.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="premium-price">
+                  <span>From</span>
+                  <strong>R500</strong>
+                  <small>/ month</small>
+                </div>
+
+                <button
+                  type="button"
+                  className="premium-button"
+                  onClick={() => router.push("/company-pricing")}
+                >
+                  Upgrade to Premium
+                  <span>→</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="plans-link"
+                  onClick={() => router.push("/company-pricing")}
+                >
+                  View all plans
+                </button>
+
+                <small className="payment-note">
+                  Choose a plan and complete payment to activate Premium.
+                </small>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* QUICK LINKS */}
+      <section className="quick-section">
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">QUICK ACCESS</span>
+            <h2>Manage your company</h2>
+          </div>
+        </div>
+
+        <div className="quick-grid">
+          <button
+            type="button"
+            className="quick-item"
+            onClick={() => router.push("/company")}
+          >
+            <div className="quick-icon">🏢</div>
+            <div>
+              <strong>Company Profile</strong>
+              <span>Edit your company information</span>
+            </div>
+            <b>→</b>
+          </button>
+
+          <button
+            type="button"
+            className="quick-item"
+            onClick={() => router.push("/company-pricing")}
+          >
+            <div className="quick-icon">💳</div>
+            <div>
+              <strong>Plans & Billing</strong>
+              <span>View Premium plans and pricing</span>
+            </div>
+            <b>→</b>
+          </button>
+
+          <button
+            type="button"
+            className="quick-item"
+            onClick={() => router.push("/internships")}
+          >
+            <div className="quick-icon">📋</div>
+            <div>
+              <strong>Browse Opportunities</strong>
+              <span>View internships on GradLink SA</span>
+            </div>
+            <b>→</b>
+          </button>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer className="dashboard-footer">
+        <div>
+          <strong>GradLink SA</strong>
+          <p>
+            Connecting South African graduates with internship
+            opportunities.
+          </p>
+        </div>
+
+        <div className="footer-links">
+          <button onClick={() => router.push("/company")}>
+            Company Profile
+          </button>
+
+          <button onClick={() => router.push("/company-pricing")}>
+            Pricing
+          </button>
+
+          <button onClick={() => router.push("/")}>
+            Home
+          </button>
+        </div>
       </footer>
 
-      {/* =====================================================
-          STYLES
-      ====================================================== */}
-
       <style jsx>{`
-        .pricing-page {
-          min-height: 100vh;
-          background: #f7faff;
-          color: #10233f;
+        .premium-section {
+          margin-top: 36px;
+          border-radius: 24px;
+          background: linear-gradient(135deg, #071f49 0%, #0b4ea2 100%);
+          color: white;
+          overflow: hidden;
+          box-shadow: 0 16px 40px rgba(5, 35, 80, 0.16);
         }
 
-        .navbar {
-          height: 76px;
-          padding: 0 7%;
-          display: flex;
+        .premium-content {
+          display: grid;
+          grid-template-columns: 1fr 320px;
+          gap: 40px;
+          padding: 34px;
           align-items: center;
-          justify-content: space-between;
-          background: white;
-          border-bottom: 1px solid #e6edf6;
-          position: sticky;
-          top: 0;
-          z-index: 20;
         }
 
-        .logo {
+        .premium-badge {
+          display: inline-flex;
+          padding: 7px 12px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.13);
+          border: 1px solid rgba(255, 255, 255, 0.18);
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+        }
+
+        .premium-content h2 {
+          margin: 14px 0 8px;
+          font-size: 28px;
+          line-height: 1.15;
+        }
+
+        .premium-content > div:first-child > p {
+          max-width: 680px;
+          margin: 0;
+          color: rgba(255, 255, 255, 0.78);
+          line-height: 1.65;
+          font-size: 14px;
+        }
+
+        .premium-features {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 14px;
+          margin-top: 25px;
+        }
+
+        .premium-feature {
           display: flex;
-          align-items: center;
           gap: 10px;
-          text-decoration: none;
-          color: #10233f;
-          font-size: 21px;
-          font-weight: 700;
+          align-items: flex-start;
         }
 
-        .logo-icon {
-          width: 38px;
-          height: 38px;
+        .premium-feature > span {
+          width: 22px;
+          height: 22px;
+          min-width: 22px;
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: 11px;
-          background: linear-gradient(
-            135deg,
-            #1261d6,
-            #0b8df5
-          );
-          color: white;
-          font-weight: 800;
-          box-shadow:
-            0 8px 20px
-            rgba(18, 97, 214, 0.25);
-        }
-
-        .logo strong {
-          color: #1261d6;
-        }
-
-        .nav-links {
-          display: flex;
-          gap: 28px;
-        }
-
-        .nav-links a {
-          color: #53657d;
-          text-decoration: none;
-          font-size: 14px;
-          font-weight: 600;
-        }
-
-        .nav-links a:hover {
-          color: #1261d6;
-        }
-
-        .nav-actions {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .login-btn,
-        .signup-btn {
-          text-decoration: none;
-          font-weight: 700;
-          font-size: 14px;
-        }
-
-        .login-btn {
-          color: #1261d6;
-          padding: 11px 16px;
-        }
-
-        .signup-btn {
-          color: white;
-          background: #1261d6;
-          padding: 12px 18px;
-          border-radius: 10px;
-          box-shadow:
-            0 7px 18px
-            rgba(18, 97, 214, 0.2);
-        }
-
-        .hero {
-          text-align: center;
-          padding: 85px 20px 55px;
-          background:
-            radial-gradient(
-              circle at top,
-              rgba(18, 97, 214, 0.1),
-              transparent 45%
-            ),
-            white;
-        }
-
-        .badge,
-        .verification-badge {
-          display: inline-block;
-          padding: 8px 14px;
-          border-radius: 999px;
-          background: #eaf3ff;
-          color: #1261d6;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.16);
           font-size: 12px;
           font-weight: 800;
-          letter-spacing: 0.5px;
         }
 
-        .hero h1 {
-          font-size: clamp(
-            42px,
-            7vw,
-            70px
-          );
-          line-height: 1.04;
-          margin: 22px auto;
-          max-width: 850px;
-          letter-spacing: -2px;
+        .premium-feature strong {
+          display: block;
+          font-size: 13px;
+          margin-bottom: 4px;
         }
 
-        .hero h1 span {
-          color: #1261d6;
+        .premium-feature small {
+          display: block;
+          color: rgba(255, 255, 255, 0.68);
+          font-size: 11px;
+          line-height: 1.5;
         }
 
-        .hero > p {
-          max-width: 680px;
-          margin: auto;
-          color: #63738a;
-          font-size: 18px;
-          line-height: 1.7;
+        .premium-action {
+          background: white;
+          color: #092653;
+          border-radius: 20px;
+          padding: 24px;
+          text-align: center;
+          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.14);
         }
 
-        .billing-toggle {
-          margin: 32px auto 0;
-          background: #edf2f8;
-          width: fit-content;
-          padding: 5px;
-          border-radius: 14px;
+        .premium-price span {
+          display: block;
+          font-size: 12px;
+          color: #71809a;
+          margin-bottom: 2px;
+        }
+
+        .premium-price strong {
+          font-size: 34px;
+          line-height: 1;
+        }
+
+        .premium-price small {
+          font-size: 12px;
+          color: #71809a;
+          margin-left: 3px;
+        }
+
+        .premium-button {
+          width: 100%;
+          margin-top: 18px;
+          border: none;
+          border-radius: 12px;
+          padding: 13px 16px;
+          background: #0b63ce;
+          color: white;
+          font-weight: 800;
+          cursor: pointer;
           display: flex;
-          gap: 4px;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          transition: 0.2s ease;
         }
 
-        .billing-toggle button {
-          border: 0;
+        .premium-button:hover {
+          background: #084faa;
+          transform: translateY(-1px);
+        }
+
+        .premium-button span {
+          font-size: 18px;
+        }
+
+        .plans-link {
+          margin-top: 12px;
+          border: none;
           background: transparent;
-          padding: 11px 18px;
-          border-radius: 10px;
+          color: #0b63ce;
           font-weight: 700;
-          color: #65758a;
           cursor: pointer;
         }
 
-        .billing-toggle button.active {
-          background: white;
-          color: #1261d6;
-          box-shadow:
-            0 4px 12px
-            rgba(0, 0, 0, 0.07);
-        }
-
-        .save {
-          margin-left: 7px;
+        .payment-note {
+          display: block;
+          margin-top: 12px;
+          color: #7a879b;
           font-size: 10px;
-          color: #159447;
+          line-height: 1.4;
         }
 
-        .info-banner,
-        .success-message,
-        .error-message {
-          max-width: 900px;
-          margin: 25px auto 0;
-          padding: 14px 18px;
-          border-radius: 12px;
-          font-size: 14px;
-          text-align: center;
+        .active-premium {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 9px 13px;
+          border-radius: 999px;
+          background: #e9f8ef;
+          color: #16733c;
+          font-size: 13px;
+          font-weight: 800;
         }
 
-        .info-banner {
-          background: #eef5ff;
-          color: #315b8f;
-          border: 1px solid #d6e6fa;
-        }
-
-        .info-banner span {
-          margin-left: 6px;
-        }
-
-        .success-message {
-          background: #eaf9f0;
-          color: #14763d;
-          border: 1px solid #ccebd8;
-          font-weight: 700;
-        }
-
-        .error-message {
-          background: #fff1f1;
-          color: #b42318;
-          border: 1px solid #f3cccc;
-        }
-
-        .pricing-section {
-          padding: 25px 6% 90px;
-        }
-
-        .pricing-grid {
-          max-width: 1180px;
-          margin: auto;
-          display: grid;
-          grid-template-columns:
-            repeat(3, 1fr);
-          gap: 22px;
-          align-items: stretch;
-        }
-
-        .pricing-card {
-          background: white;
-          border: 1px solid #e2e9f2;
-          border-radius: 22px;
-          position: relative;
-          overflow: hidden;
-          box-shadow:
-            0 15px 45px
-            rgba(20, 55, 100, 0.06);
-        }
-
-        .pricing-card.popular {
-          border: 2px solid #1261d6;
-          transform: translateY(-10px);
-          box-shadow:
-            0 25px 60px
-            rgba(18, 97, 214, 0.16);
-        }
-
-        .popular-label {
-          text-align: center;
-          padding: 9px;
-          background: #1261d6;
-          color: white;
-          font-size: 11px;
+        .active-premium span {
           font-weight: 900;
-          letter-spacing: 1px;
         }
 
-        .card-content {
-          padding: 32px;
+        .premium-action > p {
+          color: #71809a;
+          font-size: 12px;
+          line-height: 1.5;
+          margin: 15px 0 0;
         }
 
-        .plan-heading {
+        .quick-section {
+          margin-top: 38px;
+        }
+
+        .section-heading {
+          margin-bottom: 16px;
+        }
+
+        .eyebrow {
+          display: block;
+          color: #0b63ce;
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: 0.1em;
+          margin-bottom: 5px;
+        }
+
+        .section-heading h2 {
+          margin: 0;
+          font-size: 22px;
+          color: #10284b;
+        }
+
+        .quick-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 14px;
+        }
+
+        .quick-item {
+          width: 100%;
+          min-height: 82px;
+          border: 1px solid #e4eaf2;
+          background: white;
+          border-radius: 16px;
+          padding: 16px;
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          gap: 10px;
-        }
-
-        .card-content h2 {
-          margin: 0;
-          font-size: 25px;
-        }
-
-        .selected-badge {
-          padding: 5px 9px;
-          border-radius: 999px;
-          background: #eaf9f0;
-          color: #14763d;
-          font-size: 10px;
-          font-weight: 800;
-        }
-
-        .description {
-          color: #718096;
-          line-height: 1.6;
-          min-height: 52px;
-          font-size: 14px;
-        }
-
-        .price {
-          margin: 25px 0;
-          font-size: 45px;
-          font-weight: 850;
-          letter-spacing: -2px;
-        }
-
-        .currency {
-          font-size: 23px;
-          vertical-align: top;
-          margin-right: 3px;
-        }
-
-        .period {
-          font-size: 14px;
-          color: #7b899b;
-          letter-spacing: 0;
-          font-weight: 600;
-        }
-
-        .annual-note {
-          margin-top: -20px;
-          color: #159447;
-          font-size: 12px;
-          font-weight: 700;
-        }
-
-        .plan-button {
-          width: 100%;
-          border: 1px solid #cfd9e7;
-          background: white;
-          color: #1261d6;
-          padding: 14px;
-          border-radius: 11px;
-          font-weight: 800;
+          gap: 13px;
+          text-align: left;
           cursor: pointer;
           transition: 0.2s ease;
         }
 
-        .plan-button:hover {
+        .quick-item:hover {
+          border-color: #b9d4f4;
           transform: translateY(-1px);
-          box-shadow:
-            0 8px 20px
-            rgba(18, 97, 214, 0.1);
         }
 
-        .plan-button:disabled {
-          opacity: 0.65;
-          cursor: wait;
-          transform: none;
-        }
-
-        .plan-button.primary {
-          background: #1261d6;
-          color: white;
-          border-color: #1261d6;
-        }
-
-        .divider {
-          height: 1px;
-          background: #e9eef5;
-          margin: 27px 0;
-        }
-
-        .includes {
-          font-size: 13px;
-          font-weight: 800;
-        }
-
-        ul {
-          list-style: none;
-          padding: 0;
-          margin: 18px 0 0;
-        }
-
-        li {
+        .quick-icon {
+          width: 42px;
+          height: 42px;
+          min-width: 42px;
+          border-radius: 12px;
+          background: #edf5ff;
           display: flex;
-          gap: 9px;
-          margin: 13px 0;
-          color: #53657d;
-          font-size: 13px;
-          line-height: 1.5;
-        }
-
-        .check {
-          color: #159447;
-          font-weight: 900;
-        }
-
-        .verification-section {
-          padding: 90px 6%;
-          background: #0c1f38;
-          color: white;
-        }
-
-        .verification-content {
-          max-width: 1050px;
-          margin: auto;
-          text-align: center;
-        }
-
-        .verification-badge {
-          background: rgba(
-            255,
-            255,
-            255,
-            0.1
-          );
-          color: #8dc4ff;
-        }
-
-        .verification-content h2 {
-          font-size: clamp(
-            36px,
-            6vw,
-            55px
-          );
-          margin: 20px 0 12px;
-        }
-
-        .verification-content > p {
-          color: #b9c8da;
-          max-width: 650px;
-          margin: auto;
-          line-height: 1.7;
-        }
-
-        .verification-grid {
-          margin-top: 45px;
-          display: grid;
-          grid-template-columns:
-            repeat(2, 1fr);
-          gap: 18px;
-          text-align: left;
-        }
-
-        .verification-item {
-          display: flex;
-          gap: 17px;
-          padding: 25px;
-          background: rgba(
-            255,
-            255,
-            255,
-            0.06
-          );
-          border: 1px solid rgba(
-            255,
-            255,
-            255,
-            0.1
-          );
-          border-radius: 16px;
-        }
-
-        .verification-item > span {
-          font-size: 28px;
-        }
-
-        .verification-item h3 {
-          margin: 0 0 7px;
-        }
-
-        .verification-item p {
-          margin: 0;
-          color: #b9c8da;
-          font-size: 13px;
-          line-height: 1.5;
-        }
-
-        .important-note {
-          margin-top: 30px !important;
-          font-size: 12px;
-        }
-
-        .graduate-section {
-          padding: 80px 6%;
-          background: #f7faff;
-        }
-
-        .graduate-box {
-          max-width: 850px;
-          margin: auto;
-          text-align: center;
-          background: white;
-          padding: 55px 30px;
-          border-radius: 24px;
-          border: 1px solid #e1e9f3;
-          box-shadow:
-            0 15px 50px
-            rgba(20, 55, 100, 0.06);
-        }
-
-        .graduate-icon {
-          font-size: 45px;
-        }
-
-        .graduate-box h2 {
-          font-size: 34px;
-          margin: 15px 0;
-        }
-
-        .graduate-box p {
-          max-width: 650px;
-          margin:
-            auto auto 25px;
-          color: #687990;
-          line-height: 1.7;
-        }
-
-        .graduate-button,
-        .cta-button {
-          display: inline-block;
-          text-decoration: none;
-          background: #1261d6;
-          color: white;
-          padding: 14px 22px;
-          border-radius: 11px;
-          font-weight: 800;
-        }
-
-        .faq-section {
-          padding: 80px 6%;
-          background: white;
-        }
-
-        .faq-section > h2 {
-          text-align: center;
-          font-size: 38px;
-          margin-bottom: 40px;
-        }
-
-        .faq-grid {
-          max-width: 1000px;
-          margin: auto;
-          display: grid;
-          grid-template-columns:
-            repeat(2, 1fr);
-          gap: 18px;
-        }
-
-        .faq-card {
-          padding: 25px;
-          background: #f7faff;
-          border: 1px solid #e3eaf3;
-          border-radius: 15px;
-        }
-
-        .faq-card h3 {
-          margin-top: 0;
-        }
-
-        .faq-card p {
-          color: #687990;
-          line-height: 1.6;
-          font-size: 14px;
-        }
-
-        .final-cta {
-          text-align: center;
-          padding: 90px 20px;
-          background:
-            linear-gradient(
-              135deg,
-              #1261d6,
-              #087ed8
-            );
-          color: white;
-        }
-
-        .final-cta h2 {
-          font-size: clamp(
-            34px,
-            5vw,
-            50px
-          );
-          margin: 0 0 15px;
-        }
-
-        .final-cta p {
-          color: #dceeff;
-          margin-bottom: 28px;
-        }
-
-        .cta-button {
-          background: white;
-          color: #1261d6;
-        }
-
-        footer {
-          padding: 45px 7%;
-          background: #08172b;
-          color: white;
-          text-align: center;
-        }
-
-        .footer-logo {
-          display: flex;
-          justify-content: center;
           align-items: center;
-          gap: 9px;
-          font-size: 20px;
-          font-weight: 800;
+          justify-content: center;
+          font-size: 18px;
         }
 
-        footer > p {
-          color: #9eb0c6;
+        .quick-item div:nth-child(2) {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .quick-item strong {
+          display: block;
+          color: #10284b;
           font-size: 13px;
+          margin-bottom: 4px;
+        }
+
+        .quick-item span {
+          display: block;
+          color: #78879c;
+          font-size: 11px;
+          line-height: 1.4;
+        }
+
+        .quick-item b {
+          color: #0b63ce;
+          font-size: 18px;
+        }
+
+        .dashboard-footer {
+          margin-top: 45px;
+          padding: 25px 0 10px;
+          border-top: 1px solid #e5eaf1;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+        }
+
+        .dashboard-footer strong {
+          color: #10284b;
+          font-size: 15px;
+        }
+
+        .dashboard-footer p {
+          margin: 5px 0 0;
+          color: #8793a5;
+          font-size: 11px;
         }
 
         .footer-links {
           display: flex;
-          justify-content: center;
-          gap: 22px;
-          margin: 25px 0;
+          gap: 18px;
         }
 
-        .footer-links a {
-          color: #c4d1df;
-          text-decoration: none;
-          font-size: 13px;
-        }
-
-        .copyright {
-          margin-top: 30px;
+        .footer-links button {
+          border: none;
+          background: transparent;
+          color: #687890;
           font-size: 11px;
+          font-weight: 700;
+          cursor: pointer;
         }
 
-        @media (max-width: 850px) {
-          .nav-links {
-            display: none;
-          }
+        .footer-links button:hover {
+          color: #0b63ce;
+        }
 
-          .pricing-grid {
+        @media (max-width: 900px) {
+          .premium-content {
             grid-template-columns: 1fr;
-            max-width: 500px;
           }
 
-          .pricing-card.popular {
-            transform: none;
-          }
-
-          .verification-grid,
-          .faq-grid {
+          .premium-features {
             grid-template-columns: 1fr;
+          }
+
+          .quick-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .premium-action {
+            max-width: 420px;
           }
         }
 
-        @media (max-width: 520px) {
-          .navbar {
-            padding: 0 18px;
+        @media (max-width: 600px) {
+          .premium-section {
+            margin-top: 25px;
+            border-radius: 18px;
           }
 
-          .nav-actions .login-btn {
-            display: none;
+          .premium-content {
+            padding: 22px 18px;
+            gap: 24px;
           }
 
-          .hero {
-            padding-top: 55px;
+          .premium-content h2 {
+            font-size: 23px;
           }
 
-          .hero h1 {
-            font-size: 43px;
+          .premium-content > div:first-child > p {
+            font-size: 13px;
           }
 
-          .hero > p {
-            font-size: 15px;
+          .premium-action {
+            max-width: none;
+            padding: 20px 16px;
           }
 
-          .card-content {
-            padding: 27px;
+          .premium-price strong {
+            font-size: 30px;
           }
 
-          .pricing-section {
-            padding-left: 18px;
-            padding-right: 18px;
+          .quick-section {
+            margin-top: 28px;
           }
 
-          .billing-toggle {
+          .section-heading h2 {
+            font-size: 19px;
+          }
+
+          .quick-item {
+            min-height: 76px;
+            padding: 13px;
+          }
+
+          .dashboard-footer {
+            margin-top: 32px;
+            padding-bottom: 20px;
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .footer-links {
             width: 100%;
-            max-width: 300px;
-            justify-content: center;
-          }
-
-          .billing-toggle button {
-            padding: 10px 12px;
-          }
-
-          .info-banner {
-            margin-left: 18px;
-            margin-right: 18px;
+            flex-wrap: wrap;
+            gap: 12px 18px;
           }
         }
       `}</style>
     </main>
   );
-}
+} 
