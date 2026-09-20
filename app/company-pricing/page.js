@@ -70,23 +70,42 @@ const PLANS = [
 ];
 
 // ============================================================
-// BILLING HELPERS
+// ANNUAL BILLING
+// ============================================================
+//
+// Annual billing receives a 15% discount.
+//
+// Starter:
+// R500 x 12 = R6,000
+// 15% discount = R900
+// Annual total = R5,100
+//
+// Professional:
+// R1,000 x 12 = R12,000
+// 15% discount = R1,800
+// Annual total = R10,200
+//
+// Premium:
+// R2,000 x 12 = R24,000
+// 15% discount = R3,600
+// Annual total = R20,400
+//
 // ============================================================
 
 function getAnnualPrice(monthlyPrice) {
-  // 15% discount on the normal 12-month cost
   return Math.round(monthlyPrice * 12 * 0.85);
 }
 
 function getAnnualSaving(monthlyPrice) {
-  const normalAnnualPrice = monthlyPrice * 12;
-  const discountedAnnualPrice = getAnnualPrice(monthlyPrice);
+  return monthlyPrice * 12 - getAnnualPrice(monthlyPrice);
+}
 
-  return normalAnnualPrice - discountedAnnualPrice;
+function getMonthlyEquivalent(monthlyPrice) {
+  return Math.round(getAnnualPrice(monthlyPrice) / 12);
 }
 
 function formatCurrency(amount) {
-  return `R${amount.toLocaleString("en-ZA")}`;
+  return `R${Number(amount).toLocaleString("en-ZA")}`;
 }
 
 // ============================================================
@@ -96,7 +115,15 @@ function formatCurrency(amount) {
 export default function CompanyPricingPage() {
   const router = useRouter();
 
+  // ----------------------------------------------------------
+  // BILLING
+  // ----------------------------------------------------------
+
   const [billing, setBilling] = useState("monthly");
+
+  // ----------------------------------------------------------
+  // ACCOUNT
+  // ----------------------------------------------------------
 
   const [user, setUser] = useState(null);
   const [currentPlan, setCurrentPlan] = useState(null);
@@ -108,7 +135,7 @@ export default function CompanyPricingPage() {
   const [error, setError] = useState("");
 
   // ==========================================================
-  // LOAD COMPANY
+  // LOAD ACCOUNT
   // ==========================================================
 
   useEffect(() => {
@@ -137,25 +164,36 @@ export default function CompanyPricingPage() {
         return;
       }
 
-      const {
-        data: subscription,
-        error: subscriptionError,
-      } = await supabase
-        .from("company_subscriptions")
-        .select("*")
-        .eq("company_id", user.id)
-        .maybeSingle();
+      const { data: subscription, error: subscriptionError } =
+        await supabase
+          .from("company_subscriptions")
+          .select("*")
+          .eq("company_id", user.id)
+          .order("created_at", {
+            ascending: false,
+          })
+          .limit(1)
+          .maybeSingle();
 
       if (subscriptionError) {
-        console.error(subscriptionError);
+        console.error(
+          "Subscription loading error:",
+          subscriptionError
+        );
 
-        // Don't block the pricing page if the subscription
-        // record does not exist yet.
         return;
       }
 
       if (subscription) {
         setCurrentPlan(subscription);
+
+        // Restore the previously selected billing cycle.
+        if (
+          subscription.billing_cycle === "annual" ||
+          subscription.billing_cycle === "monthly"
+        ) {
+          setBilling(subscription.billing_cycle);
+        }
       }
     } catch (err) {
       console.error("Load company error:", err);
@@ -163,6 +201,37 @@ export default function CompanyPricingPage() {
     } finally {
       setLoadingUser(false);
     }
+  }
+
+  // ==========================================================
+  // BILLING SWITCH
+  // ==========================================================
+
+  function changeBilling(type) {
+    setMessage("");
+    setError("");
+
+    if (type !== "monthly" && type !== "annual") {
+      return;
+    }
+
+    setBilling(type);
+  }
+
+  // ==========================================================
+  // PRICE
+  // ==========================================================
+
+  function getDisplayedPrice(plan) {
+    if (billing === "annual") {
+      return getAnnualPrice(plan.monthlyPrice);
+    }
+
+    return plan.monthlyPrice;
+  }
+
+  function getPeriod() {
+    return billing === "annual" ? "/year" : "/month";
   }
 
   // ==========================================================
@@ -177,7 +246,7 @@ export default function CompanyPricingPage() {
       setSelectingPlan(plan.id);
 
       const {
-        data: { user },
+        data: { user: loggedInUser },
         error: userError,
       } = await supabase.auth.getUser();
 
@@ -185,32 +254,16 @@ export default function CompanyPricingPage() {
         throw userError;
       }
 
-      if (!user) {
+      if (!loggedInUser) {
         router.push("/login?redirect=/company-pricing");
         return;
       }
 
-      // --------------------------------------------------------
-      // CORRECT BILLING CALCULATION
-      // --------------------------------------------------------
-      //
-      // Monthly:
-      //   Starter       R500/month
-      //   Professional  R1,000/month
-      //   Premium       R2,000/month
-      //
-      // Annual:
-      //   12 months minus 15%
-      //
-      // Starter       R5,100/year
-      // Professional  R10,200/year
-      // Premium       R20,400/year
-      //
-      // --------------------------------------------------------
-
       const monthlyPrice = plan.monthlyPrice;
 
-      const annualPrice = getAnnualPrice(monthlyPrice);
+      const annualPrice = getAnnualPrice(
+        monthlyPrice
+      );
 
       const selectedPrice =
         billing === "annual"
@@ -218,18 +271,11 @@ export default function CompanyPricingPage() {
           : monthlyPrice;
 
       // --------------------------------------------------------
-      // IMPORTANT
-      // --------------------------------------------------------
-      //
-      // Selecting a plan DOES NOT activate Premium.
-      //
-      // The subscription remains "inactive" until a real
-      // payment provider confirms successful payment.
-      //
+      // SAVE THE PLAN AND BILLING CYCLE
       // --------------------------------------------------------
 
       const subscriptionData = {
-        company_id: user.id,
+        company_id: loggedInUser.id,
 
         plan: plan.id,
 
@@ -239,6 +285,7 @@ export default function CompanyPricingPage() {
 
         annual_price: annualPrice,
 
+        // Selecting a plan does NOT activate payment.
         status: "inactive",
 
         payment_provider: null,
@@ -248,17 +295,11 @@ export default function CompanyPricingPage() {
         updated_at: new Date().toISOString(),
       };
 
-      const {
-        data,
-        error: saveError,
-      } = await supabase
+      const { data, error: saveError } = await supabase
         .from("company_subscriptions")
-        .upsert(
-          subscriptionData,
-          {
-            onConflict: "company_id",
-          }
-        )
+        .upsert(subscriptionData, {
+          onConflict: "company_id",
+        })
         .select()
         .single();
 
@@ -269,31 +310,34 @@ export default function CompanyPricingPage() {
       setCurrentPlan(data);
 
       // --------------------------------------------------------
-      // PAYMENT NOT CONNECTED YET
+      // CONFIRM WHAT WAS SELECTED
       // --------------------------------------------------------
 
-      setMessage(
-        `${plan.name} selected at ${formatCurrency(
-          selectedPrice
-        )} ${
-          billing === "annual"
-            ? "per year"
-            : "per month"
-        }. Payment is required to activate the subscription.`
-      );
+      if (billing === "annual") {
+        setMessage(
+          `${plan.name} annual plan selected — ${formatCurrency(
+            selectedPrice
+          )} per year. This saves ${formatCurrency(
+            getAnnualSaving(monthlyPrice)
+          )} compared with paying monthly for 12 months.`
+        );
+      } else {
+        setMessage(
+          `${plan.name} monthly plan selected — ${formatCurrency(
+            selectedPrice
+          )} per month.`
+        );
+      }
 
       // --------------------------------------------------------
-      // FUTURE PAYMENT FLOW
+      // IMPORTANT
       // --------------------------------------------------------
       //
-      // Later this is where we will send the company to the
-      // real payment checkout.
+      // The subscription remains inactive.
       //
-      // Example:
+      // A real payment provider must confirm payment before
+      // status becomes "active".
       //
-      // router.push("/company-checkout");
-      //
-      // We are NOT activating the subscription here.
       // --------------------------------------------------------
     } catch (err) {
       console.error("Plan selection error:", err);
@@ -308,52 +352,16 @@ export default function CompanyPricingPage() {
   }
 
   // ==========================================================
-  // PRICE DISPLAY
-  // ==========================================================
-
-  function getDisplayedPrice(plan) {
-    if (billing === "annual") {
-      return getAnnualPrice(plan.monthlyPrice);
-    }
-
-    return plan.monthlyPrice;
-  }
-
-  function getPricePeriod() {
-    return billing === "annual"
-      ? "/year"
-      : "/month";
-  }
-
-  // ==========================================================
-  // ANNUAL EQUIVALENT
-  // ==========================================================
-
-  function getMonthlyEquivalent(plan) {
-    if (billing !== "annual") {
-      return null;
-    }
-
-    return Math.round(
-      getAnnualPrice(plan.monthlyPrice) / 12
-    );
-  }
-
-  // ==========================================================
-  // SELECTED PLAN
+  // CURRENT PLAN
   // ==========================================================
 
   function isPlanSelected(plan) {
     return currentPlan?.plan === plan.id;
   }
 
-  // ==========================================================
-  // PAYMENT STATUS
-  // ==========================================================
-
   function isActiveSubscription() {
     return (
-      currentPlan?.status?.toLowerCase() ===
+      String(currentPlan?.status || "").toLowerCase() ===
       "active"
     );
   }
@@ -372,22 +380,16 @@ export default function CompanyPricingPage() {
       <nav className="navbar">
 
         <Link href="/" className="logo">
-
-          <span className="logo-icon">
-            G
-          </span>
+          <span className="logo-icon">G</span>
 
           <span>
             GradLink <strong>SA</strong>
           </span>
-
         </Link>
 
         <div className="nav-links">
 
-          <Link href="/">
-            Home
-          </Link>
+          <Link href="/">Home</Link>
 
           <Link href="/internships">
             Internships
@@ -436,6 +438,7 @@ export default function CompanyPricingPage() {
         <h1>
           Recruit better.
           <br />
+
           <span>
             Grow with GradLink SA.
           </span>
@@ -452,50 +455,59 @@ export default function CompanyPricingPage() {
             BILLING TOGGLE
         =================================================== */}
 
-        <div className="billing-toggle">
+        <div className="billing-wrapper">
 
-          <button
-            type="button"
-            className={
-              billing === "monthly"
-                ? "active"
-                : ""
-            }
-            onClick={() =>
-              setBilling("monthly")
-            }
-          >
-            Monthly
-          </button>
+          <div className="billing-toggle">
 
-          <button
-            type="button"
-            className={
-              billing === "annual"
-                ? "active"
-                : ""
-            }
-            onClick={() =>
-              setBilling("annual")
-            }
-          >
-            Annual
+            <button
+              type="button"
+              className={
+                billing === "monthly"
+                  ? "active"
+                  : ""
+              }
+              onClick={() =>
+                changeBilling("monthly")
+              }
+            >
+              Monthly
+            </button>
 
-            <span className="save">
-              Save 15%
-            </span>
-          </button>
+            <button
+              type="button"
+              className={
+                billing === "annual"
+                  ? "active"
+                  : ""
+              }
+              onClick={() =>
+                changeBilling("annual")
+              }
+            >
+              Annual
+
+              <span className="save">
+                Save 15%
+              </span>
+            </button>
+
+          </div>
+
+          {billing === "annual" && (
+            <div className="billing-status">
+              ✓ Annual billing selected
+            </div>
+          )}
 
         </div>
 
       </section>
 
       {/* ======================================================
-          LOGIN MESSAGE
+          ACCOUNT MESSAGE
       ======================================================= */}
 
       {!loadingUser && !user && (
-
         <div className="info-banner">
 
           <strong>
@@ -508,35 +520,26 @@ export default function CompanyPricingPage() {
           </span>
 
         </div>
-
       )}
 
       {/* ======================================================
-          SUCCESS MESSAGE
+          SUCCESS
       ======================================================= */}
 
       {message && (
-
         <div className="success-message">
-
           ✓ {message}
-
         </div>
-
       )}
 
       {/* ======================================================
-          ERROR MESSAGE
+          ERROR
       ======================================================= */}
 
       {error && (
-
         <div className="error-message">
-
           ⚠️ {error}
-
         </div>
-
       )}
 
       {/* ======================================================
@@ -544,11 +547,10 @@ export default function CompanyPricingPage() {
       ======================================================= */}
 
       {isActiveSubscription() && (
-
         <div className="active-banner">
 
           <strong>
-            ✓ Premium subscription active
+            ✓ Subscription active
           </strong>
 
           <span>
@@ -557,11 +559,10 @@ export default function CompanyPricingPage() {
           </span>
 
         </div>
-
       )}
 
       {/* ======================================================
-          PRICING
+          PRICING CARDS
       ======================================================= */}
 
       <section className="pricing-section">
@@ -573,11 +574,13 @@ export default function CompanyPricingPage() {
             const displayedPrice =
               getDisplayedPrice(plan);
 
-            const monthlyEquivalent =
-              getMonthlyEquivalent(plan);
-
             const annualSaving =
               getAnnualSaving(
+                plan.monthlyPrice
+              );
+
+            const monthlyEquivalent =
+              getMonthlyEquivalent(
                 plan.monthlyPrice
               );
 
@@ -588,7 +591,6 @@ export default function CompanyPricingPage() {
               selectingPlan === plan.id;
 
             return (
-
               <div
                 key={plan.id}
                 className={`pricing-card ${
@@ -599,16 +601,12 @@ export default function CompanyPricingPage() {
               >
 
                 {plan.popular && (
-
                   <div className="popular-label">
                     MOST POPULAR
                   </div>
-
                 )}
 
                 <div className="card-content">
-
-                  {/* PLAN NAME */}
 
                   <div className="plan-heading">
 
@@ -617,16 +615,12 @@ export default function CompanyPricingPage() {
                     </h2>
 
                     {isSelected && (
-
                       <span className="selected-badge">
                         Selected
                       </span>
-
                     )}
 
                   </div>
-
-                  {/* DESCRIPTION */}
 
                   <p className="description">
                     {plan.description}
@@ -640,58 +634,59 @@ export default function CompanyPricingPage() {
                       R
                     </span>
 
-                    {displayedPrice
-                      .toLocaleString(
+                    <span className="price-number">
+                      {displayedPrice.toLocaleString(
                         "en-ZA"
                       )}
+                    </span>
 
                     <span className="period">
-                      {getPricePeriod()}
+                      {getPeriod()}
                     </span>
 
                   </div>
 
-                  {/* ANNUAL DETAILS */}
+                  {/* ANNUAL INFORMATION */}
 
                   {billing === "annual" && (
-
                     <div className="annual-details">
 
                       <p className="annual-equivalent">
 
-                        ≈{" "}
-                        {formatCurrency(
-                          monthlyEquivalent
-                        )}
-                        /month equivalent
+                        Equivalent to{" "}
+                        <strong>
+                          {formatCurrency(
+                            monthlyEquivalent
+                          )}
+                        </strong>
+                        /month
 
                       </p>
 
                       <p className="annual-saving">
 
-                        Save{" "}
-                        {formatCurrency(
-                          annualSaving
-                        )}
+                        You save{" "}
+                        <strong>
+                          {formatCurrency(
+                            annualSaving
+                          )}
+                        </strong>{" "}
                         per year
 
                       </p>
 
                     </div>
-
                   )}
 
-                  {/* MONTHLY DETAILS */}
+                  {/* MONTHLY INFORMATION */}
 
                   {billing === "monthly" && (
-
                     <p className="billing-note">
                       Billed monthly
                     </p>
-
                   )}
 
-                  {/* PLAN BUTTON */}
+                  {/* BUTTON */}
 
                   <button
                     type="button"
@@ -703,27 +698,31 @@ export default function CompanyPricingPage() {
                     onClick={() =>
                       choosePlan(plan)
                     }
-                    disabled={isSelecting}
+                    disabled={
+                      isSelecting ||
+                      !user
+                    }
                   >
 
                     {isSelecting
                       ? "Saving..."
                       : isSelected
-                      ? "Plan Selected"
+                      ? "Selected"
                       : `Choose ${plan.name}`}
 
                   </button>
 
-                  {/* DIVIDER */}
+                  {!user && (
+                    <p className="login-required">
+                      Log in to select this plan.
+                    </p>
+                  )}
 
-                  <div className="divider"></div>
-
-                  {/* FEATURES */}
+                  <div className="divider" />
 
                   <p className="includes">
 
-                    {plan.name ===
-                    "Premium"
+                    {plan.name === "Premium"
                       ? "Everything you need for advanced recruitment:"
                       : "What's included:"}
 
@@ -732,14 +731,8 @@ export default function CompanyPricingPage() {
                   <ul>
 
                     {plan.features.map(
-                      (
-                        feature,
-                        index
-                      ) => (
-
-                        <li
-                          key={index}
-                        >
+                      (feature, index) => (
+                        <li key={index}>
 
                           <span className="check">
                             ✓
@@ -748,7 +741,6 @@ export default function CompanyPricingPage() {
                           {feature}
 
                         </li>
-
                       )
                     )}
 
@@ -757,7 +749,6 @@ export default function CompanyPricingPage() {
                 </div>
 
               </div>
-
             );
           })}
 
@@ -765,403 +756,647 @@ export default function CompanyPricingPage() {
 
       </section>
       
-           {/* PREMIUM UPGRADE */}
-      <section className="premium-section">
-        <div className="premium-content">
-          <div>
-            <span className="premium-badge">GRADLINK SA PREMIUM</span>
+            {/* ======================================================
+          PRICING EXPLANATION
+      ======================================================= */}
 
-            <h2>Recruit smarter with Premium</h2>
+      <section className="pricing-note-section">
+        <div className="pricing-note">
 
-            <p>
-              Unlock advanced applicant screening and document verification
-              tools designed to help your company manage applications more
-              efficiently.
-            </p>
-
-            <div className="premium-features">
-              <div className="premium-feature">
-                <span>✓</span>
-                <div>
-                  <strong>AI Applicant Screening</strong>
-                  <small>
-                    Quickly identify applicants whose qualifications,
-                    field of study and skills match your internship.
-                  </small>
-                </div>
-              </div>
-
-              <div className="premium-feature">
-                <span>✓</span>
-                <div>
-                  <strong>CV & Qualification Verification</strong>
-                  <small>
-                    Review submitted documents with advanced document
-                    authenticity checks.
-                  </small>
-                </div>
-              </div>
-
-              <div className="premium-feature">
-                <span>✓</span>
-                <div>
-                  <strong>Advanced Applicant Insights</strong>
-                  <small>
-                    Get clearer information when reviewing and comparing
-                    applicants.
-                  </small>
-                </div>
-              </div>
-            </div>
+          <div className="note-icon">
+            💳
           </div>
 
-          <div className="premium-action">
-            {isPremium ? (
-              <>
-                <div className="active-premium">
-                  <span>✓</span>
-                  Premium Active
-                </div>
+          <div>
+            <h3>
+              Simple, transparent billing
+            </h3>
 
-                <p>
-                  Your company currently has access to Premium features.
-                </p>
-              </>
+            {billing === "annual" ? (
+              <p>
+                Annual plans are billed once per year
+                at a 15% discount. You save the
+                equivalent of almost two months compared
+                with paying monthly for 12 months.
+              </p>
             ) : (
-              <>
-                <div className="premium-price">
-                  <span>From</span>
-                  <strong>R500</strong>
-                  <small>/ month</small>
-                </div>
-
-                <button
-                  type="button"
-                  className="premium-button"
-                  onClick={() => router.push("/company-pricing")}
-                >
-                  Upgrade to Premium
-                  <span>→</span>
-                </button>
-
-                <button
-                  type="button"
-                  className="plans-link"
-                  onClick={() => router.push("/company-pricing")}
-                >
-                  View all plans
-                </button>
-
-                <small className="payment-note">
-                  Choose a plan and complete payment to activate Premium.
-                </small>
-              </>
+              <p>
+                Monthly plans are billed every month.
+                You can switch to annual billing at any
+                time before completing payment.
+              </p>
             )}
           </div>
+
         </div>
       </section>
 
-      {/* QUICK LINKS */}
-      <section className="quick-section">
-        <div className="section-heading">
-          <div>
-            <span className="eyebrow">QUICK ACCESS</span>
-            <h2>Manage your company</h2>
-          </div>
-        </div>
+      {/* ======================================================
+          FOOTER
+      ======================================================= */}
 
-        <div className="quick-grid">
-          <button
-            type="button"
-            className="quick-item"
-            onClick={() => router.push("/company")}
-          >
-            <div className="quick-icon">🏢</div>
-            <div>
-              <strong>Company Profile</strong>
-              <span>Edit your company information</span>
-            </div>
-            <b>→</b>
-          </button>
+      <footer className="pricing-footer">
 
-          <button
-            type="button"
-            className="quick-item"
-            onClick={() => router.push("/company-pricing")}
-          >
-            <div className="quick-icon">💳</div>
-            <div>
-              <strong>Plans & Billing</strong>
-              <span>View Premium plans and pricing</span>
-            </div>
-            <b>→</b>
-          </button>
+        <div className="footer-brand">
 
-          <button
-            type="button"
-            className="quick-item"
-            onClick={() => router.push("/internships")}
-          >
-            <div className="quick-icon">📋</div>
-            <div>
-              <strong>Browse Opportunities</strong>
-              <span>View internships on GradLink SA</span>
-            </div>
-            <b>→</b>
-          </button>
-        </div>
-      </section>
+          <Link href="/" className="footer-logo">
 
-      {/* FOOTER */}
-      <footer className="dashboard-footer">
-        <div>
-          <strong>GradLink SA</strong>
+            <span className="logo-icon">
+              G
+            </span>
+
+            <span>
+              GradLink <strong>SA</strong>
+            </span>
+
+          </Link>
+
           <p>
-            Connecting South African graduates with internship
-            opportunities.
+            Connecting South African graduates
+            with internship opportunities.
           </p>
+
         </div>
 
         <div className="footer-links">
-          <button onClick={() => router.push("/company")}>
-            Company Profile
-          </button>
 
-          <button onClick={() => router.push("/company-pricing")}>
-            Pricing
-          </button>
-
-          <button onClick={() => router.push("/")}>
+          <Link href="/">
             Home
-          </button>
+          </Link>
+
+          <Link href="/internships">
+            Internships
+          </Link>
+
+          <Link href="/jobs">
+            Jobs
+          </Link>
+
+          <Link href="/company">
+            Company
+          </Link>
+
+          <Link href="/company-dashboard">
+            Dashboard
+          </Link>
+
         </div>
+
       </footer>
 
+      {/* ======================================================
+          STYLES
+      ======================================================= */}
+
       <style jsx>{`
-        .premium-section {
-          margin-top: 36px;
-          border-radius: 24px;
-          background: linear-gradient(135deg, #071f49 0%, #0b4ea2 100%);
-          color: white;
-          overflow: hidden;
-          box-shadow: 0 16px 40px rgba(5, 35, 80, 0.16);
+
+        * {
+          box-sizing: border-box;
         }
 
-        .premium-content {
-          display: grid;
-          grid-template-columns: 1fr 320px;
-          gap: 40px;
-          padding: 34px;
-          align-items: center;
+        .pricing-page {
+          min-height: 100vh;
+          background: #f7f9fc;
+          color: #10284b;
+          overflow-x: hidden;
         }
 
-        .premium-badge {
-          display: inline-flex;
-          padding: 7px 12px;
-          border-radius: 999px;
-          background: rgba(255, 255, 255, 0.13);
-          border: 1px solid rgba(255, 255, 255, 0.18);
-          font-size: 11px;
-          font-weight: 800;
-          letter-spacing: 0.08em;
-        }
+        /* ====================================================
+           NAVBAR
+        ==================================================== */
 
-        .premium-content h2 {
-          margin: 14px 0 8px;
-          font-size: 28px;
-          line-height: 1.15;
-        }
-
-        .premium-content > div:first-child > p {
-          max-width: 680px;
-          margin: 0;
-          color: rgba(255, 255, 255, 0.78);
-          line-height: 1.65;
-          font-size: 14px;
-        }
-
-        .premium-features {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 14px;
-          margin-top: 25px;
-        }
-
-        .premium-feature {
-          display: flex;
-          gap: 10px;
-          align-items: flex-start;
-        }
-
-        .premium-feature > span {
-          width: 22px;
-          height: 22px;
-          min-width: 22px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 50%;
-          background: rgba(255, 255, 255, 0.16);
-          font-size: 12px;
-          font-weight: 800;
-        }
-
-        .premium-feature strong {
-          display: block;
-          font-size: 13px;
-          margin-bottom: 4px;
-        }
-
-        .premium-feature small {
-          display: block;
-          color: rgba(255, 255, 255, 0.68);
-          font-size: 11px;
-          line-height: 1.5;
-        }
-
-        .premium-action {
-          background: white;
-          color: #092653;
-          border-radius: 20px;
-          padding: 24px;
-          text-align: center;
-          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.14);
-        }
-
-        .premium-price span {
-          display: block;
-          font-size: 12px;
-          color: #71809a;
-          margin-bottom: 2px;
-        }
-
-        .premium-price strong {
-          font-size: 34px;
-          line-height: 1;
-        }
-
-        .premium-price small {
-          font-size: 12px;
-          color: #71809a;
-          margin-left: 3px;
-        }
-
-        .premium-button {
+        .navbar {
           width: 100%;
-          margin-top: 18px;
-          border: none;
-          border-radius: 12px;
-          padding: 13px 16px;
-          background: #0b63ce;
+          min-height: 72px;
+          padding: 0 6%;
+          background: white;
+          border-bottom: 1px solid #e8edf4;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 25px;
+        }
+
+        .logo {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          text-decoration: none;
+          color: #10284b;
+          font-size: 18px;
+          font-weight: 700;
+          white-space: nowrap;
+        }
+
+        .logo strong {
+          color: #0b63ce;
+        }
+
+        .logo-icon {
+          width: 34px;
+          height: 34px;
+          border-radius: 10px;
+          background: linear-gradient(
+            135deg,
+            #0b63ce,
+            #084b9b
+          );
           color: white;
-          font-weight: 800;
-          cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 10px;
+          font-weight: 900;
+          box-shadow:
+            0 5px 14px rgba(11, 99, 206, 0.2);
+        }
+
+        .nav-links {
+          display: flex;
+          align-items: center;
+          gap: 27px;
+        }
+
+        .nav-links a {
+          text-decoration: none;
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 600;
           transition: 0.2s ease;
         }
 
-        .premium-button:hover {
-          background: #084faa;
-          transform: translateY(-1px);
-        }
-
-        .premium-button span {
-          font-size: 18px;
-        }
-
-        .plans-link {
-          margin-top: 12px;
-          border: none;
-          background: transparent;
+        .nav-links a:hover {
           color: #0b63ce;
-          font-weight: 700;
-          cursor: pointer;
         }
 
-        .payment-note {
-          display: block;
-          margin-top: 12px;
-          color: #7a879b;
-          font-size: 10px;
-          line-height: 1.4;
+        .nav-actions {
+          display: flex;
+          align-items: center;
+          gap: 10px;
         }
 
-        .active-premium {
+        .login-btn,
+        .signup-btn {
+          text-decoration: none;
+          padding: 10px 16px;
+          border-radius: 9px;
+          font-size: 12px;
+          font-weight: 800;
+          transition: 0.2s ease;
+        }
+
+        .login-btn {
+          color: #0b63ce;
+          border: 1px solid #d7e3f2;
+          background: white;
+        }
+
+        .signup-btn {
+          color: white;
+          background: #0b63ce;
+        }
+
+        .login-btn:hover {
+          border-color: #0b63ce;
+        }
+
+        .signup-btn:hover {
+          background: #084fa5;
+        }
+
+        /* ====================================================
+           HERO
+        ==================================================== */
+
+        .hero {
+          text-align: center;
+          padding: 65px 20px 42px;
+          background:
+            radial-gradient(
+              circle at top,
+              rgba(11, 99, 206, 0.1),
+              transparent 45%
+            ),
+            white;
+        }
+
+        .badge {
           display: inline-flex;
           align-items: center;
-          gap: 8px;
-          padding: 9px 13px;
+          justify-content: center;
+          padding: 7px 13px;
           border-radius: 999px;
-          background: #e9f8ef;
-          color: #16733c;
-          font-size: 13px;
+          background: #edf5ff;
+          color: #0b63ce;
+          border: 1px solid #d7e8fc;
+          font-size: 11px;
           font-weight: 800;
         }
 
-        .active-premium span {
+        .hero h1 {
+          margin: 18px auto 12px;
+          max-width: 750px;
+          font-size: clamp(
+            34px,
+            5vw,
+            56px
+          );
+          line-height: 1.08;
+          letter-spacing: -1.5px;
+          color: #092653;
+        }
+
+        .hero h1 span {
+          color: #0b63ce;
+        }
+
+        .hero > p {
+          max-width: 650px;
+          margin: 0 auto;
+          color: #718096;
+          font-size: 15px;
+          line-height: 1.7;
+        }
+
+        /* ====================================================
+           BILLING
+        ==================================================== */
+
+        .billing-wrapper {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          margin-top: 30px;
+        }
+
+        .billing-toggle {
+          display: inline-flex;
+          padding: 5px;
+          background: #edf2f8;
+          border: 1px solid #dfe6ef;
+          border-radius: 13px;
+          gap: 4px;
+        }
+
+        .billing-toggle button {
+          border: none;
+          background: transparent;
+          color: #65758c;
+          padding: 11px 19px;
+          border-radius: 9px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 800;
+          transition: 0.2s ease;
+        }
+
+        .billing-toggle button.active {
+          background: white;
+          color: #0b63ce;
+          box-shadow:
+            0 3px 10px rgba(
+              15,
+              40,
+              75,
+              0.1
+            );
+        }
+
+        .billing-toggle button:hover {
+          color: #0b63ce;
+        }
+
+        .save {
+          display: inline-block;
+          margin-left: 7px;
+          padding: 3px 6px;
+          border-radius: 5px;
+          background: #dff5e8;
+          color: #168346;
+          font-size: 9px;
           font-weight: 900;
         }
 
-        .premium-action > p {
-          color: #71809a;
+        .billing-status {
+          margin-top: 10px;
+          color: #168346;
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        /* ====================================================
+           MESSAGES
+        ==================================================== */
+
+        .info-banner,
+        .success-message,
+        .error-message,
+        .active-banner {
+          width: min(
+            1120px,
+            calc(100% - 32px)
+          );
+          margin: 20px auto 0;
+          padding: 13px 16px;
+          border-radius: 11px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          text-align: center;
           font-size: 12px;
           line-height: 1.5;
-          margin: 15px 0 0;
         }
 
-        .quick-section {
-          margin-top: 38px;
+        .info-banner {
+          background: #edf5ff;
+          border: 1px solid #d6e7fa;
+          color: #31577f;
         }
 
-        .section-heading {
-          margin-bottom: 16px;
+        .success-message {
+          background: #eaf8ef;
+          border: 1px solid #ccebd7;
+          color: #176b39;
         }
 
-        .eyebrow {
-          display: block;
-          color: #0b63ce;
+        .error-message {
+          background: #fff0f0;
+          border: 1px solid #f3cccc;
+          color: #a52c2c;
+        }
+
+        .active-banner {
+          background: #eaf8ef;
+          border: 1px solid #ccebd7;
+          color: #176b39;
+        }
+
+        /* ====================================================
+           PRICING
+        ==================================================== */
+
+        .pricing-section {
+          width: min(
+            1120px,
+            calc(100% - 32px)
+          );
+          margin: 38px auto 0;
+        }
+
+        .pricing-grid {
+          display: grid;
+          grid-template-columns:
+            repeat(3, minmax(0, 1fr));
+          gap: 20px;
+          align-items: stretch;
+        }
+
+        .pricing-card {
+          position: relative;
+          background: white;
+          border: 1px solid #e3e9f1;
+          border-radius: 19px;
+          overflow: hidden;
+          box-shadow:
+            0 7px 24px rgba(
+              20,
+              45,
+              80,
+              0.06
+            );
+          transition:
+            transform 0.2s ease,
+            box-shadow 0.2s ease;
+        }
+
+        .pricing-card:hover {
+          transform: translateY(-3px);
+          box-shadow:
+            0 12px 32px rgba(
+              20,
+              45,
+              80,
+              0.1
+            );
+        }
+
+        .pricing-card.popular {
+          border: 2px solid #0b63ce;
+        }
+
+        .popular-label {
+          padding: 8px;
+          text-align: center;
+          background: #0b63ce;
+          color: white;
           font-size: 10px;
           font-weight: 900;
-          letter-spacing: 0.1em;
-          margin-bottom: 5px;
+          letter-spacing: 0.08em;
         }
 
-        .section-heading h2 {
+        .card-content {
+          padding: 27px 23px 25px;
+        }
+
+        .plan-heading {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+        }
+
+        .plan-heading h2 {
           margin: 0;
           font-size: 22px;
           color: #10284b;
         }
 
-        .quick-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 14px;
+        .selected-badge {
+          padding: 5px 8px;
+          border-radius: 999px;
+          background: #e8f7ee;
+          color: #168346;
+          font-size: 9px;
+          font-weight: 900;
+          white-space: nowrap;
         }
 
-        .quick-item {
-          width: 100%;
-          min-height: 82px;
-          border: 1px solid #e4eaf2;
-          background: white;
-          border-radius: 16px;
-          padding: 16px;
+        .description {
+          min-height: 54px;
+          margin: 12px 0 19px;
+          color: #78879b;
+          font-size: 12px;
+          line-height: 1.6;
+        }
+
+        .price {
           display: flex;
-          align-items: center;
-          gap: 13px;
-          text-align: left;
+          align-items: baseline;
+          color: #092653;
+          min-height: 50px;
+        }
+
+        .currency {
+          font-size: 19px;
+          font-weight: 800;
+          margin-right: 2px;
+        }
+
+        .price-number {
+          font-size: 37px;
+          font-weight: 900;
+          letter-spacing: -1px;
+        }
+
+        .period {
+          margin-left: 5px;
+          color: #78879b;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        .billing-note {
+          min-height: 30px;
+          margin: 5px 0 0;
+          color: #8995a7;
+          font-size: 11px;
+        }
+
+        /* ====================================================
+           ANNUAL DETAILS
+        ==================================================== */
+
+        .annual-details {
+          min-height: 58px;
+          margin-top: 3px;
+        }
+
+        .annual-equivalent,
+        .annual-saving {
+          margin: 3px 0;
+          font-size: 10px;
+        }
+
+        .annual-equivalent {
+          color: #718096;
+        }
+
+        .annual-equivalent strong {
+          color: #092653;
+        }
+
+        .annual-saving {
+          color: #168346;
+          font-weight: 800;
+        }
+
+        .annual-saving strong {
+          font-weight: 900;
+        }
+
+        /* ====================================================
+           BUTTON
+        ==================================================== */
+
+        .plan-button {
+          width: 100%;
+          min-height: 45px;
+          margin-top: 18px;
+          border: 1px solid #cbd8e8;
+          border-radius: 10px;
+          background: white;
+          color: #0b63ce;
           cursor: pointer;
+          font-size: 12px;
+          font-weight: 900;
           transition: 0.2s ease;
         }
 
-        .quick-item:hover {
-          border-color: #b9d4f4;
-          transform: translateY(-1px);
+        .plan-button:hover:not(:disabled) {
+          background: #edf5ff;
+          border-color: #0b63ce;
         }
 
-        .quick-icon {
+        .plan-button.primary {
+          background: #0b63ce;
+          color: white;
+          border-color: #0b63ce;
+        }
+
+        .plan-button.primary:hover:not(:disabled) {
+          background: #084fa5;
+        }
+
+        .plan-button:disabled {
+          cursor: not-allowed;
+          opacity: 0.55;
+        }
+
+        .login-required {
+          margin: 7px 0 0;
+          text-align: center;
+          color: #8b97a8;
+          font-size: 9px;
+        }
+
+        .divider {
+          height: 1px;
+          margin: 22px 0 18px;
+          background: #e8edf3;
+        }
+
+        .includes {
+          margin: 0 0 12px;
+          color: #445671;
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .card-content ul {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+        }
+
+        .card-content li {
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          margin-bottom: 10px;
+          color: #65758c;
+          font-size: 11px;
+          line-height: 1.45;
+        }
+
+        .check {
+          color: #168346;
+          font-weight: 900;
+          flex-shrink: 0;
+        }
+
+        /* ====================================================
+           PRICING NOTE
+        ==================================================== */
+
+        .pricing-note-section {
+          width: min(
+            1120px,
+            calc(100% - 32px)
+          );
+          margin: 34px auto 0;
+        }
+
+        .pricing-note {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          padding: 20px;
+          border: 1px solid #e0e7ef;
+          border-radius: 15px;
+          background: white;
+        }
+
+        .note-icon {
           width: 42px;
           height: 42px;
           min-width: 42px;
@@ -1173,142 +1408,250 @@ export default function CompanyPricingPage() {
           font-size: 18px;
         }
 
-        .quick-item div:nth-child(2) {
-          flex: 1;
-          min-width: 0;
-        }
-
-        .quick-item strong {
-          display: block;
+        .pricing-note h3 {
+          margin: 0 0 5px;
           color: #10284b;
-          font-size: 13px;
-          margin-bottom: 4px;
+          font-size: 14px;
         }
 
-        .quick-item span {
-          display: block;
-          color: #78879c;
+        .pricing-note p {
+          margin: 0;
+          color: #718096;
           font-size: 11px;
-          line-height: 1.4;
+          line-height: 1.6;
         }
 
-        .quick-item b {
-          color: #0b63ce;
-          font-size: 18px;
-        }
+        /* ====================================================
+           FOOTER
+        ==================================================== */
 
-        .dashboard-footer {
-          margin-top: 45px;
-          padding: 25px 0 10px;
-          border-top: 1px solid #e5eaf1;
+        .pricing-footer {
+          width: min(
+            1120px,
+            calc(100% - 32px)
+          );
+          margin: 50px auto 0;
+          padding: 25px 0 35px;
+          border-top: 1px solid #e1e7ef;
           display: flex;
-          align-items: center;
           justify-content: space-between;
-          gap: 20px;
+          align-items: center;
+          gap: 30px;
         }
 
-        .dashboard-footer strong {
+        .footer-logo {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          text-decoration: none;
           color: #10284b;
           font-size: 15px;
+          font-weight: 800;
         }
 
-        .dashboard-footer p {
-          margin: 5px 0 0;
-          color: #8793a5;
-          font-size: 11px;
+        .footer-logo .logo-icon {
+          width: 29px;
+          height: 29px;
+          border-radius: 8px;
+          font-size: 13px;
+        }
+
+        .footer-logo strong {
+          color: #0b63ce;
+        }
+
+        .footer-brand p {
+          margin: 8px 0 0;
+          color: #8a96a8;
+          font-size: 10px;
         }
 
         .footer-links {
           display: flex;
-          gap: 18px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+          gap: 17px;
         }
 
-        .footer-links button {
-          border: none;
-          background: transparent;
-          color: #687890;
-          font-size: 11px;
+        .footer-links a {
+          text-decoration: none;
+          color: #69798f;
+          font-size: 10px;
           font-weight: 700;
-          cursor: pointer;
         }
 
-        .footer-links button:hover {
+        .footer-links a:hover {
           color: #0b63ce;
         }
 
+        /* ====================================================
+           TABLET
+        ==================================================== */
+
         @media (max-width: 900px) {
-          .premium-content {
-            grid-template-columns: 1fr;
+
+          .navbar {
+            padding: 0 4%;
           }
 
-          .premium-features {
-            grid-template-columns: 1fr;
+          .nav-links {
+            display: none;
           }
 
-          .quick-grid {
-            grid-template-columns: 1fr;
+          .pricing-grid {
+            grid-template-columns:
+              repeat(2, minmax(0, 1fr));
           }
 
-          .premium-action {
-            max-width: 420px;
+          .pricing-card:last-child {
+            grid-column:
+              1 / -1;
+            max-width: 520px;
+            width: 100%;
+            margin: 0 auto;
           }
+
         }
 
+        /* ====================================================
+           MOBILE / IPHONE
+        ==================================================== */
+
         @media (max-width: 600px) {
-          .premium-section {
-            margin-top: 25px;
-            border-radius: 18px;
+
+          .navbar {
+            min-height: 64px;
+            padding: 0 15px;
           }
 
-          .premium-content {
-            padding: 22px 18px;
-            gap: 24px;
+          .logo {
+            font-size: 15px;
           }
 
-          .premium-content h2 {
-            font-size: 23px;
+          .logo-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
           }
 
-          .premium-content > div:first-child > p {
+          .nav-actions {
+            gap: 6px;
+          }
+
+          .login-btn,
+          .signup-btn {
+            padding: 8px 10px;
+            font-size: 10px;
+          }
+
+          .hero {
+            padding:
+              43px
+              16px
+              32px;
+          }
+
+          .hero h1 {
+            font-size: 34px;
+            letter-spacing: -1px;
+          }
+
+          .hero > p {
             font-size: 13px;
           }
 
-          .premium-action {
+          .badge {
+            font-size: 9px;
+          }
+
+          .billing-toggle {
+            width: 100%;
+            max-width: 310px;
+          }
+
+          .billing-toggle button {
+            flex: 1;
+            padding: 11px 8px;
+            font-size: 11px;
+          }
+
+          .save {
+            display: block;
+            width: fit-content;
+            margin: 4px auto 0;
+          }
+
+          .info-banner,
+          .success-message,
+          .error-message,
+          .active-banner {
+            width: calc(100% - 24px);
+            flex-direction: column;
+            margin-top: 14px;
+            padding: 12px;
+          }
+
+          .pricing-section {
+            width: calc(100% - 24px);
+            margin-top: 25px;
+          }
+
+          .pricing-grid {
+            grid-template-columns: 1fr;
+            gap: 15px;
+          }
+
+          .pricing-card:last-child {
+            grid-column: auto;
             max-width: none;
-            padding: 20px 16px;
           }
 
-          .premium-price strong {
-            font-size: 30px;
+          .card-content {
+            padding: 23px 19px;
           }
 
-          .quick-section {
-            margin-top: 28px;
+          .description {
+            min-height: auto;
           }
 
-          .section-heading h2 {
-            font-size: 19px;
+          .price-number {
+            font-size: 34px;
           }
 
-          .quick-item {
-            min-height: 76px;
-            padding: 13px;
+          .pricing-note-section {
+            width: calc(100% - 24px);
+            margin-top: 25px;
           }
 
-          .dashboard-footer {
-            margin-top: 32px;
-            padding-bottom: 20px;
+          .pricing-note {
+            align-items: flex-start;
+            padding: 16px;
+          }
+
+          .pricing-note h3 {
+            font-size: 13px;
+          }
+
+          .pricing-note p {
+            font-size: 10px;
+          }
+
+          .pricing-footer {
+            width: calc(100% - 24px);
             flex-direction: column;
             align-items: flex-start;
+            margin-top: 35px;
           }
 
           .footer-links {
-            width: 100%;
-            flex-wrap: wrap;
-            gap: 12px 18px;
+            justify-content: flex-start;
+            gap: 13px;
           }
+
         }
+
       `}</style>
+
     </main>
   );
-} 
+}
