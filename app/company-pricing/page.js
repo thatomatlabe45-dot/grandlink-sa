@@ -166,103 +166,141 @@ export default function CompanyPricingPage() {
   // ==========================================================
 
   async function choosePlan(plan) {
-    setMessage("");
-    setError("");
+  setMessage("");
+  setError("");
 
-    try {
-      setSelectingPlan(plan.id);
+  try {
+    setSelectingPlan(plan.id);
 
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-      if (userError) {
-        throw userError;
-      }
-
-      /*
-       * Company account must exist before we can associate
-       * a payment/subscription with the user.
-       *
-       * BUT we do NOT create a companies row here.
-       */
-
-      if (!user) {
-        router.push(
-          `/signup?role=company&redirect=/company-pricing`
-        );
-        return;
-      }
-
-      const price =
-        billing === "annual"
-          ? getAnnualPrice(plan.monthly)
-          : plan.monthly;
-
-      /*
-       * Store ONLY the selected plan as inactive.
-       *
-       * This does NOT give the company access.
-       *
-       * Payment must later change the subscription to:
-       *
-       * status = "active"
-       */
-
-      const { data, error: saveError } = await supabase
-        .from("company_subscriptions")
-        .upsert(
-          {
-            company_id: user.id,
-            plan: plan.id,
-            status: "inactive",
-            monthly_price:
-              billing === "annual"
-                ? getMonthlyEquivalent(plan.monthly)
-                : plan.monthly,
-            payment_provider: null,
-            payment_reference: null,
-            updated_at: new Date().toISOString(),
-          },
-          {
-            onConflict: "company_id",
-          }
-        )
-        .select()
-        .single();
-
-      if (saveError) {
-        throw saveError;
-      }
-
-      setCurrentPlan(data);
-
-      /*
-       * Send the company to the payment page.
-       *
-       * The company profile is NOT created yet.
-       */
-
-      router.push(
-        `/company/payment?plan=${encodeURIComponent(
-          plan.id
-        )}&billing=${billing}`
-      );
-    } catch (error) {
-      console.error(
-        "Plan selection error:",
-        error
-      );
-
-      setError(
-        error?.message ||
-          "Something went wrong while selecting your plan."
-      );
-    } finally {
-      setSelectingPlan(null);
+    if (userError) {
+      throw userError;
     }
+
+    if (!user) {
+      router.push(
+        `/signup?role=company&redirect=/company-pricing`
+      );
+      return;
+    }
+
+    const price =
+      billing === "annual"
+        ? getAnnualPrice(plan.monthly)
+        : plan.monthly;
+
+    /*
+     * Save the selected plan as INACTIVE.
+     *
+     * Selecting a plan does NOT activate the company.
+     * PayFast payment must be completed first.
+     */
+
+    const { error: saveError } = await supabase
+      .from("company_subscriptions")
+      .upsert(
+        {
+          company_id: user.id,
+          plan: plan.id,
+          status: "inactive",
+          monthly_price:
+            billing === "annual"
+              ? getMonthlyEquivalent(plan.monthly)
+              : plan.monthly,
+          payment_provider: null,
+          payment_reference: null,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "company_id",
+        }
+      );
+
+    if (saveError) {
+      throw saveError;
+    }
+
+    /*
+     * Ask our secure server route to create
+     * the PayFast payment request.
+     */
+
+    const response = await fetch(
+      "/api/payfast/create-payment",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          plan: plan.id,
+          billing,
+          price,
+          email: user.email,
+        }),
+      }
+    );
+
+    const payment = await response.json();
+
+    if (!response.ok || !payment.success) {
+      throw new Error(
+        payment.error ||
+          "Could not create the PayFast payment."
+      );
+    }
+
+    /*
+     * Create a temporary HTML form.
+     *
+     * PayFast expects the payment information
+     * to be submitted as form fields.
+     */
+
+    const form = document.createElement("form");
+
+    form.method = "POST";
+    form.action = payment.paymentUrl;
+    form.style.display = "none";
+
+    Object.entries(payment.paymentData).forEach(
+      ([key, value]) => {
+        const input =
+          document.createElement("input");
+
+        input.type = "hidden";
+        input.name = key;
+        input.value = String(value);
+
+        form.appendChild(input);
+      }
+    );
+
+    document.body.appendChild(form);
+
+    /*
+     * Send the company to PayFast.
+     */
+
+    form.submit();
+  } catch (error) {
+    console.error(
+      "PayFast payment error:",
+      error
+    );
+
+    setError(
+      error?.message ||
+        "Something went wrong while preparing your payment."
+    );
+
+    setSelectingPlan(null);
   }
+}
 
   // ==========================================================
   // LOADING
