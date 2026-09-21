@@ -10,6 +10,10 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
+// ============================================================
+// PLANS
+// ============================================================
+
 const PLANS = [
   {
     id: "starter",
@@ -56,6 +60,10 @@ const PLANS = [
   },
 ];
 
+// ============================================================
+// PAGE
+// ============================================================
+
 export default function CompanyPricingPage() {
   const router = useRouter();
 
@@ -66,6 +74,10 @@ export default function CompanyPricingPage() {
   const [selectingPlan, setSelectingPlan] = useState(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  // ==========================================================
+  // LOAD ACCOUNT
+  // ==========================================================
 
   useEffect(() => {
     loadAccount();
@@ -119,6 +131,7 @@ export default function CompanyPricingPage() {
       setCurrentPlan(subscription || null);
     } catch (error) {
       console.error(error);
+
       setError(
         error?.message ||
           "Could not load the pricing page."
@@ -128,13 +141,17 @@ export default function CompanyPricingPage() {
     }
   }
 
+  // ==========================================================
+  // PRICING
+  // ==========================================================
+
   function getAnnualPrice(monthlyPrice) {
     /*
      * Annual price = 10 months worth of the monthly price.
      *
-     * Example:
      * R500 x 10 = R5,000 per year
-     * instead of R6,000 monthly over 12 months.
+     * R950 x 10 = R9,500 per year
+     * R1,500 x 10 = R15,000 per year
      */
 
     return monthlyPrice * 10;
@@ -143,6 +160,10 @@ export default function CompanyPricingPage() {
   function getMonthlyEquivalent(monthlyPrice) {
     return Math.round(getAnnualPrice(monthlyPrice) / 12);
   }
+
+  // ==========================================================
+  // CHOOSE PLAN
+  // ==========================================================
 
   async function choosePlan(plan) {
     setMessage("");
@@ -243,6 +264,10 @@ export default function CompanyPricingPage() {
     }
   }
 
+  // ==========================================================
+  // LOADING
+  // ==========================================================
+
   if (loading) {
     return (
       <main style={styles.loadingPage}>
@@ -259,6 +284,10 @@ export default function CompanyPricingPage() {
     );
   }
 
+  // ==========================================================
+  // PAGE
+  // ==========================================================
+
   return (
     <main style={styles.page}>
       {/* =====================================================
@@ -269,6 +298,7 @@ export default function CompanyPricingPage() {
         <Link
           href="/"
           style={styles.logo}
+          className="gl-logo"
         >
           <span style={styles.logoIcon}>
             G
@@ -280,7 +310,10 @@ export default function CompanyPricingPage() {
           </span>
         </Link>
 
-        <div style={styles.navLinks}>
+        <div
+          style={styles.navLinks}
+          className="gl-nav-links"
+        >
           <Link
             href="/"
             style={styles.navLink}
@@ -303,7 +336,10 @@ export default function CompanyPricingPage() {
           </Link>
         </div>
 
-        <div style={styles.navActions}>
+        <div
+          style={styles.navActions}
+          className="gl-nav-actions"
+        >
           <Link
             href="/login"
             style={styles.loginButton}
@@ -335,7 +371,10 @@ export default function CompanyPricingPage() {
           African graduates.
         </p>
 
-        <div style={styles.securityNote}>
+        <div
+          style={styles.securityNote}
+          className="gl-security-note"
+        >
           <span style={styles.checkCircle}>
             ✓
           </span>
@@ -352,7 +391,10 @@ export default function CompanyPricingPage() {
       ====================================================== */}
 
       <section style={styles.billingSection}>
-        <div style={styles.billingToggle}>
+        <div
+          style={styles.billingToggle}
+          className="gl-billing-toggle"
+        >
           <button
             type="button"
             onClick={() =>
@@ -410,7 +452,10 @@ export default function CompanyPricingPage() {
       ====================================================== */}
 
       <section style={styles.pricingSection}>
-        <div style={styles.pricingGrid}>
+        <div
+          style={styles.pricingGrid}
+          className="gl-pricing-grid"
+        >
           {PLANS.map((plan) => {
             const annualPrice =
               getAnnualPrice(plan.monthly);
@@ -438,9 +483,17 @@ export default function CompanyPricingPage() {
                     ? styles.popularCard
                     : {}),
                 }}
+                className={
+                  plan.popular
+                    ? "gl-plan-card gl-popular-card"
+                    : "gl-plan-card"
+                }
               >
                 {plan.popular && (
-                  <div style={styles.popularBadge}>
+                  <div
+                    style={styles.popularBadge}
+                    className="gl-popular-badge"
+                  >
                     MOST POPULAR
                   </div>
                 )}
@@ -460,38 +513,57 @@ export default function CompanyPricingPage() {
                       {plan.name}
                     </h2>
 
-                    <p style={styles.planDescription}>
+                    <p
+                      style={
+                        styles.planDescription
+                      }
+                    >
                       {plan.description}
                     </p>
                   </div>
                 </div>
 
-                <div style={styles.priceArea}>
+                <div
+                  style={styles.priceArea}
+                  className="gl-price-area"
+                >
                   {billing === "monthly" ? (
                     <>
-                      <span style={styles.currency}>
+                      <span
+                        style={styles.currency}
+                      >
                         R
                       </span>
 
-                      <span style={styles.price}>
+                      <span
+                        style={styles.price}
+                      >
                         {plan.monthly.toLocaleString()}
                       </span>
 
-                      <span style={styles.period}>
+                      <span
+                        style={styles.period}
+                      >
                         /month
                       </span>
                     </>
                   ) : (
                     <>
-                      <span style={styles.currency}>
+                      <span
+                        style={styles.currency}
+                      >
                         R
                       </span>
 
-                      <span style={styles.price}>
+                      <span
+                        style={styles.price}
+                      >
                         {annualPrice.toLocaleString()}
                       </span>
 
-                      <span style={styles.period}>
+                      <span
+                        style={styles.period}
+                      >
                         /year
                       </span>
                     </>
@@ -499,20 +571,28 @@ export default function CompanyPricingPage() {
                 </div>
 
                 {billing === "annual" && (
-                  <div style={styles.annualNote}>
+                  <div
+                    style={styles.annualNote}
+                  >
                     Equivalent to R
                     {monthlyEquivalent.toLocaleString()}
                     /month
                   </div>
                 )}
 
-                <div style={styles.divider} />
+                <div
+                  style={styles.divider}
+                />
 
-                <div style={styles.featureTitle}>
+                <div
+                  style={styles.featureTitle}
+                >
                   Includes:
                 </div>
 
-                <ul style={styles.featureList}>
+                <ul
+                  style={styles.featureList}
+                >
                   {plan.features.map(
                     (feature) => (
                       <li
@@ -558,7 +638,11 @@ export default function CompanyPricingPage() {
                     : "Choose Plan →"}
                 </button>
 
-                <p style={styles.paymentSmall}>
+                <p
+                  style={
+                    styles.paymentSmall
+                  }
+                >
                   🔒 Secure payment required
                   before company registration
                 </p>
@@ -589,7 +673,10 @@ export default function CompanyPricingPage() {
           </p>
         </div>
 
-        <div style={styles.steps}>
+        <div
+          style={styles.steps}
+          className="gl-steps"
+        >
           <Step
             number="01"
             icon="💳"
@@ -625,7 +712,10 @@ export default function CompanyPricingPage() {
       ====================================================== */}
 
       <section style={styles.featureSection}>
-        <div style={styles.featurePanel}>
+        <div
+          style={styles.featurePanel}
+          className="gl-feature-panel"
+        >
           <div style={styles.featurePanelText}>
             <span style={styles.smallBadge}>
               BUILT FOR RECRUITERS
@@ -643,7 +733,10 @@ export default function CompanyPricingPage() {
               in one place.
             </p>
 
-            <div style={styles.miniFeatures}>
+            <div
+              style={styles.miniFeatures}
+              className="gl-mini-features"
+            >
               <div>
                 <strong>
                   AI Matching
@@ -754,7 +847,23 @@ export default function CompanyPricingPage() {
         </div>
       </footer>
 
+      {/* =====================================================
+          RESPONSIVE CSS
+      ====================================================== */}
+
       <style jsx>{`
+        :global(html) {
+          width: 100%;
+          overflow-x: hidden;
+        }
+
+        :global(body) {
+          margin: 0;
+          width: 100%;
+          max-width: 100%;
+          overflow-x: hidden;
+        }
+
         * {
           box-sizing: border-box;
         }
@@ -768,27 +877,127 @@ export default function CompanyPricingPage() {
           font-family: inherit;
         }
 
+        .gl-logo {
+          flex-shrink: 0;
+        }
+
+        @media (max-width: 1000px) {
+          .gl-pricing-grid {
+            grid-template-columns: repeat(
+              2,
+              minmax(0, 1fr)
+            ) !important;
+          }
+
+          .gl-popular-card {
+            transform: none !important;
+          }
+
+          .gl-steps {
+            grid-template-columns: repeat(
+              2,
+              minmax(0, 1fr)
+            ) !important;
+          }
+
+          .gl-feature-panel {
+            grid-template-columns: 1fr !important;
+          }
+
+          .gl-mini-features {
+            grid-template-columns: 1fr !important;
+          }
+        }
+
         @media (max-width: 850px) {
-          .navLinks {
-            display: none;
+          .gl-nav-links {
+            display: none !important;
+          }
+
+          .gl-pricing-grid {
+            gap: 18px !important;
+          }
+
+          .gl-plan-card {
+            padding: 26px !important;
           }
         }
 
         @media (max-width: 700px) {
-          .pricingGrid {
-            grid-template-columns: 1fr;
+          .gl-pricing-grid {
+            grid-template-columns: 1fr !important;
+            width: 100% !important;
+          }
+
+          .gl-plan-card {
+            width: 100% !important;
+            max-width: 100% !important;
+          }
+
+          .gl-popular-card {
+            transform: none !important;
+          }
+
+          .gl-steps {
+            grid-template-columns: 1fr !important;
+          }
+
+          .gl-feature-panel {
+            padding: 32px 24px !important;
           }
         }
 
         @media (max-width: 520px) {
-          .navActions {
-            display: none;
+          .gl-nav-actions {
+            display: none !important;
+          }
+
+          .gl-logo {
+            font-size: 19px !important;
+          }
+
+          .gl-billing-toggle {
+            width: 100% !important;
+            max-width: 360px !important;
+          }
+
+          .gl-security-note {
+            width: 100% !important;
+            justify-content: flex-start !important;
+            text-align: left !important;
+          }
+
+          .gl-price-area {
+            flex-wrap: nowrap !important;
+          }
+
+          .gl-plan-card {
+            padding: 24px 20px !important;
+            border-radius: 20px !important;
+          }
+
+          .gl-popular-badge {
+            top: -12px !important;
+          }
+        }
+
+        @media (max-width: 380px) {
+          .gl-logo {
+            font-size: 17px !important;
+          }
+
+          .gl-billing-toggle {
+            padding: 4px !important;
           }
         }
       `}</style>
     </main>
   );
 }
+
+// ============================================================
+// STEP COMPONENT
+// ============================================================
 
 function Step({
   number,
@@ -813,336 +1022,468 @@ function Step({
   );
 }
 
+// ============================================================
+// STYLES
+// ============================================================
+
 const styles = {
+  // ==========================================================
+  // PAGE
+  // ==========================================================
+
   page: {
     minHeight: "100vh",
     background:
-      "linear-gradient(180deg,#f7fbff 0%,#ffffff 50%,#f5f9ff 100%)",
+      "linear-gradient(180deg, #f7fbff 0%, #ffffff 45%, #f8fbff 100%)",
     color: "#10233f",
+    fontFamily:
+      "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    overflowX: "hidden",
   },
+
+  // ==========================================================
+  // LOADING
+  // ==========================================================
 
   loadingPage: {
     minHeight: "100vh",
     display: "flex",
-    justifyContent: "center",
     alignItems: "center",
-    background: "#f5f9ff",
-    padding: "20px",
+    justifyContent: "center",
+    background:
+      "linear-gradient(135deg, #eef6ff 0%, #ffffff 55%, #f5f9ff 100%)",
+    padding: "24px",
+    fontFamily:
+      "Inter, ui-sans-serif, system-ui, sans-serif",
   },
 
   loadingBox: {
-    background: "#fff",
-    padding: "40px",
-    borderRadius: "22px",
+    width: "100%",
+    maxWidth: "420px",
+    background: "#ffffff",
+    border: "1px solid #e4edf8",
+    borderRadius: "24px",
+    padding: "42px 28px",
     textAlign: "center",
     boxShadow:
-      "0 20px 60px rgba(15,59,112,.10)",
+      "0 20px 60px rgba(16, 35, 63, 0.10)",
   },
 
   spinner: {
-    fontSize: "42px",
-    color: "#1261d6",
-    marginBottom: "10px",
+    width: "54px",
+    height: "54px",
+    margin: "0 auto 18px",
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background:
+      "linear-gradient(135deg, #0b6bcb, #19a7ff)",
+    color: "#ffffff",
+    fontSize: "30px",
+    fontWeight: "800",
   },
 
+  // ==========================================================
+  // NAVBAR
+  // ==========================================================
+
   navbar: {
-    minHeight: "72px",
-    padding: "0 6%",
+    width: "100%",
+    maxWidth: "1240px",
+    margin: "0 auto",
+    padding: "18px 24px",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: "20px",
-    background: "rgba(255,255,255,.96)",
-    borderBottom: "1px solid #e7eef7",
-    position: "sticky",
-    top: 0,
-    zIndex: 50,
+    gap: "24px",
+    position: "relative",
+    zIndex: 20,
   },
 
   logo: {
     display: "flex",
     alignItems: "center",
-    gap: "9px",
-    color: "#10233f",
+    gap: "10px",
     textDecoration: "none",
-    fontSize: "21px",
-    fontWeight: "800",
-    whiteSpace: "nowrap",
+    color: "#10233f",
+    fontSize: "22px",
+    fontWeight: "700",
+    letterSpacing: "-0.5px",
   },
 
   logoIcon: {
     width: "38px",
     height: "38px",
-    borderRadius: "11px",
-    background:
-      "linear-gradient(135deg,#1261d6,#08a0ff)",
-    color: "#fff",
-    display: "flex",
+    borderRadius: "12px",
+    display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    fontWeight: "900",
+    background:
+      "linear-gradient(135deg, #0868c9, #19a7ff)",
+    color: "#ffffff",
+    fontSize: "20px",
+    fontWeight: "800",
     boxShadow:
-      "0 8px 18px rgba(18,97,214,.25)",
+      "0 8px 22px rgba(8, 104, 201, 0.25)",
   },
 
   navLinks: {
     display: "flex",
-    gap: "30px",
     alignItems: "center",
+    justifyContent: "center",
+    gap: "30px",
+    flex: 1,
   },
 
   navLink: {
-    color: "#52647c",
+    color: "#52657d",
     textDecoration: "none",
     fontSize: "14px",
-    fontWeight: "650",
+    fontWeight: "600",
+    transition: "0.2s ease",
   },
 
   navActions: {
     display: "flex",
     alignItems: "center",
+    justifyContent: "flex-end",
   },
 
   loginButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "42px",
+    padding: "0 18px",
+    borderRadius: "12px",
+    background: "#ffffff",
+    border: "1px solid #d9e5f2",
+    color: "#0b5cab",
     textDecoration: "none",
-    color: "#1261d6",
-    border: "1px solid #cfe0f5",
-    padding: "10px 18px",
-    borderRadius: "10px",
-    fontWeight: "750",
     fontSize: "14px",
-    background: "#fff",
+    fontWeight: "700",
+    boxShadow:
+      "0 5px 16px rgba(16, 35, 63, 0.06)",
   },
 
+  // ==========================================================
+  // HERO
+  // ==========================================================
+
   hero: {
-    textAlign: "center",
-    padding: "75px 20px 35px",
+    width: "100%",
     maxWidth: "900px",
     margin: "0 auto",
+    padding: "70px 24px 34px",
+    textAlign: "center",
   },
 
   heroBadge: {
     display: "inline-flex",
-    padding: "8px 13px",
-    borderRadius: "30px",
-    background: "#eaf3ff",
-    color: "#1261d6",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "8px 14px",
+    borderRadius: "999px",
+    background: "#e9f5ff",
+    border: "1px solid #cfe8ff",
+    color: "#0968c5",
     fontSize: "12px",
-    fontWeight: "850",
-    letterSpacing: ".5px",
+    fontWeight: "800",
+    letterSpacing: "0.7px",
     marginBottom: "18px",
   },
 
   heroTitle: {
     margin: 0,
-    fontSize: "clamp(40px,7vw,68px)",
-    lineHeight: "1.05",
+    fontSize: "clamp(38px, 6vw, 68px)",
+    lineHeight: 1.04,
     letterSpacing: "-2.5px",
-    fontWeight: "900",
+    fontWeight: "850",
+    color: "#10233f",
   },
 
   gradientText: {
-    color: "#1261d6",
+    background:
+      "linear-gradient(90deg, #0868c9, #18a7ff)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    backgroundClip: "text",
   },
 
   heroText: {
-    maxWidth: "650px",
-    margin: "22px auto 25px",
-    color: "#64748b",
-    lineHeight: "1.7",
+    maxWidth: "680px",
+    margin: "22px auto 0",
+    color: "#61738a",
     fontSize: "17px",
+    lineHeight: 1.7,
   },
 
   securityNote: {
     display: "inline-flex",
     alignItems: "center",
-    gap: "9px",
-    padding: "11px 15px",
-    background: "#f0fdf4",
-    border: "1px solid #bbf7d0",
-    borderRadius: "12px",
-    color: "#166534",
+    gap: "10px",
+    marginTop: "28px",
+    padding: "12px 17px",
+    borderRadius: "14px",
+    background: "#ffffff",
+    border: "1px solid #dce9f5",
+    color: "#43566e",
     fontSize: "13px",
-    fontWeight: "650",
-    maxWidth: "100%",
+    lineHeight: 1.5,
+    boxShadow:
+      "0 8px 26px rgba(16, 35, 63, 0.06)",
   },
 
   checkCircle: {
-    width: "22px",
-    height: "22px",
-    borderRadius: "50%",
-    background: "#16a34a",
-    color: "#fff",
-    display: "inline-flex",
-    justifyContent: "center",
-    alignItems: "center",
+    width: "24px",
+    height: "24px",
     flexShrink: 0,
-    fontSize: "12px",
+    borderRadius: "50%",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "#e5f7ed",
+    color: "#16824d",
+    fontWeight: "900",
+    fontSize: "13px",
   },
+
+  // ==========================================================
+  // BILLING
+  // ==========================================================
 
   billingSection: {
     display: "flex",
     justifyContent: "center",
-    padding: "10px 20px 30px",
+    padding: "10px 24px 38px",
   },
 
   billingToggle: {
+    position: "relative",
     display: "flex",
     alignItems: "center",
-    gap: "5px",
+    gap: "4px",
     padding: "5px",
-    background: "#eaf1f9",
-    borderRadius: "14px",
-    flexWrap: "wrap",
-    justifyContent: "center",
+    background: "#eaf2fa",
+    border: "1px solid #dce8f4",
+    borderRadius: "16px",
+    boxShadow:
+      "0 8px 24px rgba(16, 35, 63, 0.06)",
   },
 
   billingButton: {
+    minWidth: "112px",
+    minHeight: "44px",
     border: "none",
+    borderRadius: "12px",
     background: "transparent",
-    color: "#64748b",
-    padding: "11px 18px",
-    borderRadius: "10px",
+    color: "#61738a",
+    fontSize: "14px",
     fontWeight: "750",
     cursor: "pointer",
-    fontSize: "14px",
+    padding: "0 16px",
   },
 
   billingActive: {
-    background: "#fff",
-    color: "#1261d6",
+    background: "#ffffff",
+    color: "#075eb5",
     boxShadow:
-      "0 3px 12px rgba(20,70,120,.12)",
+      "0 4px 14px rgba(16, 35, 63, 0.10)",
   },
 
   saveBadge: {
-    background: "#dcfce7",
-    color: "#15803d",
+    marginLeft: "5px",
+    marginRight: "5px",
+    padding: "7px 9px",
+    borderRadius: "8px",
+    background: "#dff7e9",
+    color: "#177447",
     fontSize: "10px",
-    fontWeight: "900",
-    padding: "6px 8px",
-    borderRadius: "7px",
-    margin: "0 5px",
+    fontWeight: "850",
+    letterSpacing: "0.3px",
+    whiteSpace: "nowrap",
   },
 
+  // ==========================================================
+  // MESSAGES
+  // ==========================================================
+
+  successMessage: {
+    width: "calc(100% - 48px)",
+    maxWidth: "700px",
+    margin: "0 auto 24px",
+    padding: "14px 18px",
+    borderRadius: "14px",
+    background: "#eaf9f0",
+    border: "1px solid #c9ecd8",
+    color: "#176b42",
+    textAlign: "center",
+    fontSize: "14px",
+    fontWeight: "650",
+  },
+
+  errorMessage: {
+    width: "calc(100% - 48px)",
+    maxWidth: "700px",
+    margin: "0 auto 24px",
+    padding: "14px 18px",
+    borderRadius: "14px",
+    background: "#fff0f0",
+    border: "1px solid #f3d0d0",
+    color: "#b42323",
+    textAlign: "center",
+    fontSize: "14px",
+    fontWeight: "650",
+  },
+
+  // ==========================================================
+  // PRICING
+  // ==========================================================
+
   pricingSection: {
-    padding: "0 20px 80px",
+    width: "100%",
+    maxWidth: "1240px",
+    margin: "0 auto",
+    padding: "10px 24px 70px",
   },
 
   pricingGrid: {
-    maxWidth: "1180px",
-    margin: "0 auto",
+    width: "100%",
     display: "grid",
     gridTemplateColumns:
-      "repeat(3,minmax(0,1fr))",
-    gap: "22px",
+      "repeat(3, minmax(0, 1fr))",
+    gap: "24px",
+    alignItems: "stretch",
   },
 
   planCard: {
-    background: "#fff",
-    border: "1px solid #e1eaf4",
-    borderRadius: "22px",
-    padding: "30px",
     position: "relative",
+    minWidth: 0,
     display: "flex",
     flexDirection: "column",
-    minWidth: 0,
+    background: "#ffffff",
+    border: "1px solid #dfe9f3",
+    borderRadius: "24px",
+    padding: "30px",
     boxShadow:
-      "0 15px 40px rgba(24,69,120,.07)",
+      "0 14px 45px rgba(16, 35, 63, 0.08)",
   },
 
   popularCard: {
-    border: "2px solid #1261d6",
+    border:
+      "2px solid #0a75d1",
     boxShadow:
-      "0 20px 55px rgba(18,97,214,.15)",
-    transform: "translateY(-6px)",
+      "0 18px 55px rgba(8, 104, 201, 0.16)",
+    transform: "translateY(-8px)",
   },
 
   popularBadge: {
     position: "absolute",
-    top: "-13px",
+    top: "-14px",
     left: "50%",
     transform: "translateX(-50%)",
-    background: "#1261d6",
-    color: "#fff",
     padding: "7px 13px",
-    borderRadius: "20px",
+    borderRadius: "999px",
+    background:
+      "linear-gradient(90deg, #0868c9, #18a7ff)",
+    color: "#ffffff",
     fontSize: "10px",
     fontWeight: "900",
-    letterSpacing: ".5px",
+    letterSpacing: "0.7px",
     whiteSpace: "nowrap",
+    boxShadow:
+      "0 8px 20px rgba(8, 104, 201, 0.25)",
+  },
+
+  planTop: {
+    minHeight: "176px",
   },
 
   planIcon: {
-    fontSize: "30px",
-    marginBottom: "12px",
+    width: "46px",
+    height: "46px",
+    borderRadius: "14px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "#eef7ff",
+    fontSize: "22px",
+    marginBottom: "15px",
   },
 
   planName: {
-    margin: "0 0 9px",
-    fontSize: "25px",
-    fontWeight: "850",
+    margin: 0,
+    color: "#10233f",
+    fontSize: "24px",
+    fontWeight: "800",
+    letterSpacing: "-0.6px",
   },
 
   planDescription: {
-    margin: 0,
-    color: "#718198",
+    margin: "10px 0 0",
+    color: "#687b91",
     fontSize: "13px",
-    lineHeight: "1.6",
-    minHeight: "63px",
+    lineHeight: 1.6,
   },
 
   priceArea: {
+    minHeight: "72px",
     display: "flex",
     alignItems: "baseline",
-    marginTop: "28px",
-    minHeight: "55px",
+    gap: "3px",
+    whiteSpace: "nowrap",
   },
 
   currency: {
-    fontSize: "18px",
+    color: "#0a6bc8",
+    fontSize: "20px",
     fontWeight: "800",
-    color: "#1261d6",
-    marginRight: "3px",
+    alignSelf: "flex-start",
+    marginTop: "10px",
   },
 
   price: {
-    fontSize: "42px",
-    lineHeight: 1,
-    fontWeight: "900",
     color: "#10233f",
-    letterSpacing: "-1.5px",
+    fontSize: "42px",
+    fontWeight: "850",
+    letterSpacing: "-2px",
+    lineHeight: 1,
   },
 
   period: {
-    color: "#718198",
+    color: "#72849a",
     fontSize: "13px",
-    marginLeft: "5px",
+    fontWeight: "600",
+    marginLeft: "4px",
   },
 
   annualNote: {
-    marginTop: "8px",
-    color: "#15803d",
+    minHeight: "24px",
+    color: "#197448",
     fontSize: "12px",
-    fontWeight: "750",
+    fontWeight: "700",
+    marginTop: "3px",
   },
 
   divider: {
+    width: "100%",
     height: "1px",
-    background: "#edf1f6",
-    margin: "25px 0",
+    background: "#e8eef5",
+    margin: "22px 0",
   },
 
   featureTitle: {
+    color: "#263c55",
     fontSize: "13px",
-    fontWeight: "850",
-    marginBottom: "13px",
+    fontWeight: "800",
+    marginBottom: "14px",
   },
 
   featureList: {
     listStyle: "none",
     padding: 0,
-    margin: "0 0 25px",
+    margin: 0,
     display: "flex",
     flexDirection: "column",
     gap: "12px",
@@ -1153,93 +1494,76 @@ const styles = {
     display: "flex",
     alignItems: "flex-start",
     gap: "9px",
-    color: "#52647c",
+    color: "#53677e",
     fontSize: "13px",
-    lineHeight: "1.45",
+    lineHeight: 1.5,
   },
 
   featureCheck: {
-    width: "19px",
-    height: "19px",
-    borderRadius: "50%",
-    background: "#eaf3ff",
-    color: "#1261d6",
+    width: "20px",
+    height: "20px",
+    flexShrink: 0,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
+    borderRadius: "50%",
+    background: "#e8f5ff",
+    color: "#0870cb",
     fontSize: "11px",
     fontWeight: "900",
+    marginTop: "1px",
   },
 
   planButton: {
     width: "100%",
     minHeight: "50px",
-    borderRadius: "12px",
-    fontWeight: "850",
+    marginTop: "28px",
+    borderRadius: "14px",
     fontSize: "14px",
+    fontWeight: "800",
     cursor: "pointer",
     transition:
-      "transform .15s ease, box-shadow .15s ease",
+      "transform 0.2s ease, box-shadow 0.2s ease",
   },
 
   planButtonPrimary: {
-    border: "none",
+    border: "1px solid #0871d1",
     background:
-      "linear-gradient(135deg,#1261d6,#087ed8)",
-    color: "#fff",
+      "linear-gradient(135deg, #0868c9, #18a7ff)",
+    color: "#ffffff",
     boxShadow:
-      "0 10px 22px rgba(18,97,214,.22)",
+      "0 10px 24px rgba(8, 104, 201, 0.22)",
   },
 
   planButtonSecondary: {
-    border: "1px solid #cbdced",
-    background: "#fff",
-    color: "#1261d6",
+    border: "1px solid #cbdbea",
+    background: "#ffffff",
+    color: "#075eb5",
   },
 
   disabledButton: {
-    opacity: ".65",
+    opacity: 0.65,
     cursor: "not-allowed",
-    transform: "none",
+    boxShadow: "none",
   },
 
   paymentSmall: {
-    textAlign: "center",
     margin: "12px 0 0",
-    color: "#94a3b8",
+    textAlign: "center",
+    color: "#8a99aa",
     fontSize: "11px",
+    lineHeight: 1.5,
   },
 
-  successMessage: {
-    maxWidth: "700px",
-    margin: "0 auto 25px",
-    padding: "14px 17px",
-    background: "#ecfdf3",
-    border: "1px solid #bbf7d0",
-    color: "#166534",
-    borderRadius: "12px",
-    fontSize: "14px",
-    fontWeight: "700",
-  },
-
-  errorMessage: {
-    maxWidth: "700px",
-    margin: "0 auto 25px",
-    padding: "14px 17px",
-    background: "#fff1f2",
-    border: "1px solid #fecdd3",
-    color: "#be123c",
-    borderRadius: "12px",
-    fontSize: "14px",
-    fontWeight: "700",
-  },
+  // ==========================================================
+  // HOW IT WORKS
+  // ==========================================================
 
   howSection: {
-    padding: "85px 20px",
-    background: "#f7fbff",
-    borderTop: "1px solid #edf3f9",
-    borderBottom: "1px solid #edf3f9",
+    width: "100%",
+    maxWidth: "1180px",
+    margin: "0 auto",
+    padding: "78px 24px",
   },
 
   sectionHeading: {
@@ -1249,147 +1573,183 @@ const styles = {
   },
 
   smallBadge: {
-    display: "inline-block",
-    color: "#1261d6",
-    background: "#eaf3ff",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
     padding: "7px 11px",
-    borderRadius: "20px",
+    borderRadius: "999px",
+    background: "#eaf5ff",
+    color: "#0868c9",
     fontSize: "10px",
-    fontWeight: "900",
-    letterSpacing: ".7px",
-    marginBottom: "12px",
+    fontWeight: "850",
+    letterSpacing: "0.8px",
   },
 
   steps: {
-    maxWidth: "1100px",
-    margin: "0 auto",
     display: "grid",
     gridTemplateColumns:
-      "repeat(4,minmax(0,1fr))",
+      "repeat(4, minmax(0, 1fr))",
     gap: "18px",
   },
 
   step: {
-    background: "#fff",
-    border: "1px solid #e1eaf4",
-    borderRadius: "18px",
-    padding: "24px",
     position: "relative",
+    minWidth: 0,
+    padding: "28px 22px",
+    background: "#ffffff",
+    border: "1px solid #e3ebf4",
+    borderRadius: "20px",
+    textAlign: "center",
+    boxShadow:
+      "0 10px 35px rgba(16, 35, 63, 0.05)",
   },
 
   stepNumber: {
     position: "absolute",
-    right: "16px",
     top: "15px",
-    color: "#dbe7f5",
-    fontSize: "24px",
-    fontWeight: "900",
+    right: "17px",
+    color: "#a8bacd",
+    fontSize: "11px",
+    fontWeight: "850",
   },
 
   stepIcon: {
-    fontSize: "27px",
-    marginBottom: "15px",
+    width: "52px",
+    height: "52px",
+    margin: "0 auto 17px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: "16px",
+    background: "#edf7ff",
+    fontSize: "24px",
   },
 
+  // ==========================================================
+  // FEATURE SECTION
+  // ==========================================================
+
   featureSection: {
-    padding: "80px 20px",
+    width: "100%",
+    maxWidth: "1180px",
+    margin: "0 auto",
+    padding: "20px 24px 85px",
   },
 
   featurePanel: {
-    maxWidth: "1100px",
-    margin: "0 auto",
-    borderRadius: "28px",
-    padding: "50px",
-    background:
-      "linear-gradient(135deg,#0c3d82,#1261d6)",
-    color: "#fff",
     display: "grid",
     gridTemplateColumns:
-      "1.5fr .8fr",
+      "minmax(0, 1.5fr) minmax(260px, 0.7fr)",
     gap: "40px",
     alignItems: "center",
+    padding: "50px",
+    borderRadius: "30px",
+    background:
+      "linear-gradient(135deg, #0b315e 0%, #075cae 60%, #0788d9 100%)",
     boxShadow:
-      "0 25px 60px rgba(18,97,214,.18)",
+      "0 25px 70px rgba(8, 71, 130, 0.20)",
+    overflow: "hidden",
   },
 
   featurePanelText: {
     minWidth: 0,
   },
 
+  miniFeatures: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(3, minmax(0, 1fr))",
+    gap: "18px",
+    marginTop: "28px",
+  },
+
   featureVisual: {
-    background:
-      "rgba(255,255,255,.10)",
-    border:
-      "1px solid rgba(255,255,255,.18)",
-    borderRadius: "22px",
-    padding: "35px",
+    minHeight: "260px",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
+    justifyContent: "center",
     textAlign: "center",
-    gap: "9px",
+    borderRadius: "24px",
+    background:
+      "rgba(255,255,255,0.10)",
+    border:
+      "1px solid rgba(255,255,255,0.18)",
+    color: "#ffffff",
+    padding: "30px",
   },
 
   visualCircle: {
     width: "100px",
     height: "100px",
+    marginBottom: "22px",
     borderRadius: "50%",
-    background:
-      "rgba(255,255,255,.14)",
     display: "flex",
-    justifyContent: "center",
     alignItems: "center",
-    marginBottom: "8px",
+    justifyContent: "center",
+    background:
+      "rgba(255,255,255,0.13)",
+    border:
+      "1px solid rgba(255,255,255,0.25)",
   },
 
   visualIcon: {
-    width: "62px",
-    height: "62px",
-    borderRadius: "50%",
-    background: "#fff",
-    color: "#1261d6",
+    width: "60px",
+    height: "60px",
     display: "flex",
-    justifyContent: "center",
     alignItems: "center",
-    fontSize: "30px",
+    justifyContent: "center",
+    borderRadius: "50%",
+    background: "#ffffff",
+    color: "#0870c9",
+    fontSize: "28px",
     fontWeight: "900",
+    boxShadow:
+      "0 12px 30px rgba(0,0,0,0.15)",
   },
 
-  miniFeatures: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(3,minmax(0,1fr))",
-    gap: "20px",
-    marginTop: "30px",
-  },
+  // ==========================================================
+  // FOOTER
+  // ==========================================================
 
   footer: {
-    background: "#07172c",
-    color: "#fff",
+    width: "100%",
+    padding: "55px 24px 30px",
     textAlign: "center",
-    padding: "50px 20px 35px",
+    background: "#081a2f",
+    color: "#ffffff",
   },
 
   footerLogo: {
-    display: "flex",
-    justifyContent: "center",
+    display: "inline-flex",
     alignItems: "center",
-    gap: "8px",
-    fontSize: "20px",
-    fontWeight: "850",
+    gap: "9px",
+    fontSize: "21px",
+    fontWeight: "700",
   },
 
   footerLinks: {
     display: "flex",
+    alignItems: "center",
     justifyContent: "center",
-    gap: "22px",
     flexWrap: "wrap",
-    margin: "25px 0",
+    gap: "22px",
+    marginTop: "25px",
   },
 
   footerLink: {
-    color: "#b8c8dc",
+    color: "#b8c9da",
     textDecoration: "none",
     fontSize: "13px",
+    fontWeight: "600",
+  },
+
+  copyright: {
+    marginTop: "28px",
+    paddingTop: "22px",
+    borderTop:
+      "1px solid rgba(255,255,255,0.10)",
+    color: "#8195aa",
+    fontSize: "11px",
   },
 };
