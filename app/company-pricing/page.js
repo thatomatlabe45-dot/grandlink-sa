@@ -10,159 +10,93 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-// ============================================================
-// PRICING
-// ============================================================
-
 const PLANS = [
   {
     id: "starter",
     name: "Starter",
-    monthlyPrice: 500,
+    monthly: 500,
     description:
-      "For businesses starting their graduate recruitment journey.",
+      "Everything a company needs to start recruiting graduates on GradLink SA.",
     features: [
-      "Company profile",
       "Post internship opportunities",
-      "Receive applications",
+      "Receive graduate applications",
       "View applicant profiles",
       "Manage applications",
-      "Contact applicants",
+      "Basic applicant matching",
     ],
-    popular: false,
   },
-
   {
     id: "professional",
     name: "Professional",
-    monthlyPrice: 1000,
+    monthly: 950,
     description:
-      "For companies actively recruiting South African graduates.",
+      "More powerful recruitment tools for companies hiring regularly.",
     features: [
       "Everything in Starter",
-      "More internship listings",
+      "Advanced applicant screening",
       "AI candidate matching",
-      "Skills matching",
-      "Advanced applicant filters",
-      "Applicant insights",
-      "Recruitment management tools",
+      "Applicant management tools",
+      "Priority recruitment visibility",
     ],
     popular: true,
   },
-
   {
-    id: "premium",
-    name: "Premium",
-    monthlyPrice: 2000,
+    id: "enterprise",
+    name: "Enterprise",
+    monthly: 1500,
     description:
-      "For companies wanting advanced AI-powered recruitment.",
+      "Advanced recruitment capabilities for growing organisations.",
     features: [
       "Everything in Professional",
-      "AI-assisted document verification",
-      "CV consistency checks",
-      "Qualification document analysis",
-      "Advanced AI candidate analysis",
-      "Recruitment analytics",
+      "Advanced AI screening",
+      "Document verification tools",
+      "CV and qualification authenticity checks",
       "Priority support",
     ],
-    popular: false,
   },
 ];
-
-// ============================================================
-// ANNUAL BILLING
-// ============================================================
-//
-// Annual billing receives a 15% discount.
-//
-// Starter:
-// R500 x 12 = R6,000
-// 15% discount = R900
-// Annual total = R5,100
-//
-// Professional:
-// R1,000 x 12 = R12,000
-// 15% discount = R1,800
-// Annual total = R10,200
-//
-// Premium:
-// R2,000 x 12 = R24,000
-// 15% discount = R3,600
-// Annual total = R20,400
-//
-// ============================================================
-
-function getAnnualPrice(monthlyPrice) {
-  return Math.round(monthlyPrice * 12 * 0.85);
-}
-
-function getAnnualSaving(monthlyPrice) {
-  return monthlyPrice * 12 - getAnnualPrice(monthlyPrice);
-}
-
-function getMonthlyEquivalent(monthlyPrice) {
-  return Math.round(getAnnualPrice(monthlyPrice) / 12);
-}
-
-function formatCurrency(amount) {
-  return `R${Number(amount).toLocaleString("en-ZA")}`;
-}
-
-// ============================================================
-// PAGE
-// ============================================================
 
 export default function CompanyPricingPage() {
   const router = useRouter();
 
-  // ----------------------------------------------------------
-  // BILLING
-  // ----------------------------------------------------------
-
   const [billing, setBilling] = useState("monthly");
-
-  // ----------------------------------------------------------
-  // ACCOUNT
-  // ----------------------------------------------------------
-
   const [user, setUser] = useState(null);
   const [currentPlan, setCurrentPlan] = useState(null);
-
-  const [loadingUser, setLoadingUser] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [selectingPlan, setSelectingPlan] = useState(null);
-
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  // ==========================================================
-  // LOAD ACCOUNT
-  // ==========================================================
-
   useEffect(() => {
-    loadCompany();
+    loadAccount();
   }, []);
 
-  async function loadCompany() {
+  async function loadAccount() {
     try {
-      setLoadingUser(true);
-      setError("");
+      setLoading(true);
 
       const {
         data: { user },
-        error: userError,
+        error: authError,
       } = await supabase.auth.getUser();
 
-      if (userError) {
-        console.error(userError);
-        setError("We could not load your account.");
-        return;
+      if (authError) {
+        console.error(authError);
       }
 
-      setUser(user);
+      setUser(user || null);
 
       if (!user) {
+        setLoading(false);
         return;
       }
+
+      /*
+       * IMPORTANT
+       *
+       * We check the subscription but we do NOT assume
+       * that selecting a plan means payment happened.
+       */
 
       const { data: subscription, error: subscriptionError } =
         await supabase
@@ -180,63 +114,35 @@ export default function CompanyPricingPage() {
           "Subscription loading error:",
           subscriptionError
         );
-
-        return;
       }
 
-      if (subscription) {
-        setCurrentPlan(subscription);
-
-        // Restore the previously selected billing cycle.
-        if (
-          subscription.billing_cycle === "annual" ||
-          subscription.billing_cycle === "monthly"
-        ) {
-          setBilling(subscription.billing_cycle);
-        }
-      }
-    } catch (err) {
-      console.error("Load company error:", err);
-      setError("Something went wrong while loading your account.");
+      setCurrentPlan(subscription || null);
+    } catch (error) {
+      console.error(error);
+      setError(
+        error?.message ||
+          "Could not load the pricing page."
+      );
     } finally {
-      setLoadingUser(false);
+      setLoading(false);
     }
   }
 
-  // ==========================================================
-  // BILLING SWITCH
-  // ==========================================================
+  function getAnnualPrice(monthlyPrice) {
+    /*
+     * Annual price = 10 months worth of the monthly price.
+     *
+     * Example:
+     * R500 x 10 = R5,000 per year
+     * instead of R6,000 monthly over 12 months.
+     */
 
-  function changeBilling(type) {
-    setMessage("");
-    setError("");
-
-    if (type !== "monthly" && type !== "annual") {
-      return;
-    }
-
-    setBilling(type);
+    return monthlyPrice * 10;
   }
 
-  // ==========================================================
-  // PRICE
-  // ==========================================================
-
-  function getDisplayedPrice(plan) {
-    if (billing === "annual") {
-      return getAnnualPrice(plan.monthlyPrice);
-    }
-
-    return plan.monthlyPrice;
+  function getMonthlyEquivalent(monthlyPrice) {
+    return Math.round(getAnnualPrice(monthlyPrice) / 12);
   }
-
-  function getPeriod() {
-    return billing === "annual" ? "/year" : "/month";
-  }
-
-  // ==========================================================
-  // CHOOSE PLAN
-  // ==========================================================
 
   async function choosePlan(plan) {
     setMessage("");
@@ -246,7 +152,7 @@ export default function CompanyPricingPage() {
       setSelectingPlan(plan.id);
 
       const {
-        data: { user: loggedInUser },
+        data: { user },
         error: userError,
       } = await supabase.auth.getUser();
 
@@ -254,52 +160,54 @@ export default function CompanyPricingPage() {
         throw userError;
       }
 
-      if (!loggedInUser) {
-        router.push("/login?redirect=/company-pricing");
+      /*
+       * Company account must exist before we can associate
+       * a payment/subscription with the user.
+       *
+       * BUT we do NOT create a companies row here.
+       */
+
+      if (!user) {
+        router.push(
+          `/signup?role=company&redirect=/company-pricing`
+        );
         return;
       }
 
-      const monthlyPrice = plan.monthlyPrice;
-
-      const annualPrice = getAnnualPrice(
-        monthlyPrice
-      );
-
-      const selectedPrice =
+      const price =
         billing === "annual"
-          ? annualPrice
-          : monthlyPrice;
+          ? getAnnualPrice(plan.monthly)
+          : plan.monthly;
 
-      // --------------------------------------------------------
-      // SAVE THE PLAN AND BILLING CYCLE
-      // --------------------------------------------------------
-
-      const subscriptionData = {
-        company_id: loggedInUser.id,
-
-        plan: plan.id,
-
-        billing_cycle: billing,
-
-        monthly_price: monthlyPrice,
-
-        annual_price: annualPrice,
-
-        // Selecting a plan does NOT activate payment.
-        status: "inactive",
-
-        payment_provider: null,
-
-        payment_reference: null,
-
-        updated_at: new Date().toISOString(),
-      };
+      /*
+       * Store ONLY the selected plan as inactive.
+       *
+       * This does NOT give the company access.
+       *
+       * Payment must later change the subscription to:
+       *
+       * status = "active"
+       */
 
       const { data, error: saveError } = await supabase
         .from("company_subscriptions")
-        .upsert(subscriptionData, {
-          onConflict: "company_id",
-        })
+        .upsert(
+          {
+            company_id: user.id,
+            plan: plan.id,
+            status: "inactive",
+            monthly_price:
+              billing === "annual"
+                ? getMonthlyEquivalent(plan.monthly)
+                : plan.monthly,
+            payment_provider: null,
+            payment_reference: null,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "company_id",
+          }
+        )
         .select()
         .single();
 
@@ -309,41 +217,25 @@ export default function CompanyPricingPage() {
 
       setCurrentPlan(data);
 
-      // --------------------------------------------------------
-      // CONFIRM WHAT WAS SELECTED
-      // --------------------------------------------------------
+      /*
+       * Send the company to the payment page.
+       *
+       * The company profile is NOT created yet.
+       */
 
-      if (billing === "annual") {
-        setMessage(
-          `${plan.name} annual plan selected — ${formatCurrency(
-            selectedPrice
-          )} per year. This saves ${formatCurrency(
-            getAnnualSaving(monthlyPrice)
-          )} compared with paying monthly for 12 months.`
-        );
-      } else {
-        setMessage(
-          `${plan.name} monthly plan selected — ${formatCurrency(
-            selectedPrice
-          )} per month.`
-        );
-      }
-
-      // --------------------------------------------------------
-      // IMPORTANT
-      // --------------------------------------------------------
-      //
-      // The subscription remains inactive.
-      //
-      // A real payment provider must confirm payment before
-      // status becomes "active".
-      //
-      // --------------------------------------------------------
-    } catch (err) {
-      console.error("Plan selection error:", err);
+      router.push(
+        `/company/payment?plan=${encodeURIComponent(
+          plan.id
+        )}&billing=${billing}`
+      );
+    } catch (error) {
+      console.error(
+        "Plan selection error:",
+        error
+      );
 
       setError(
-        err?.message ||
+        error?.message ||
           "Something went wrong while selecting your plan."
       );
     } finally {
@@ -351,1307 +243,1153 @@ export default function CompanyPricingPage() {
     }
   }
 
-  // ==========================================================
-  // CURRENT PLAN
-  // ==========================================================
-
-  function isPlanSelected(plan) {
-    return currentPlan?.plan === plan.id;
-  }
-
-  function isActiveSubscription() {
+  if (loading) {
     return (
-      String(currentPlan?.status || "").toLowerCase() ===
-      "active"
+      <main style={styles.loadingPage}>
+        <div style={styles.loadingBox}>
+          <div style={styles.spinner}>◌</div>
+
+          <h2>Loading GradLink SA</h2>
+
+          <p>
+            Preparing company plans...
+          </p>
+        </div>
+      </main>
     );
   }
 
-  // ==========================================================
-  // RENDER
-  // ==========================================================
-
   return (
-    <main className="pricing-page">
-
-      {/* ======================================================
+    <main style={styles.page}>
+      {/* =====================================================
           NAVBAR
-      ======================================================= */}
+      ====================================================== */}
 
-      <nav className="navbar">
-
-        <Link href="/" className="logo">
-          <span className="logo-icon">G</span>
+      <nav style={styles.navbar}>
+        <Link
+          href="/"
+          style={styles.logo}
+        >
+          <span style={styles.logoIcon}>
+            G
+          </span>
 
           <span>
-            GradLink <strong>SA</strong>
+            GradLink{" "}
+            <strong>SA</strong>
           </span>
         </Link>
 
-        <div className="nav-links">
+        <div style={styles.navLinks}>
+          <Link
+            href="/"
+            style={styles.navLink}
+          >
+            Home
+          </Link>
 
-          <Link href="/">Home</Link>
-
-          <Link href="/internships">
+          <Link
+            href="/internships"
+            style={styles.navLink}
+          >
             Internships
           </Link>
 
-          <Link href="/jobs">
+          <Link
+            href="/jobs"
+            style={styles.navLink}
+          >
             Jobs
           </Link>
-
-          <Link href="/company">
-            Company
-          </Link>
-
         </div>
 
-        <div className="nav-actions">
-
+        <div style={styles.navActions}>
           <Link
             href="/login"
-            className="login-btn"
+            style={styles.loginButton}
           >
             Log In
           </Link>
-
-          <Link
-            href="/signup"
-            className="signup-btn"
-          >
-            Get Started
-          </Link>
-
         </div>
-
       </nav>
 
-      {/* ======================================================
+      {/* =====================================================
           HERO
-      ======================================================= */}
+      ====================================================== */}
 
-      <section className="hero">
-
-        <div className="badge">
-          🚀 Built for South African businesses
+      <section style={styles.hero}>
+        <div style={styles.heroBadge}>
+          🏢 FOR COMPANIES
         </div>
 
-        <h1>
-          Recruit better.
-          <br />
-
-          <span>
-            Grow with GradLink SA.
+        <h1 style={styles.heroTitle}>
+          Choose your{" "}
+          <span style={styles.gradientText}>
+            GradLink plan
           </span>
         </h1>
 
-        <p>
-          Access talented South African graduates,
-          manage applications, and use AI-powered
-          recruitment tools to find the right
-          candidates.
+        <p style={styles.heroText}>
+          Access the tools you need to find,
+          screen and manage talented South
+          African graduates.
         </p>
 
-        {/* ==================================================
-            BILLING TOGGLE
-        =================================================== */}
+        <div style={styles.securityNote}>
+          <span style={styles.checkCircle}>
+            ✓
+          </span>
 
-        <div className="billing-wrapper">
-
-          <div className="billing-toggle">
-
-            <button
-              type="button"
-              className={
-                billing === "monthly"
-                  ? "active"
-                  : ""
-              }
-              onClick={() =>
-                changeBilling("monthly")
-              }
-            >
-              Monthly
-            </button>
-
-            <button
-              type="button"
-              className={
-                billing === "annual"
-                  ? "active"
-                  : ""
-              }
-              onClick={() =>
-                changeBilling("annual")
-              }
-            >
-              Annual
-
-              <span className="save">
-                Save 15%
-              </span>
-            </button>
-
-          </div>
-
-          {billing === "annual" && (
-            <div className="billing-status">
-              ✓ Annual billing selected
-            </div>
-          )}
-
+          <span>
+            Payment is required before a company
+            profile can be registered.
+          </span>
         </div>
-
       </section>
 
-      {/* ======================================================
-          ACCOUNT MESSAGE
-      ======================================================= */}
+      {/* =====================================================
+          BILLING TOGGLE
+      ====================================================== */}
 
-      {!loadingUser && !user && (
-        <div className="info-banner">
+      <section style={styles.billingSection}>
+        <div style={styles.billingToggle}>
+          <button
+            type="button"
+            onClick={() =>
+              setBilling("monthly")
+            }
+            style={{
+              ...styles.billingButton,
+              ...(billing === "monthly"
+                ? styles.billingActive
+                : {}),
+            }}
+          >
+            Monthly
+          </button>
 
-          <strong>
-            Company account required.
-          </strong>
+          <button
+            type="button"
+            onClick={() =>
+              setBilling("annual")
+            }
+            style={{
+              ...styles.billingButton,
+              ...(billing === "annual"
+                ? styles.billingActive
+                : {}),
+            }}
+          >
+            Annual
+          </button>
 
-          <span>
-            Log in or create a company account
-            to select a GradLink SA plan.
+          <span style={styles.saveBadge}>
+            SAVE 2 MONTHS
           </span>
-
         </div>
-      )}
+      </section>
 
-      {/* ======================================================
-          SUCCESS
-      ======================================================= */}
+      {/* =====================================================
+          MESSAGES
+      ====================================================== */}
 
       {message && (
-        <div className="success-message">
-          ✓ {message}
+        <div style={styles.successMessage}>
+          {message}
         </div>
       )}
-
-      {/* ======================================================
-          ERROR
-      ======================================================= */}
 
       {error && (
-        <div className="error-message">
-          ⚠️ {error}
+        <div style={styles.errorMessage}>
+          {error}
         </div>
       )}
 
-      {/* ======================================================
-          ACTIVE SUBSCRIPTION
-      ======================================================= */}
+      {/* =====================================================
+          PRICING
+      ====================================================== */}
 
-      {isActiveSubscription() && (
-        <div className="active-banner">
-
-          <strong>
-            ✓ Subscription active
-          </strong>
-
-          <span>
-            Your {currentPlan.plan} plan is
-            currently active.
-          </span>
-
-        </div>
-      )}
-
-      {/* ======================================================
-          PRICING CARDS
-      ======================================================= */}
-
-      <section className="pricing-section">
-
-        <div className="pricing-grid">
-
+      <section style={styles.pricingSection}>
+        <div style={styles.pricingGrid}>
           {PLANS.map((plan) => {
-
-            const displayedPrice =
-              getDisplayedPrice(plan);
-
-            const annualSaving =
-              getAnnualSaving(
-                plan.monthlyPrice
-              );
+            const annualPrice =
+              getAnnualPrice(plan.monthly);
 
             const monthlyEquivalent =
               getMonthlyEquivalent(
-                plan.monthlyPrice
+                plan.monthly
               );
 
-            const isSelected =
-              isPlanSelected(plan);
+            const isCurrent =
+              currentPlan?.plan ===
+                plan.id &&
+              currentPlan?.status ===
+                "active";
 
             const isSelecting =
               selectingPlan === plan.id;
 
             return (
-              <div
+              <article
                 key={plan.id}
-                className={`pricing-card ${
-                  plan.popular
-                    ? "popular"
-                    : ""
-                }`}
+                style={{
+                  ...styles.planCard,
+                  ...(plan.popular
+                    ? styles.popularCard
+                    : {}),
+                }}
               >
-
                 {plan.popular && (
-                  <div className="popular-label">
+                  <div style={styles.popularBadge}>
                     MOST POPULAR
                   </div>
                 )}
 
-                <div className="card-content">
+                <div style={styles.planTop}>
+                  <div>
+                    <div style={styles.planIcon}>
+                      {plan.id === "starter"
+                        ? "🚀"
+                        : plan.id ===
+                          "professional"
+                        ? "⭐"
+                        : "🏢"}
+                    </div>
 
-                  <div className="plan-heading">
-
-                    <h2>
+                    <h2 style={styles.planName}>
                       {plan.name}
                     </h2>
 
-                    {isSelected && (
-                      <span className="selected-badge">
-                        Selected
-                      </span>
-                    )}
-
-                  </div>
-
-                  <p className="description">
-                    {plan.description}
-                  </p>
-
-                  {/* PRICE */}
-
-                  <div className="price">
-
-                    <span className="currency">
-                      R
-                    </span>
-
-                    <span className="price-number">
-                      {displayedPrice.toLocaleString(
-                        "en-ZA"
-                      )}
-                    </span>
-
-                    <span className="period">
-                      {getPeriod()}
-                    </span>
-
-                  </div>
-
-                  {/* ANNUAL INFORMATION */}
-
-                  {billing === "annual" && (
-                    <div className="annual-details">
-
-                      <p className="annual-equivalent">
-
-                        Equivalent to{" "}
-                        <strong>
-                          {formatCurrency(
-                            monthlyEquivalent
-                          )}
-                        </strong>
-                        /month
-
-                      </p>
-
-                      <p className="annual-saving">
-
-                        You save{" "}
-                        <strong>
-                          {formatCurrency(
-                            annualSaving
-                          )}
-                        </strong>{" "}
-                        per year
-
-                      </p>
-
-                    </div>
-                  )}
-
-                  {/* MONTHLY INFORMATION */}
-
-                  {billing === "monthly" && (
-                    <p className="billing-note">
-                      Billed monthly
+                    <p style={styles.planDescription}>
+                      {plan.description}
                     </p>
-                  )}
-
-                  {/* BUTTON */}
-
-                  <button
-                    type="button"
-                    className={`plan-button ${
-                      plan.popular
-                        ? "primary"
-                        : ""
-                    }`}
-                    onClick={() =>
-                      choosePlan(plan)
-                    }
-                    disabled={
-                      isSelecting ||
-                      !user
-                    }
-                  >
-
-                    {isSelecting
-                      ? "Saving..."
-                      : isSelected
-                      ? "Selected"
-                      : `Choose ${plan.name}`}
-
-                  </button>
-
-                  {!user && (
-                    <p className="login-required">
-                      Log in to select this plan.
-                    </p>
-                  )}
-
-                  <div className="divider" />
-
-                  <p className="includes">
-
-                    {plan.name === "Premium"
-                      ? "Everything you need for advanced recruitment:"
-                      : "What's included:"}
-
-                  </p>
-
-                  <ul>
-
-                    {plan.features.map(
-                      (feature, index) => (
-                        <li key={index}>
-
-                          <span className="check">
-                            ✓
-                          </span>
-
-                          {feature}
-
-                        </li>
-                      )
-                    )}
-
-                  </ul>
-
+                  </div>
                 </div>
 
-              </div>
+                <div style={styles.priceArea}>
+                  {billing === "monthly" ? (
+                    <>
+                      <span style={styles.currency}>
+                        R
+                      </span>
+
+                      <span style={styles.price}>
+                        {plan.monthly.toLocaleString()}
+                      </span>
+
+                      <span style={styles.period}>
+                        /month
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span style={styles.currency}>
+                        R
+                      </span>
+
+                      <span style={styles.price}>
+                        {annualPrice.toLocaleString()}
+                      </span>
+
+                      <span style={styles.period}>
+                        /year
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {billing === "annual" && (
+                  <div style={styles.annualNote}>
+                    Equivalent to R
+                    {monthlyEquivalent.toLocaleString()}
+                    /month
+                  </div>
+                )}
+
+                <div style={styles.divider} />
+
+                <div style={styles.featureTitle}>
+                  Includes:
+                </div>
+
+                <ul style={styles.featureList}>
+                  {plan.features.map(
+                    (feature) => (
+                      <li
+                        key={feature}
+                        style={styles.feature}
+                      >
+                        <span
+                          style={
+                            styles.featureCheck
+                          }
+                        >
+                          ✓
+                        </span>
+
+                        <span>
+                          {feature}
+                        </span>
+                      </li>
+                    )
+                  )}
+                </ul>
+
+                <button
+                  type="button"
+                  disabled={isSelecting}
+                  onClick={() =>
+                    choosePlan(plan)
+                  }
+                  style={{
+                    ...styles.planButton,
+                    ...(plan.popular
+                      ? styles.planButtonPrimary
+                      : styles.planButtonSecondary),
+                    ...(isSelecting
+                      ? styles.disabledButton
+                      : {}),
+                  }}
+                >
+                  {isSelecting
+                    ? "Preparing payment..."
+                    : isCurrent
+                    ? "Manage Plan"
+                    : "Choose Plan →"}
+                </button>
+
+                <p style={styles.paymentSmall}>
+                  🔒 Secure payment required
+                  before company registration
+                </p>
+              </article>
             );
           })}
-
-        </div>
-
-      </section>
-      
-            {/* ======================================================
-          PRICING EXPLANATION
-      ======================================================= */}
-
-      <section className="pricing-note-section">
-        <div className="pricing-note">
-
-          <div className="note-icon">
-            💳
-          </div>
-
-          <div>
-            <h3>
-              Simple, transparent billing
-            </h3>
-
-            {billing === "annual" ? (
-              <p>
-                Annual plans are billed once per year
-                at a 15% discount. You save the
-                equivalent of almost two months compared
-                with paying monthly for 12 months.
-              </p>
-            ) : (
-              <p>
-                Monthly plans are billed every month.
-                You can switch to annual billing at any
-                time before completing payment.
-              </p>
-            )}
-          </div>
-
         </div>
       </section>
 
-      {/* ======================================================
-          FOOTER
-      ======================================================= */}
+      {/* =====================================================
+          HOW IT WORKS
+      ====================================================== */}
 
-      <footer className="pricing-footer">
+      <section style={styles.howSection}>
+        <div style={styles.sectionHeading}>
+          <span style={styles.smallBadge}>
+            SIMPLE PROCESS
+          </span>
 
-        <div className="footer-brand">
-
-          <Link href="/" className="footer-logo">
-
-            <span className="logo-icon">
-              G
-            </span>
-
-            <span>
-              GradLink <strong>SA</strong>
-            </span>
-
-          </Link>
+          <h2>
+            Get your company on GradLink
+          </h2>
 
           <p>
-            Connecting South African graduates
-            with internship opportunities.
+            Your company profile is created only
+            after payment has been successfully
+            verified.
           </p>
-
         </div>
 
-        <div className="footer-links">
+        <div style={styles.steps}>
+          <Step
+            number="01"
+            icon="💳"
+            title="Choose a plan"
+            text="Select the plan that matches your recruitment needs."
+          />
 
-          <Link href="/">
+          <Step
+            number="02"
+            icon="🔐"
+            title="Complete payment"
+            text="Complete the payment through the secure payment process."
+          />
+
+          <Step
+            number="03"
+            icon="🏢"
+            title="Register your company"
+            text="Once payment is verified, your company profile becomes available."
+          />
+
+          <Step
+            number="04"
+            icon="🚀"
+            title="Start recruiting"
+            text="Post opportunities and manage graduate applications."
+          />
+        </div>
+      </section>
+
+      {/* =====================================================
+          PREMIUM FEATURES
+      ====================================================== */}
+
+      <section style={styles.featureSection}>
+        <div style={styles.featurePanel}>
+          <div style={styles.featurePanelText}>
+            <span style={styles.smallBadge}>
+              BUILT FOR RECRUITERS
+            </span>
+
+            <h2>
+              More than just an internship
+              listing platform.
+            </h2>
+
+            <p>
+              GradLink SA is designed to help
+              companies move from posting an
+              opportunity to managing applicants
+              in one place.
+            </p>
+
+            <div style={styles.miniFeatures}>
+              <div>
+                <strong>
+                  AI Matching
+                </strong>
+
+                <span>
+                  Compare applicant
+                  qualifications, fields and
+                  skills.
+                </span>
+              </div>
+
+              <div>
+                <strong>
+                  Applicant Management
+                </strong>
+
+                <span>
+                  Review and manage applications
+                  from your dashboard.
+                </span>
+              </div>
+
+              <div>
+                <strong>
+                  Document Verification
+                </strong>
+
+                <span>
+                  Advanced verification tools
+                  can help screen submitted
+                  documents.
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div style={styles.featureVisual}>
+            <div style={styles.visualCircle}>
+              <div style={styles.visualIcon}>
+                ✓
+              </div>
+            </div>
+
+            <strong>
+              Professional recruitment
+            </strong>
+
+            <span>
+              One company workspace
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* =====================================================
+          FOOTER
+      ====================================================== */}
+
+      <footer style={styles.footer}>
+        <div style={styles.footerLogo}>
+          <span style={styles.logoIcon}>
+            G
+          </span>
+
+          GradLink{" "}
+          <strong>SA</strong>
+        </div>
+
+        <p>
+          Connecting South African graduates
+          with internship opportunities.
+        </p>
+
+        <div style={styles.footerLinks}>
+          <Link
+            href="/"
+            style={styles.footerLink}
+          >
             Home
           </Link>
 
-          <Link href="/internships">
+          <Link
+            href="/internships"
+            style={styles.footerLink}
+          >
             Internships
           </Link>
 
-          <Link href="/jobs">
+          <Link
+            href="/jobs"
+            style={styles.footerLink}
+          >
             Jobs
           </Link>
 
-          <Link href="/company">
-            Company
+          <Link
+            href="/login"
+            style={styles.footerLink}
+          >
+            Login
           </Link>
-
-          <Link href="/company-dashboard">
-            Dashboard
-          </Link>
-
         </div>
 
+        <div style={styles.copyright}>
+          © {new Date().getFullYear()} GradLink
+          SA. All rights reserved.
+        </div>
       </footer>
 
-      {/* ======================================================
-          STYLES
-      ======================================================= */}
-
       <style jsx>{`
-
         * {
           box-sizing: border-box;
         }
 
-        .pricing-page {
-          min-height: 100vh;
-          background: #f7f9fc;
-          color: #10284b;
-          overflow-x: hidden;
+        button,
+        a {
+          -webkit-tap-highlight-color: transparent;
         }
 
-        /* ====================================================
-           NAVBAR
-        ==================================================== */
-
-        .navbar {
-          width: 100%;
-          min-height: 72px;
-          padding: 0 6%;
-          background: white;
-          border-bottom: 1px solid #e8edf4;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 25px;
-        }
-
-        .logo {
-          display: flex;
-          align-items: center;
-          gap: 9px;
-          text-decoration: none;
-          color: #10284b;
-          font-size: 18px;
-          font-weight: 700;
-          white-space: nowrap;
-        }
-
-        .logo strong {
-          color: #0b63ce;
-        }
-
-        .logo-icon {
-          width: 34px;
-          height: 34px;
-          border-radius: 10px;
-          background: linear-gradient(
-            135deg,
-            #0b63ce,
-            #084b9b
-          );
-          color: white;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 900;
-          box-shadow:
-            0 5px 14px rgba(11, 99, 206, 0.2);
-        }
-
-        .nav-links {
-          display: flex;
-          align-items: center;
-          gap: 27px;
-        }
-
-        .nav-links a {
-          text-decoration: none;
-          color: #64748b;
-          font-size: 13px;
-          font-weight: 600;
-          transition: 0.2s ease;
-        }
-
-        .nav-links a:hover {
-          color: #0b63ce;
-        }
-
-        .nav-actions {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        .login-btn,
-        .signup-btn {
-          text-decoration: none;
-          padding: 10px 16px;
-          border-radius: 9px;
-          font-size: 12px;
-          font-weight: 800;
-          transition: 0.2s ease;
-        }
-
-        .login-btn {
-          color: #0b63ce;
-          border: 1px solid #d7e3f2;
-          background: white;
-        }
-
-        .signup-btn {
-          color: white;
-          background: #0b63ce;
-        }
-
-        .login-btn:hover {
-          border-color: #0b63ce;
-        }
-
-        .signup-btn:hover {
-          background: #084fa5;
-        }
-
-        /* ====================================================
-           HERO
-        ==================================================== */
-
-        .hero {
-          text-align: center;
-          padding: 65px 20px 42px;
-          background:
-            radial-gradient(
-              circle at top,
-              rgba(11, 99, 206, 0.1),
-              transparent 45%
-            ),
-            white;
-        }
-
-        .badge {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 7px 13px;
-          border-radius: 999px;
-          background: #edf5ff;
-          color: #0b63ce;
-          border: 1px solid #d7e8fc;
-          font-size: 11px;
-          font-weight: 800;
-        }
-
-        .hero h1 {
-          margin: 18px auto 12px;
-          max-width: 750px;
-          font-size: clamp(
-            34px,
-            5vw,
-            56px
-          );
-          line-height: 1.08;
-          letter-spacing: -1.5px;
-          color: #092653;
-        }
-
-        .hero h1 span {
-          color: #0b63ce;
-        }
-
-        .hero > p {
-          max-width: 650px;
-          margin: 0 auto;
-          color: #718096;
-          font-size: 15px;
-          line-height: 1.7;
-        }
-
-        /* ====================================================
-           BILLING
-        ==================================================== */
-
-        .billing-wrapper {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          margin-top: 30px;
-        }
-
-        .billing-toggle {
-          display: inline-flex;
-          padding: 5px;
-          background: #edf2f8;
-          border: 1px solid #dfe6ef;
-          border-radius: 13px;
-          gap: 4px;
-        }
-
-        .billing-toggle button {
-          border: none;
-          background: transparent;
-          color: #65758c;
-          padding: 11px 19px;
-          border-radius: 9px;
-          cursor: pointer;
-          font-size: 13px;
-          font-weight: 800;
-          transition: 0.2s ease;
-        }
-
-        .billing-toggle button.active {
-          background: white;
-          color: #0b63ce;
-          box-shadow:
-            0 3px 10px rgba(
-              15,
-              40,
-              75,
-              0.1
-            );
-        }
-
-        .billing-toggle button:hover {
-          color: #0b63ce;
-        }
-
-        .save {
-          display: inline-block;
-          margin-left: 7px;
-          padding: 3px 6px;
-          border-radius: 5px;
-          background: #dff5e8;
-          color: #168346;
-          font-size: 9px;
-          font-weight: 900;
-        }
-
-        .billing-status {
-          margin-top: 10px;
-          color: #168346;
-          font-size: 11px;
-          font-weight: 800;
-        }
-
-        /* ====================================================
-           MESSAGES
-        ==================================================== */
-
-        .info-banner,
-        .success-message,
-        .error-message,
-        .active-banner {
-          width: min(
-            1120px,
-            calc(100% - 32px)
-          );
-          margin: 20px auto 0;
-          padding: 13px 16px;
-          border-radius: 11px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 7px;
-          text-align: center;
-          font-size: 12px;
-          line-height: 1.5;
-        }
-
-        .info-banner {
-          background: #edf5ff;
-          border: 1px solid #d6e7fa;
-          color: #31577f;
-        }
-
-        .success-message {
-          background: #eaf8ef;
-          border: 1px solid #ccebd7;
-          color: #176b39;
-        }
-
-        .error-message {
-          background: #fff0f0;
-          border: 1px solid #f3cccc;
-          color: #a52c2c;
-        }
-
-        .active-banner {
-          background: #eaf8ef;
-          border: 1px solid #ccebd7;
-          color: #176b39;
-        }
-
-        /* ====================================================
-           PRICING
-        ==================================================== */
-
-        .pricing-section {
-          width: min(
-            1120px,
-            calc(100% - 32px)
-          );
-          margin: 38px auto 0;
-        }
-
-        .pricing-grid {
-          display: grid;
-          grid-template-columns:
-            repeat(3, minmax(0, 1fr));
-          gap: 20px;
-          align-items: stretch;
-        }
-
-        .pricing-card {
-          position: relative;
-          background: white;
-          border: 1px solid #e3e9f1;
-          border-radius: 19px;
-          overflow: hidden;
-          box-shadow:
-            0 7px 24px rgba(
-              20,
-              45,
-              80,
-              0.06
-            );
-          transition:
-            transform 0.2s ease,
-            box-shadow 0.2s ease;
-        }
-
-        .pricing-card:hover {
-          transform: translateY(-3px);
-          box-shadow:
-            0 12px 32px rgba(
-              20,
-              45,
-              80,
-              0.1
-            );
-        }
-
-        .pricing-card.popular {
-          border: 2px solid #0b63ce;
-        }
-
-        .popular-label {
-          padding: 8px;
-          text-align: center;
-          background: #0b63ce;
-          color: white;
-          font-size: 10px;
-          font-weight: 900;
-          letter-spacing: 0.08em;
-        }
-
-        .card-content {
-          padding: 27px 23px 25px;
-        }
-
-        .plan-heading {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 8px;
-        }
-
-        .plan-heading h2 {
-          margin: 0;
-          font-size: 22px;
-          color: #10284b;
+        button {
+          font-family: inherit;
         }
-
-        .selected-badge {
-          padding: 5px 8px;
-          border-radius: 999px;
-          background: #e8f7ee;
-          color: #168346;
-          font-size: 9px;
-          font-weight: 900;
-          white-space: nowrap;
-        }
-
-        .description {
-          min-height: 54px;
-          margin: 12px 0 19px;
-          color: #78879b;
-          font-size: 12px;
-          line-height: 1.6;
-        }
-
-        .price {
-          display: flex;
-          align-items: baseline;
-          color: #092653;
-          min-height: 50px;
-        }
-
-        .currency {
-          font-size: 19px;
-          font-weight: 800;
-          margin-right: 2px;
-        }
-
-        .price-number {
-          font-size: 37px;
-          font-weight: 900;
-          letter-spacing: -1px;
-        }
-
-        .period {
-          margin-left: 5px;
-          color: #78879b;
-          font-size: 11px;
-          font-weight: 700;
-        }
-
-        .billing-note {
-          min-height: 30px;
-          margin: 5px 0 0;
-          color: #8995a7;
-          font-size: 11px;
-        }
-
-        /* ====================================================
-           ANNUAL DETAILS
-        ==================================================== */
-
-        .annual-details {
-          min-height: 58px;
-          margin-top: 3px;
-        }
-
-        .annual-equivalent,
-        .annual-saving {
-          margin: 3px 0;
-          font-size: 10px;
-        }
-
-        .annual-equivalent {
-          color: #718096;
-        }
-
-        .annual-equivalent strong {
-          color: #092653;
-        }
-
-        .annual-saving {
-          color: #168346;
-          font-weight: 800;
-        }
-
-        .annual-saving strong {
-          font-weight: 900;
-        }
-
-        /* ====================================================
-           BUTTON
-        ==================================================== */
-
-        .plan-button {
-          width: 100%;
-          min-height: 45px;
-          margin-top: 18px;
-          border: 1px solid #cbd8e8;
-          border-radius: 10px;
-          background: white;
-          color: #0b63ce;
-          cursor: pointer;
-          font-size: 12px;
-          font-weight: 900;
-          transition: 0.2s ease;
-        }
-
-        .plan-button:hover:not(:disabled) {
-          background: #edf5ff;
-          border-color: #0b63ce;
-        }
-
-        .plan-button.primary {
-          background: #0b63ce;
-          color: white;
-          border-color: #0b63ce;
-        }
-
-        .plan-button.primary:hover:not(:disabled) {
-          background: #084fa5;
-        }
-
-        .plan-button:disabled {
-          cursor: not-allowed;
-          opacity: 0.55;
-        }
-
-        .login-required {
-          margin: 7px 0 0;
-          text-align: center;
-          color: #8b97a8;
-          font-size: 9px;
-        }
-
-        .divider {
-          height: 1px;
-          margin: 22px 0 18px;
-          background: #e8edf3;
-        }
-
-        .includes {
-          margin: 0 0 12px;
-          color: #445671;
-          font-size: 11px;
-          font-weight: 800;
-        }
-
-        .card-content ul {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-        }
-
-        .card-content li {
-          display: flex;
-          align-items: flex-start;
-          gap: 8px;
-          margin-bottom: 10px;
-          color: #65758c;
-          font-size: 11px;
-          line-height: 1.45;
-        }
-
-        .check {
-          color: #168346;
-          font-weight: 900;
-          flex-shrink: 0;
-        }
-
-        /* ====================================================
-           PRICING NOTE
-        ==================================================== */
-
-        .pricing-note-section {
-          width: min(
-            1120px,
-            calc(100% - 32px)
-          );
-          margin: 34px auto 0;
-        }
-
-        .pricing-note {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          padding: 20px;
-          border: 1px solid #e0e7ef;
-          border-radius: 15px;
-          background: white;
-        }
-
-        .note-icon {
-          width: 42px;
-          height: 42px;
-          min-width: 42px;
-          border-radius: 12px;
-          background: #edf5ff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 18px;
-        }
-
-        .pricing-note h3 {
-          margin: 0 0 5px;
-          color: #10284b;
-          font-size: 14px;
-        }
-
-        .pricing-note p {
-          margin: 0;
-          color: #718096;
-          font-size: 11px;
-          line-height: 1.6;
-        }
-
-        /* ====================================================
-           FOOTER
-        ==================================================== */
-
-        .pricing-footer {
-          width: min(
-            1120px,
-            calc(100% - 32px)
-          );
-          margin: 50px auto 0;
-          padding: 25px 0 35px;
-          border-top: 1px solid #e1e7ef;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 30px;
-        }
-
-        .footer-logo {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          text-decoration: none;
-          color: #10284b;
-          font-size: 15px;
-          font-weight: 800;
-        }
-
-        .footer-logo .logo-icon {
-          width: 29px;
-          height: 29px;
-          border-radius: 8px;
-          font-size: 13px;
-        }
-
-        .footer-logo strong {
-          color: #0b63ce;
-        }
-
-        .footer-brand p {
-          margin: 8px 0 0;
-          color: #8a96a8;
-          font-size: 10px;
-        }
-
-        .footer-links {
-          display: flex;
-          flex-wrap: wrap;
-          justify-content: flex-end;
-          gap: 17px;
-        }
-
-        .footer-links a {
-          text-decoration: none;
-          color: #69798f;
-          font-size: 10px;
-          font-weight: 700;
-        }
-
-        .footer-links a:hover {
-          color: #0b63ce;
-        }
-
-        /* ====================================================
-           TABLET
-        ==================================================== */
-
-        @media (max-width: 900px) {
-
-          .navbar {
-            padding: 0 4%;
-          }
 
-          .nav-links {
+        @media (max-width: 850px) {
+          .navLinks {
             display: none;
           }
-
-          .pricing-grid {
-            grid-template-columns:
-              repeat(2, minmax(0, 1fr));
-          }
-
-          .pricing-card:last-child {
-            grid-column:
-              1 / -1;
-            max-width: 520px;
-            width: 100%;
-            margin: 0 auto;
-          }
-
         }
 
-        /* ====================================================
-           MOBILE / IPHONE
-        ==================================================== */
-
-        @media (max-width: 600px) {
-
-          .navbar {
-            min-height: 64px;
-            padding: 0 15px;
-          }
-
-          .logo {
-            font-size: 15px;
-          }
-
-          .logo-icon {
-            width: 30px;
-            height: 30px;
-            border-radius: 8px;
-          }
-
-          .nav-actions {
-            gap: 6px;
-          }
-
-          .login-btn,
-          .signup-btn {
-            padding: 8px 10px;
-            font-size: 10px;
-          }
-
-          .hero {
-            padding:
-              43px
-              16px
-              32px;
-          }
-
-          .hero h1 {
-            font-size: 34px;
-            letter-spacing: -1px;
-          }
-
-          .hero > p {
-            font-size: 13px;
-          }
-
-          .badge {
-            font-size: 9px;
-          }
-
-          .billing-toggle {
-            width: 100%;
-            max-width: 310px;
-          }
-
-          .billing-toggle button {
-            flex: 1;
-            padding: 11px 8px;
-            font-size: 11px;
-          }
-
-          .save {
-            display: block;
-            width: fit-content;
-            margin: 4px auto 0;
-          }
-
-          .info-banner,
-          .success-message,
-          .error-message,
-          .active-banner {
-            width: calc(100% - 24px);
-            flex-direction: column;
-            margin-top: 14px;
-            padding: 12px;
-          }
-
-          .pricing-section {
-            width: calc(100% - 24px);
-            margin-top: 25px;
-          }
-
-          .pricing-grid {
+        @media (max-width: 700px) {
+          .pricingGrid {
             grid-template-columns: 1fr;
-            gap: 15px;
           }
-
-          .pricing-card:last-child {
-            grid-column: auto;
-            max-width: none;
-          }
-
-          .card-content {
-            padding: 23px 19px;
-          }
-
-          .description {
-            min-height: auto;
-          }
-
-          .price-number {
-            font-size: 34px;
-          }
-
-          .pricing-note-section {
-            width: calc(100% - 24px);
-            margin-top: 25px;
-          }
-
-          .pricing-note {
-            align-items: flex-start;
-            padding: 16px;
-          }
-
-          .pricing-note h3 {
-            font-size: 13px;
-          }
-
-          .pricing-note p {
-            font-size: 10px;
-          }
-
-          .pricing-footer {
-            width: calc(100% - 24px);
-            flex-direction: column;
-            align-items: flex-start;
-            margin-top: 35px;
-          }
-
-          .footer-links {
-            justify-content: flex-start;
-            gap: 13px;
-          }
-
         }
 
+        @media (max-width: 520px) {
+          .navActions {
+            display: none;
+          }
+        }
       `}</style>
-
     </main>
   );
 }
+
+function Step({
+  number,
+  icon,
+  title,
+  text,
+}) {
+  return (
+    <div style={styles.step}>
+      <div style={styles.stepNumber}>
+        {number}
+      </div>
+
+      <div style={styles.stepIcon}>
+        {icon}
+      </div>
+
+      <h3>{title}</h3>
+
+      <p>{text}</p>
+    </div>
+  );
+}
+
+const styles = {
+  page: {
+    minHeight: "100vh",
+    background:
+      "linear-gradient(180deg,#f7fbff 0%,#ffffff 50%,#f5f9ff 100%)",
+    color: "#10233f",
+  },
+
+  loadingPage: {
+    minHeight: "100vh",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    background: "#f5f9ff",
+    padding: "20px",
+  },
+
+  loadingBox: {
+    background: "#fff",
+    padding: "40px",
+    borderRadius: "22px",
+    textAlign: "center",
+    boxShadow:
+      "0 20px 60px rgba(15,59,112,.10)",
+  },
+
+  spinner: {
+    fontSize: "42px",
+    color: "#1261d6",
+    marginBottom: "10px",
+  },
+
+  navbar: {
+    minHeight: "72px",
+    padding: "0 6%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "20px",
+    background: "rgba(255,255,255,.96)",
+    borderBottom: "1px solid #e7eef7",
+    position: "sticky",
+    top: 0,
+    zIndex: 50,
+  },
+
+  logo: {
+    display: "flex",
+    alignItems: "center",
+    gap: "9px",
+    color: "#10233f",
+    textDecoration: "none",
+    fontSize: "21px",
+    fontWeight: "800",
+    whiteSpace: "nowrap",
+  },
+
+  logoIcon: {
+    width: "38px",
+    height: "38px",
+    borderRadius: "11px",
+    background:
+      "linear-gradient(135deg,#1261d6,#08a0ff)",
+    color: "#fff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: "900",
+    boxShadow:
+      "0 8px 18px rgba(18,97,214,.25)",
+  },
+
+  navLinks: {
+    display: "flex",
+    gap: "30px",
+    alignItems: "center",
+  },
+
+  navLink: {
+    color: "#52647c",
+    textDecoration: "none",
+    fontSize: "14px",
+    fontWeight: "650",
+  },
+
+  navActions: {
+    display: "flex",
+    alignItems: "center",
+  },
+
+  loginButton: {
+    textDecoration: "none",
+    color: "#1261d6",
+    border: "1px solid #cfe0f5",
+    padding: "10px 18px",
+    borderRadius: "10px",
+    fontWeight: "750",
+    fontSize: "14px",
+    background: "#fff",
+  },
+
+  hero: {
+    textAlign: "center",
+    padding: "75px 20px 35px",
+    maxWidth: "900px",
+    margin: "0 auto",
+  },
+
+  heroBadge: {
+    display: "inline-flex",
+    padding: "8px 13px",
+    borderRadius: "30px",
+    background: "#eaf3ff",
+    color: "#1261d6",
+    fontSize: "12px",
+    fontWeight: "850",
+    letterSpacing: ".5px",
+    marginBottom: "18px",
+  },
+
+  heroTitle: {
+    margin: 0,
+    fontSize: "clamp(40px,7vw,68px)",
+    lineHeight: "1.05",
+    letterSpacing: "-2.5px",
+    fontWeight: "900",
+  },
+
+  gradientText: {
+    color: "#1261d6",
+  },
+
+  heroText: {
+    maxWidth: "650px",
+    margin: "22px auto 25px",
+    color: "#64748b",
+    lineHeight: "1.7",
+    fontSize: "17px",
+  },
+
+  securityNote: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "9px",
+    padding: "11px 15px",
+    background: "#f0fdf4",
+    border: "1px solid #bbf7d0",
+    borderRadius: "12px",
+    color: "#166534",
+    fontSize: "13px",
+    fontWeight: "650",
+    maxWidth: "100%",
+  },
+
+  checkCircle: {
+    width: "22px",
+    height: "22px",
+    borderRadius: "50%",
+    background: "#16a34a",
+    color: "#fff",
+    display: "inline-flex",
+    justifyContent: "center",
+    alignItems: "center",
+    flexShrink: 0,
+    fontSize: "12px",
+  },
+
+  billingSection: {
+    display: "flex",
+    justifyContent: "center",
+    padding: "10px 20px 30px",
+  },
+
+  billingToggle: {
+    display: "flex",
+    alignItems: "center",
+    gap: "5px",
+    padding: "5px",
+    background: "#eaf1f9",
+    borderRadius: "14px",
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
+
+  billingButton: {
+    border: "none",
+    background: "transparent",
+    color: "#64748b",
+    padding: "11px 18px",
+    borderRadius: "10px",
+    fontWeight: "750",
+    cursor: "pointer",
+    fontSize: "14px",
+  },
+
+  billingActive: {
+    background: "#fff",
+    color: "#1261d6",
+    boxShadow:
+      "0 3px 12px rgba(20,70,120,.12)",
+  },
+
+  saveBadge: {
+    background: "#dcfce7",
+    color: "#15803d",
+    fontSize: "10px",
+    fontWeight: "900",
+    padding: "6px 8px",
+    borderRadius: "7px",
+    margin: "0 5px",
+  },
+
+  pricingSection: {
+    padding: "0 20px 80px",
+  },
+
+  pricingGrid: {
+    maxWidth: "1180px",
+    margin: "0 auto",
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(3,minmax(0,1fr))",
+    gap: "22px",
+  },
+
+  planCard: {
+    background: "#fff",
+    border: "1px solid #e1eaf4",
+    borderRadius: "22px",
+    padding: "30px",
+    position: "relative",
+    display: "flex",
+    flexDirection: "column",
+    minWidth: 0,
+    boxShadow:
+      "0 15px 40px rgba(24,69,120,.07)",
+  },
+
+  popularCard: {
+    border: "2px solid #1261d6",
+    boxShadow:
+      "0 20px 55px rgba(18,97,214,.15)",
+    transform: "translateY(-6px)",
+  },
+
+  popularBadge: {
+    position: "absolute",
+    top: "-13px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    background: "#1261d6",
+    color: "#fff",
+    padding: "7px 13px",
+    borderRadius: "20px",
+    fontSize: "10px",
+    fontWeight: "900",
+    letterSpacing: ".5px",
+    whiteSpace: "nowrap",
+  },
+
+  planIcon: {
+    fontSize: "30px",
+    marginBottom: "12px",
+  },
+
+  planName: {
+    margin: "0 0 9px",
+    fontSize: "25px",
+    fontWeight: "850",
+  },
+
+  planDescription: {
+    margin: 0,
+    color: "#718198",
+    fontSize: "13px",
+    lineHeight: "1.6",
+    minHeight: "63px",
+  },
+
+  priceArea: {
+    display: "flex",
+    alignItems: "baseline",
+    marginTop: "28px",
+    minHeight: "55px",
+  },
+
+  currency: {
+    fontSize: "18px",
+    fontWeight: "800",
+    color: "#1261d6",
+    marginRight: "3px",
+  },
+
+  price: {
+    fontSize: "42px",
+    lineHeight: 1,
+    fontWeight: "900",
+    color: "#10233f",
+    letterSpacing: "-1.5px",
+  },
+
+  period: {
+    color: "#718198",
+    fontSize: "13px",
+    marginLeft: "5px",
+  },
+
+  annualNote: {
+    marginTop: "8px",
+    color: "#15803d",
+    fontSize: "12px",
+    fontWeight: "750",
+  },
+
+  divider: {
+    height: "1px",
+    background: "#edf1f6",
+    margin: "25px 0",
+  },
+
+  featureTitle: {
+    fontSize: "13px",
+    fontWeight: "850",
+    marginBottom: "13px",
+  },
+
+  featureList: {
+    listStyle: "none",
+    padding: 0,
+    margin: "0 0 25px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
+    flex: 1,
+  },
+
+  feature: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "9px",
+    color: "#52647c",
+    fontSize: "13px",
+    lineHeight: "1.45",
+  },
+
+  featureCheck: {
+    width: "19px",
+    height: "19px",
+    borderRadius: "50%",
+    background: "#eaf3ff",
+    color: "#1261d6",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    fontSize: "11px",
+    fontWeight: "900",
+  },
+
+  planButton: {
+    width: "100%",
+    minHeight: "50px",
+    borderRadius: "12px",
+    fontWeight: "850",
+    fontSize: "14px",
+    cursor: "pointer",
+    transition:
+      "transform .15s ease, box-shadow .15s ease",
+  },
+
+  planButtonPrimary: {
+    border: "none",
+    background:
+      "linear-gradient(135deg,#1261d6,#087ed8)",
+    color: "#fff",
+    boxShadow:
+      "0 10px 22px rgba(18,97,214,.22)",
+  },
+
+  planButtonSecondary: {
+    border: "1px solid #cbdced",
+    background: "#fff",
+    color: "#1261d6",
+  },
+
+  disabledButton: {
+    opacity: ".65",
+    cursor: "not-allowed",
+    transform: "none",
+  },
+
+  paymentSmall: {
+    textAlign: "center",
+    margin: "12px 0 0",
+    color: "#94a3b8",
+    fontSize: "11px",
+  },
+
+  successMessage: {
+    maxWidth: "700px",
+    margin: "0 auto 25px",
+    padding: "14px 17px",
+    background: "#ecfdf3",
+    border: "1px solid #bbf7d0",
+    color: "#166534",
+    borderRadius: "12px",
+    fontSize: "14px",
+    fontWeight: "700",
+  },
+
+  errorMessage: {
+    maxWidth: "700px",
+    margin: "0 auto 25px",
+    padding: "14px 17px",
+    background: "#fff1f2",
+    border: "1px solid #fecdd3",
+    color: "#be123c",
+    borderRadius: "12px",
+    fontSize: "14px",
+    fontWeight: "700",
+  },
+
+  howSection: {
+    padding: "85px 20px",
+    background: "#f7fbff",
+    borderTop: "1px solid #edf3f9",
+    borderBottom: "1px solid #edf3f9",
+  },
+
+  sectionHeading: {
+    maxWidth: "700px",
+    margin: "0 auto 45px",
+    textAlign: "center",
+  },
+
+  smallBadge: {
+    display: "inline-block",
+    color: "#1261d6",
+    background: "#eaf3ff",
+    padding: "7px 11px",
+    borderRadius: "20px",
+    fontSize: "10px",
+    fontWeight: "900",
+    letterSpacing: ".7px",
+    marginBottom: "12px",
+  },
+
+  steps: {
+    maxWidth: "1100px",
+    margin: "0 auto",
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(4,minmax(0,1fr))",
+    gap: "18px",
+  },
+
+  step: {
+    background: "#fff",
+    border: "1px solid #e1eaf4",
+    borderRadius: "18px",
+    padding: "24px",
+    position: "relative",
+  },
+
+  stepNumber: {
+    position: "absolute",
+    right: "16px",
+    top: "15px",
+    color: "#dbe7f5",
+    fontSize: "24px",
+    fontWeight: "900",
+  },
+
+  stepIcon: {
+    fontSize: "27px",
+    marginBottom: "15px",
+  },
+
+  featureSection: {
+    padding: "80px 20px",
+  },
+
+  featurePanel: {
+    maxWidth: "1100px",
+    margin: "0 auto",
+    borderRadius: "28px",
+    padding: "50px",
+    background:
+      "linear-gradient(135deg,#0c3d82,#1261d6)",
+    color: "#fff",
+    display: "grid",
+    gridTemplateColumns:
+      "1.5fr .8fr",
+    gap: "40px",
+    alignItems: "center",
+    boxShadow:
+      "0 25px 60px rgba(18,97,214,.18)",
+  },
+
+  featurePanelText: {
+    minWidth: 0,
+  },
+
+  featureVisual: {
+    background:
+      "rgba(255,255,255,.10)",
+    border:
+      "1px solid rgba(255,255,255,.18)",
+    borderRadius: "22px",
+    padding: "35px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    textAlign: "center",
+    gap: "9px",
+  },
+
+  visualCircle: {
+    width: "100px",
+    height: "100px",
+    borderRadius: "50%",
+    background:
+      "rgba(255,255,255,.14)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: "8px",
+  },
+
+  visualIcon: {
+    width: "62px",
+    height: "62px",
+    borderRadius: "50%",
+    background: "#fff",
+    color: "#1261d6",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    fontSize: "30px",
+    fontWeight: "900",
+  },
+
+  miniFeatures: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(3,minmax(0,1fr))",
+    gap: "20px",
+    marginTop: "30px",
+  },
+
+  footer: {
+    background: "#07172c",
+    color: "#fff",
+    textAlign: "center",
+    padding: "50px 20px 35px",
+  },
+
+  footerLogo: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "8px",
+    fontSize: "20px",
+    fontWeight: "850",
+  },
+
+  footerLinks: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "22px",
+    flexWrap: "wrap",
+    margin: "25px 0",
+  },
+
+  footerLink: {
+    color: "#b8c8dc",
+    textDecoration: "none",
+    fontSize: "13px",
+  },
+};
