@@ -1,14 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  Suspense,
+  useEffect,
+  useState,
+} from "react";
+
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import {
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
+
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
+
+// ============================================================
+// PLANS
+// ============================================================
 
 const PLANS = {
   starter: {
@@ -27,7 +40,41 @@ const PLANS = {
   },
 };
 
+// ============================================================
+// PAGE WRAPPER
+// ============================================================
+
 export default function CompanyPaymentPage() {
+  return (
+    <Suspense
+      fallback={
+        <main style={styles.loadingPage}>
+          <div style={styles.loadingBox}>
+            <div style={styles.loadingIcon}>
+              💳
+            </div>
+
+            <h2>
+              Preparing payment
+            </h2>
+
+            <p>
+              Please wait...
+            </p>
+          </div>
+        </main>
+      }
+    >
+      <CompanyPaymentContent />
+    </Suspense>
+  );
+}
+
+// ============================================================
+// PAYMENT CONTENT
+// ============================================================
+
+function CompanyPaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -43,7 +90,9 @@ export default function CompanyPaymentPage() {
     PLANS[planId] ||
     PLANS.starter;
 
-  const [user, setUser] = useState(null);
+  const [user, setUser] =
+    useState(null);
+
   const [subscription, setSubscription] =
     useState(null);
 
@@ -59,6 +108,10 @@ export default function CompanyPaymentPage() {
   const [error, setError] =
     useState("");
 
+  // ==========================================================
+  // LOAD PAYMENT PAGE
+  // ==========================================================
+
   useEffect(() => {
     loadPaymentPage();
   }, []);
@@ -66,6 +119,7 @@ export default function CompanyPaymentPage() {
   async function loadPaymentPage() {
     try {
       setLoading(true);
+      setError("");
 
       const {
         data: { user },
@@ -78,7 +132,7 @@ export default function CompanyPaymentPage() {
 
       if (!user) {
         router.replace(
-          `/login?redirect=/company-pricing`
+          "/login?redirect=/company-pricing"
         );
 
         return;
@@ -89,16 +143,15 @@ export default function CompanyPaymentPage() {
       const {
         data: subscriptionData,
         error: subscriptionError,
-      } =
-        await supabase
-          .from("company_subscriptions")
-          .select("*")
-          .eq("company_id", user.id)
-          .order("created_at", {
-            ascending: false,
-          })
-          .limit(1)
-          .maybeSingle();
+      } = await supabase
+        .from("company_subscriptions")
+        .select("*")
+        .eq("company_id", user.id)
+        .order("created_at", {
+          ascending: false,
+        })
+        .limit(1)
+        .maybeSingle();
 
       if (subscriptionError) {
         throw subscriptionError;
@@ -108,10 +161,9 @@ export default function CompanyPaymentPage() {
         subscriptionData || null
       );
 
-      /*
-       * If payment has already been verified,
-       * do not make the user pay/register again.
-       */
+      // --------------------------------------------------------
+      // ACTIVE SUBSCRIPTION
+      // --------------------------------------------------------
 
       if (
         subscriptionData?.status
@@ -120,17 +172,24 @@ export default function CompanyPaymentPage() {
         router.replace("/company");
         return;
       }
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(
+        "Payment page error:",
+        err
+      );
 
       setError(
-        error?.message ||
+        err?.message ||
           "Could not load the payment page."
       );
     } finally {
       setLoading(false);
     }
   }
+
+  // ==========================================================
+  // PRICE
+  // ==========================================================
 
   function getAmount() {
     if (billing === "annual") {
@@ -140,15 +199,9 @@ export default function CompanyPaymentPage() {
     return plan.monthly;
   }
 
-  /*
-   * IMPORTANT
-   *
-   * This function intentionally does NOT mark
-   * the subscription active.
-   *
-   * A real payment provider/webhook must confirm
-   * payment first.
-   */
+  // ==========================================================
+  // CHECK PAYMENT
+  // ==========================================================
 
   async function checkPaymentStatus() {
     try {
@@ -158,7 +211,12 @@ export default function CompanyPaymentPage() {
 
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
+
+      if (userError) {
+        throw userError;
+      }
 
       if (!user) {
         router.replace(
@@ -171,20 +229,23 @@ export default function CompanyPaymentPage() {
       const {
         data: latestSubscription,
         error: subscriptionError,
-      } =
-        await supabase
-          .from("company_subscriptions")
-          .select("*")
-          .eq("company_id", user.id)
-          .order("created_at", {
-            ascending: false,
-          })
-          .limit(1)
-          .maybeSingle();
+      } = await supabase
+        .from("company_subscriptions")
+        .select("*")
+        .eq("company_id", user.id)
+        .order("created_at", {
+          ascending: false,
+        })
+        .limit(1)
+        .maybeSingle();
 
       if (subscriptionError) {
         throw subscriptionError;
       }
+
+      setSubscription(
+        latestSubscription || null
+      );
 
       if (
         latestSubscription?.status
@@ -204,17 +265,24 @@ export default function CompanyPaymentPage() {
       setMessage(
         "We have not received a verified payment yet. Please complete payment first."
       );
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(
+        "Payment status error:",
+        err
+      );
 
       setError(
-        error?.message ||
+        err?.message ||
           "Could not check your payment status."
       );
     } finally {
       setChecking(false);
     }
   }
+
+  // ==========================================================
+  // LOADING
+  // ==========================================================
 
   if (loading) {
     return (
@@ -235,6 +303,10 @@ export default function CompanyPaymentPage() {
       </main>
     );
   }
+
+  // ==========================================================
+  // MAIN PAGE
+  // ==========================================================
 
   return (
     <main style={styles.page}>
@@ -266,7 +338,7 @@ export default function CompanyPaymentPage() {
       </nav>
 
       {/* =====================================================
-          MAIN
+          HEADER
       ====================================================== */}
 
       <section style={styles.container}>
@@ -275,19 +347,24 @@ export default function CompanyPaymentPage() {
             🔒 SECURE CHECKOUT
           </div>
 
-          <h1>
+          <h1 style={styles.mainTitle}>
             Complete your{" "}
-            <span>
+            <span style={styles.titleHighlight}>
               company payment
             </span>
           </h1>
 
-          <p>
-            Your company profile will only become
-            available after your payment has been
-            successfully verified.
+          <p style={styles.headerText}>
+            Your company profile will only
+            become available after your
+            payment has been successfully
+            verified.
           </p>
         </div>
+
+        {/* ===================================================
+            MESSAGES
+        ==================================================== */}
 
         {error && (
           <div style={styles.error}>
@@ -301,9 +378,13 @@ export default function CompanyPaymentPage() {
           </div>
         )}
 
+        {/* ===================================================
+            CHECKOUT
+        ==================================================== */}
+
         <div style={styles.checkoutGrid}>
           {/* =================================================
-              ORDER
+              ORDER SUMMARY
           ================================================== */}
 
           <div style={styles.card}>
@@ -320,8 +401,7 @@ export default function CompanyPaymentPage() {
             <div style={styles.planIcon}>
               {planId === "starter"
                 ? "🚀"
-                : planId ===
-                  "professional"
+                : planId === "professional"
                 ? "⭐"
                 : "🏢"}
             </div>
@@ -380,7 +460,7 @@ export default function CompanyPaymentPage() {
           </div>
 
           {/* =================================================
-              PAYMENT AREA
+              PAYMENT
           ================================================== */}
 
           <div style={styles.card}>
@@ -399,18 +479,23 @@ export default function CompanyPaymentPage() {
             </h2>
 
             <p style={styles.paymentText}>
-              Your payment provider will be
-              connected here. GradLink SA will
-              only activate your company
-              subscription after the payment
-              provider confirms the transaction.
+              Complete your payment through
+              the secure payment gateway.
+              GradLink SA will only activate
+              your company subscription after
+              the payment provider confirms
+              the transaction.
             </p>
 
-            {/* ---------------------------------------------
-                PAYMENT PROVIDER PLACEHOLDER
-            ---------------------------------------------- */}
+            {/* -----------------------------------------------
+                PAYMENT PROVIDER
+            ------------------------------------------------ */}
 
-            <div style={styles.paymentPlaceholder}>
+            <div
+              style={
+                styles.paymentPlaceholder
+              }
+            >
               <div
                 style={
                   styles.paymentPlaceholderIcon
@@ -424,8 +509,8 @@ export default function CompanyPaymentPage() {
               </strong>
 
               <p>
-                Complete your payment using
-                the secure payment gateway.
+                Your secure payment gateway
+                will be connected here.
               </p>
 
               <button
@@ -445,9 +530,9 @@ export default function CompanyPaymentPage() {
               </button>
             </div>
 
-            {/* ---------------------------------------------
+            {/* -----------------------------------------------
                 CHECK PAYMENT
-            ---------------------------------------------- */}
+            ------------------------------------------------ */}
 
             <button
               type="button"
@@ -467,6 +552,10 @@ export default function CompanyPaymentPage() {
                 : "I've completed payment — Check status"}
             </button>
 
+            {/* -----------------------------------------------
+                WARNING
+            ------------------------------------------------ */}
+
             <div style={styles.warning}>
               <strong>
                 Important
@@ -481,9 +570,9 @@ export default function CompanyPaymentPage() {
           </div>
         </div>
 
-        {/* =================================================
+        {/* ===================================================
             FLOW
-        ================================================== */}
+        ==================================================== */}
 
         <div style={styles.flow}>
           <FlowStep
@@ -519,24 +608,28 @@ export default function CompanyPaymentPage() {
       <style jsx>{`
         @media (max-width: 750px) {
           .checkoutGrid {
-            grid-template-columns: 1fr;
+            grid-template-columns: 1fr !important;
           }
         }
 
         @media (max-width: 520px) {
           .flow {
-            flex-direction: column;
+            flex-direction: column !important;
           }
 
           .flowLine {
-            width: 2px;
-            height: 25px;
+            width: 2px !important;
+            height: 25px !important;
           }
         }
       `}</style>
     </main>
   );
 }
+
+// ============================================================
+// FLOW STEP
+// ============================================================
 
 function FlowStep({
   number,
@@ -556,50 +649,86 @@ function FlowStep({
         {number}
       </div>
 
-      <span>{title}</span>
+      <span>
+        {title}
+      </span>
     </div>
   );
 }
 
+// ============================================================
+// STYLES
+// ============================================================
+
 const styles = {
+  // ==========================================================
+  // PAGE
+  // ==========================================================
+
   page: {
     minHeight: "100vh",
     background:
-      "linear-gradient(180deg,#f5f9ff,#ffffff)",
+      "linear-gradient(180deg, #f5f9ff 0%, #ffffff 55%, #f8fbff 100%)",
     color: "#10233f",
+    fontFamily:
+      "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    overflowX: "hidden",
   },
+
+  // ==========================================================
+  // LOADING
+  // ==========================================================
 
   loadingPage: {
     minHeight: "100vh",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
-    background: "#f5f9ff",
+    background:
+      "linear-gradient(135deg, #eef6ff, #ffffff)",
     padding: "20px",
+    fontFamily:
+      "Inter, ui-sans-serif, system-ui, sans-serif",
   },
 
   loadingBox: {
-    background: "#fff",
-    padding: "40px",
+    width: "100%",
+    maxWidth: "420px",
+    background: "#ffffff",
+    padding: "40px 28px",
     borderRadius: "22px",
     textAlign: "center",
+    border: "1px solid #e2eaf3",
     boxShadow:
       "0 20px 60px rgba(15,59,112,.10)",
   },
 
   loadingIcon: {
-    fontSize: "40px",
-    marginBottom: "10px",
+    width: "60px",
+    height: "60px",
+    margin: "0 auto 16px",
+    borderRadius: "18px",
+    background: "#eaf4ff",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    fontSize: "30px",
   },
 
+  // ==========================================================
+  // NAVBAR
+  // ==========================================================
+
   navbar: {
-    height: "72px",
+    width: "100%",
+    minHeight: "72px",
     padding: "0 6%",
-    background: "#fff",
+    background: "#ffffff",
     borderBottom: "1px solid #e4ecf5",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: "15px",
     position: "sticky",
     top: 0,
     zIndex: 50,
@@ -613,6 +742,7 @@ const styles = {
     textDecoration: "none",
     fontSize: "20px",
     fontWeight: "850",
+    flexShrink: 0,
   },
 
   logoIcon: {
@@ -621,7 +751,7 @@ const styles = {
     borderRadius: "11px",
     background:
       "linear-gradient(135deg,#1261d6,#08a0ff)",
-    color: "#fff",
+    color: "#ffffff",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
@@ -633,13 +763,23 @@ const styles = {
     textDecoration: "none",
     fontWeight: "750",
     fontSize: "14px",
+    whiteSpace: "nowrap",
   },
 
+  // ==========================================================
+  // CONTAINER
+  // ==========================================================
+
   container: {
+    width: "100%",
     maxWidth: "1050px",
     margin: "0 auto",
     padding: "65px 20px 80px",
   },
+
+  // ==========================================================
+  // HEADER
+  // ==========================================================
 
   header: {
     textAlign: "center",
@@ -648,7 +788,9 @@ const styles = {
   },
 
   badge: {
-    display: "inline-block",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
     background: "#eaf3ff",
     color: "#1261d6",
     padding: "8px 12px",
@@ -659,6 +801,34 @@ const styles = {
     marginBottom: "15px",
   },
 
+  mainTitle: {
+    margin: 0,
+    fontSize: "clamp(34px, 6vw, 52px)",
+    lineHeight: 1.08,
+    letterSpacing: "-1.8px",
+    fontWeight: "900",
+  },
+
+  titleHighlight: {
+    background:
+      "linear-gradient(90deg,#1261d6,#08a0ff)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    backgroundClip: "text",
+  },
+
+  headerText: {
+    maxWidth: "650px",
+    margin: "18px auto 0",
+    color: "#687990",
+    lineHeight: 1.7,
+    fontSize: "15px",
+  },
+
+  // ==========================================================
+  // MESSAGES
+  // ==========================================================
+
   error: {
     background: "#fff1f2",
     border: "1px solid #fecdd3",
@@ -667,6 +837,7 @@ const styles = {
     borderRadius: "12px",
     marginBottom: "20px",
     fontWeight: "650",
+    fontSize: "13px",
   },
 
   message: {
@@ -677,17 +848,24 @@ const styles = {
     borderRadius: "12px",
     marginBottom: "20px",
     fontWeight: "650",
+    fontSize: "13px",
   },
+
+  // ==========================================================
+  // CHECKOUT
+  // ==========================================================
 
   checkoutGrid: {
     display: "grid",
     gridTemplateColumns:
-      "minmax(0,.8fr) minmax(0,1.2fr)",
+      "minmax(0, .8fr) minmax(0, 1.2fr)",
     gap: "22px",
+    alignItems: "stretch",
   },
 
   card: {
-    background: "#fff",
+    minWidth: 0,
+    background: "#ffffff",
     border: "1px solid #dfe8f2",
     borderRadius: "22px",
     padding: "30px",
@@ -698,6 +876,7 @@ const styles = {
   cardHeader: {
     display: "flex",
     justifyContent: "space-between",
+    alignItems: "center",
     color: "#7b8ba0",
     fontSize: "11px",
     fontWeight: "900",
@@ -708,20 +887,33 @@ const styles = {
     fontSize: "15px",
   },
 
+  // ==========================================================
+  // PLAN
+  // ==========================================================
+
   planIcon: {
-    fontSize: "40px",
+    width: "62px",
+    height: "62px",
     marginTop: "30px",
+    borderRadius: "17px",
+    background: "#edf7ff",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    fontSize: "31px",
   },
 
   planName: {
-    margin: "12px 0 5px",
+    margin: "16px 0 5px",
     fontSize: "28px",
     fontWeight: "900",
+    letterSpacing: "-.7px",
   },
 
   planText: {
     color: "#718198",
     margin: 0,
+    fontSize: "14px",
   },
 
   line: {
@@ -733,6 +925,7 @@ const styles = {
   summaryRow: {
     display: "flex",
     justifyContent: "space-between",
+    alignItems: "center",
     gap: "15px",
     marginBottom: "14px",
     color: "#687990",
@@ -743,6 +936,7 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: "15px",
     fontSize: "17px",
   },
 
@@ -751,17 +945,25 @@ const styles = {
     fontSize: "12px",
     lineHeight: "1.5",
     marginTop: "15px",
+    marginBottom: 0,
   },
+
+  // ==========================================================
+  // PAYMENT
+  // ==========================================================
 
   paymentTitle: {
     margin: "22px 0 8px",
     fontSize: "25px",
+    fontWeight: "850",
+    letterSpacing: "-.4px",
   },
 
   paymentText: {
     color: "#687990",
     lineHeight: "1.65",
     fontSize: "14px",
+    margin: 0,
   },
 
   paymentPlaceholder: {
@@ -774,8 +976,15 @@ const styles = {
   },
 
   paymentPlaceholderIcon: {
-    fontSize: "38px",
-    marginBottom: "10px",
+    width: "58px",
+    height: "58px",
+    margin: "0 auto 12px",
+    borderRadius: "16px",
+    background: "#eaf4ff",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    fontSize: "27px",
   },
 
   paymentButton: {
@@ -786,10 +995,12 @@ const styles = {
     borderRadius: "12px",
     background:
       "linear-gradient(135deg,#1261d6,#087ed8)",
-    color: "#fff",
+    color: "#ffffff",
     fontWeight: "850",
     fontSize: "14px",
     cursor: "pointer",
+    boxShadow:
+      "0 9px 22px rgba(18,97,214,.20)",
   },
 
   checkButton: {
@@ -798,11 +1009,12 @@ const styles = {
     minHeight: "48px",
     border: "1px solid #cbdced",
     borderRadius: "12px",
-    background: "#fff",
+    background: "#ffffff",
     color: "#1261d6",
     fontWeight: "800",
     fontSize: "13px",
     cursor: "pointer",
+    padding: "10px 15px",
   },
 
   disabled: {
@@ -824,10 +1036,14 @@ const styles = {
     lineHeight: "1.5",
   },
 
+  // ==========================================================
+  // FLOW
+  // ==========================================================
+
   flow: {
     marginTop: "45px",
     padding: "20px",
-    background: "#fff",
+    background: "#ffffff",
     border: "1px solid #e2eaf3",
     borderRadius: "18px",
     display: "flex",
@@ -856,11 +1072,12 @@ const styles = {
     justifyContent: "center",
     alignItems: "center",
     fontWeight: "900",
+    flexShrink: 0,
   },
 
   flowNumberActive: {
     background: "#1261d6",
-    color: "#fff",
+    color: "#ffffff",
   },
 
   flowLine: {
