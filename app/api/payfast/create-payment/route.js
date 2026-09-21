@@ -12,8 +12,8 @@ const PLANS = {
     price: "1000.00",
   },
 
-  premium: {
-    name: "Premium",
+  enterprise: {
+    name: "Enterprise",
     price: "1500.00",
   },
 };
