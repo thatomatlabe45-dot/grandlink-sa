@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 
@@ -11,416 +10,204 @@ const supabase = createClient(
 );
 
 // ============================================================
-// PLANS
+// GRADLINK SA COMPANY PRICING
 // ============================================================
 
-const PLANS = [
-  {
-    id: "starter",
+const PLANS = {
+  starter: {
     name: "Starter",
     monthly: 500,
-    description:
-      "Everything a company needs to start recruiting graduates on GradLink SA.",
-    features: [
-      "Post internship opportunities",
-      "Receive graduate applications",
-      "View applicant profiles",
-      "Manage applications",
-      "Basic applicant matching",
-    ],
+    annual: 5000,
+    listings: 5,
+    description: "For companies starting their graduate recruitment.",
   },
-  {
-    id: "professional",
+
+  professional: {
     name: "Professional",
     monthly: 950,
-    description:
-      "More powerful recruitment tools for companies hiring regularly.",
-    features: [
-      "Everything in Starter",
-      "Advanced applicant screening",
-      "AI candidate matching",
-      "Applicant management tools",
-      "Priority recruitment visibility",
-    ],
-    popular: true,
+    annual: 9500,
+    listings: 15,
+    description: "For growing companies hiring more graduates.",
   },
-  {
-    id: "enterprise",
+
+  enterprise: {
     name: "Enterprise",
     monthly: 1500,
-    description:
-      "Advanced recruitment capabilities for growing organisations.",
-    features: [
-      "Everything in Professional",
-      "Advanced AI screening",
-      "Document verification tools",
-      "CV and qualification authenticity checks",
-      "Priority support",
-    ],
+    annual: 15000,
+    listings: 30,
+    description: "For companies with larger recruitment needs.",
   },
-];
 
-// ============================================================
-// PAGE
-// ============================================================
+  pay_per_listing: {
+    name: "Pay Per Listing",
+    monthly: null,
+    annual: null,
+    price: 250,
+    listings: 1,
+    description: "Pay only when you need to publish one listing.",
+  },
+};
 
 export default function CompanyPricingPage() {
   const router = useRouter();
 
   const [billing, setBilling] = useState("monthly");
-  const [user, setUser] = useState(null);
-  const [currentPlan, setCurrentPlan] = useState(null);
+  const [selectedPlan, setSelectedPlan] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectingPlan, setSelectingPlan] = useState(null);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-
-  // ==========================================================
-  // LOAD ACCOUNT
-  // ==========================================================
+  const [company, setCompany] = useState(null);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    loadAccount();
+    loadCompany();
   }, []);
 
-  async function loadAccount() {
+  async function loadCompany() {
     try {
-      setLoading(true);
-
       const {
         data: { user },
-        error: authError,
       } = await supabase.auth.getUser();
 
-      if (authError) {
-        console.error(authError);
-      }
-
-      setUser(user || null);
-
       if (!user) {
-        setLoading(false);
+        router.push("/login");
         return;
       }
 
-      /*
-       * IMPORTANT
-       *
-       * We check the subscription but we do NOT assume
-       * that selecting a plan means payment happened.
-       */
+      setUser(user);
 
-      const { data: subscription, error: subscriptionError } =
-        await supabase
-          .from("company_subscriptions")
-          .select("*")
-          .eq("company_id", user.id)
-          .order("created_at", {
-            ascending: false,
-          })
-          .limit(1)
-          .maybeSingle();
+      const { data: companyData, error } = await supabase
+        .from("companies")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-      if (subscriptionError) {
-        console.error(
-          "Subscription loading error:",
-          subscriptionError
-        );
+      if (error) {
+        console.error("Company lookup error:", error);
       }
 
-      setCurrentPlan(subscription || null);
+      setCompany(companyData || null);
     } catch (error) {
-      console.error(error);
-
-      setError(
-        error?.message ||
-          "Could not load the pricing page."
-      );
+      console.error("Pricing page error:", error);
     } finally {
       setLoading(false);
     }
   }
 
-  // ==========================================================
-  // PRICING
-  // ==========================================================
-
-  function getAnnualPrice(monthlyPrice) {
-    /*
-     * Annual price = 10 months worth of the monthly price.
-     *
-     * R500 x 10 = R5,000 per year
-     * R950 x 10 = R9,500 per year
-     * R1,500 x 10 = R15,000 per year
-     */
-
-    return monthlyPrice * 10;
+  function selectPlan(planKey) {
+    setSelectedPlan(planKey);
   }
 
-  function getMonthlyEquivalent(monthlyPrice) {
-    return Math.round(getAnnualPrice(monthlyPrice) / 12);
+  function getPrice(plan) {
+    if (plan.monthly === null) {
+      return plan.price;
+    }
+
+    return billing === "monthly" ? plan.monthly : plan.annual;
   }
 
-  // ==========================================================
-  // CHOOSE PLAN
-  // ==========================================================
-
-  async function choosePlan(plan) {
-  setMessage("");
-  setError("");
-
-  try {
-    setSelectingPlan(plan.id);
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError) {
-      throw userError;
+  function getPeriod(plan) {
+    if (plan.monthly === null) {
+      return "per listing";
     }
 
-    if (!user) {
-      router.push(
-        `/signup?role=company&redirect=/company-pricing`
-      );
-      return;
-    }
-
-    const price =
-      billing === "annual"
-        ? getAnnualPrice(plan.monthly)
-        : plan.monthly;
-
-    /*
-     * Save the selected plan as INACTIVE.
-     *
-     * Selecting a plan does NOT activate the company.
-     * PayFast payment must be completed first.
-     */
-
-    const { error: saveError } = await supabase
-      .from("company_subscriptions")
-      .upsert(
-        {
-          company_id: user.id,
-          plan: plan.id,
-          status: "inactive",
-          monthly_price:
-            billing === "annual"
-              ? getMonthlyEquivalent(plan.monthly)
-              : plan.monthly,
-          payment_provider: null,
-          payment_reference: null,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "company_id",
-        }
-      );
-
-    if (saveError) {
-      throw saveError;
-    }
-
-    /*
-     * Ask our secure server route to create
-     * the PayFast payment request.
-     */
-
-    const response = await fetch(
-      "/api/payfast/create-payment",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          plan: plan.id,
-          billing,
-          price,
-          email: user.email,
-        }),
-      }
-    );
-
-    const payment = await response.json();
-
-    if (!response.ok || !payment.success) {
-      throw new Error(
-        payment.error ||
-          "Could not create the PayFast payment."
-      );
-    }
-
-    /*
-     * Create a temporary HTML form.
-     *
-     * PayFast expects the payment information
-     * to be submitted as form fields.
-     */
-
-    const form = document.createElement("form");
-
-    form.method = "POST";
-    form.action = payment.paymentUrl;
-    form.style.display = "none";
-
-    Object.entries(payment.paymentData).forEach(
-      ([key, value]) => {
-        const input =
-          document.createElement("input");
-
-        input.type = "hidden";
-        input.name = key;
-        input.value = String(value);
-
-        form.appendChild(input);
-      }
-    );
-
-    document.body.appendChild(form);
-
-    /*
-     * Send the company to PayFast.
-     */
-
-    form.submit();
-  } catch (error) {
-    console.error(
-      "PayFast payment error:",
-      error
-    );
-
-    setError(
-      error?.message ||
-        "Something went wrong while preparing your payment."
-    );
-
-    setSelectingPlan(null);
+    return billing === "monthly" ? "per month" : "per year";
   }
-}
 
-  // ==========================================================
-  // LOADING
-  // ==========================================================
+  function continueToPayment(planKey) {
+    const plan = PLANS[planKey];
+
+    if (!plan) return;
+
+    // --------------------------------------------------------
+    // IMPORTANT:
+    // Selecting a plan does NOT activate Premium.
+    // The payment flow must verify successful payment first.
+    // --------------------------------------------------------
+
+    const params = new URLSearchParams({
+      plan: planKey,
+      billing:
+        planKey === "pay_per_listing"
+          ? "listing"
+          : billing,
+    });
+
+    router.push(`/company-payment?${params.toString()}`);
+  }
 
   if (loading) {
     return (
       <main style={styles.loadingPage}>
-        <div style={styles.loadingBox}>
-          <div style={styles.spinner}>◌</div>
-
-          <h2>Loading GradLink SA</h2>
-
-          <p>
-            Preparing company plans...
-          </p>
-        </div>
+        <div style={styles.loadingSpinner}></div>
+        <p style={styles.loadingText}>Loading GradLink SA pricing...</p>
       </main>
     );
   }
 
-  // ==========================================================
-  // PAGE
-  // ==========================================================
-
   return (
     <main style={styles.page}>
       {/* =====================================================
-          NAVBAR
+          HEADER
       ====================================================== */}
 
-      <nav style={styles.navbar}>
-        <Link
-          href="/"
-          style={styles.logo}
-          className="gl-logo"
-        >
-          <span style={styles.logoIcon}>
-            G
-          </span>
-
-          <span>
-            GradLink{" "}
-            <strong>SA</strong>
-          </span>
-        </Link>
-
-        <div
-          style={styles.navLinks}
-          className="gl-nav-links"
-        >
-          <Link
-            href="/"
-            style={styles.navLink}
+      <header style={styles.header}>
+        <div style={styles.headerInner}>
+          <button
+            onClick={() => router.push("/")}
+            style={styles.logoButton}
           >
-            Home
-          </Link>
+            <div style={styles.logoMark}>G</div>
 
-          <Link
-            href="/internships"
-            style={styles.navLink}
-          >
-            Internships
-          </Link>
+            <div>
+              <div style={styles.logoText}>GradLink SA</div>
+              <div style={styles.logoSubtext}>
+                Company Recruitment
+              </div>
+            </div>
+          </button>
 
-          <Link
-            href="/jobs"
-            style={styles.navLink}
+          <button
+            onClick={() => router.push("/company-dashboard")}
+            style={styles.dashboardButton}
           >
-            Jobs
-          </Link>
+            Dashboard
+          </button>
         </div>
-
-        <div
-          style={styles.navActions}
-          className="gl-nav-actions"
-        >
-          <Link
-            href="/login"
-            style={styles.loginButton}
-          >
-            Log In
-          </Link>
-        </div>
-      </nav>
+      </header>
 
       {/* =====================================================
           HERO
       ====================================================== */}
 
       <section style={styles.hero}>
-        <div style={styles.heroBadge}>
-          🏢 FOR COMPANIES
+        <div style={styles.badge}>
+          🏢 COMPANY PLANS
         </div>
 
         <h1 style={styles.heroTitle}>
-          Choose your{" "}
-          <span style={styles.gradientText}>
-            GradLink plan
-          </span>
+          Choose the right plan for your
+          <span style={styles.heroAccent}> recruitment needs</span>
         </h1>
 
         <p style={styles.heroText}>
-          Access the tools you need to find,
-          screen and manage talented South
-          African graduates.
+          Publish internship and graduate opportunities on
+          GradLink SA and connect with qualified South African
+          graduates.
         </p>
 
-        <div
-          style={styles.securityNote}
-          className="gl-security-note"
-        >
-          <span style={styles.checkCircle}>
-            ✓
-          </span>
+        <div style={styles.importantNotice}>
+          <span style={styles.noticeIcon}>🔒</span>
 
-          <span>
-            Payment is required before a company
-            profile can be registered.
-          </span>
+          <div>
+            <strong style={styles.noticeTitle}>
+              Payment is required
+            </strong>
+
+            <p style={styles.noticeText}>
+              Companies do not have a free plan. Selecting a plan
+              does not activate your subscription. Your access is
+              activated only after successful payment verification.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -429,19 +216,13 @@ export default function CompanyPricingPage() {
       ====================================================== */}
 
       <section style={styles.billingSection}>
-        <div
-          style={styles.billingToggle}
-          className="gl-billing-toggle"
-        >
+        <div style={styles.billingToggle}>
           <button
-            type="button"
-            onClick={() =>
-              setBilling("monthly")
-            }
+            onClick={() => setBilling("monthly")}
             style={{
               ...styles.billingButton,
               ...(billing === "monthly"
-                ? styles.billingActive
+                ? styles.billingButtonActive
                 : {}),
             }}
           >
@@ -449,383 +230,104 @@ export default function CompanyPricingPage() {
           </button>
 
           <button
-            type="button"
-            onClick={() =>
-              setBilling("annual")
-            }
+            onClick={() => setBilling("annual")}
             style={{
               ...styles.billingButton,
               ...(billing === "annual"
-                ? styles.billingActive
+                ? styles.billingButtonActive
                 : {}),
             }}
           >
             Annual
+            <span style={styles.saveBadge}>Save</span>
           </button>
-
-          <span style={styles.saveBadge}>
-            SAVE 2 MONTHS
-          </span>
         </div>
+
+        <p style={styles.billingHint}>
+          Annual plans are priced at only 10 months of the monthly
+          price.
+        </p>
       </section>
-
-      {/* =====================================================
-          MESSAGES
-      ====================================================== */}
-
-      {message && (
-        <div style={styles.successMessage}>
-          {message}
-        </div>
-      )}
-
-      {error && (
-        <div style={styles.errorMessage}>
-          {error}
-        </div>
-      )}
 
       {/* =====================================================
           PRICING
       ====================================================== */}
 
       <section style={styles.pricingSection}>
-        <div
-          style={styles.pricingGrid}
-          className="gl-pricing-grid"
-        >
-          {PLANS.map((plan) => {
-            const annualPrice =
-              getAnnualPrice(plan.monthly);
+        <div style={styles.pricingGrid}>
 
-            const monthlyEquivalent =
-              getMonthlyEquivalent(
-                plan.monthly
-              );
+          {/* STARTER */}
+          <PlanCard
+            planKey="starter"
+            plan={PLANS.starter}
+            billing={billing}
+            selectedPlan={selectedPlan}
+            onSelect={selectPlan}
+            onContinue={continueToPayment}
+            getPrice={getPrice}
+            getPeriod={getPeriod}
+          />
 
-            const isCurrent =
-              currentPlan?.plan ===
-                plan.id &&
-              currentPlan?.status ===
-                "active";
+          {/* PROFESSIONAL */}
+          <PlanCard
+            planKey="professional"
+            plan={PLANS.professional}
+            billing={billing}
+            selectedPlan={selectedPlan}
+            onSelect={selectPlan}
+            onContinue={continueToPayment}
+            getPrice={getPrice}
+            getPeriod={getPeriod}
+            popular
+          />
 
-            const isSelecting =
-              selectingPlan === plan.id;
+          {/* ENTERPRISE */}
+          <PlanCard
+            planKey="enterprise"
+            plan={PLANS.enterprise}
+            billing={billing}
+            selectedPlan={selectedPlan}
+            onSelect={selectPlan}
+            onContinue={continueToPayment}
+            getPrice={getPrice}
+            getPeriod={getPeriod}
+          />
 
-            return (
-              <article
-                key={plan.id}
-                style={{
-                  ...styles.planCard,
-                  ...(plan.popular
-                    ? styles.popularCard
-                    : {}),
-                }}
-                className={
-                  plan.popular
-                    ? "gl-plan-card gl-popular-card"
-                    : "gl-plan-card"
-                }
-              >
-                {plan.popular && (
-                  <div
-                    style={styles.popularBadge}
-                    className="gl-popular-badge"
-                  >
-                    MOST POPULAR
-                  </div>
-                )}
+          {/* PAY PER LISTING */}
+          <PlanCard
+            planKey="pay_per_listing"
+            plan={PLANS.pay_per_listing}
+            billing={billing}
+            selectedPlan={selectedPlan}
+            onSelect={selectPlan}
+            onContinue={continueToPayment}
+            getPrice={getPrice}
+            getPeriod={getPeriod}
+            payPerListing
+          />
 
-                <div style={styles.planTop}>
-                  <div>
-                    <div style={styles.planIcon}>
-                      {plan.id === "starter"
-                        ? "🚀"
-                        : plan.id ===
-                          "professional"
-                        ? "⭐"
-                        : "🏢"}
-                    </div>
-
-                    <h2 style={styles.planName}>
-                      {plan.name}
-                    </h2>
-
-                    <p
-                      style={
-                        styles.planDescription
-                      }
-                    >
-                      {plan.description}
-                    </p>
-                  </div>
-                </div>
-
-                <div
-                  style={styles.priceArea}
-                  className="gl-price-area"
-                >
-                  {billing === "monthly" ? (
-                    <>
-                      <span
-                        style={styles.currency}
-                      >
-                        R
-                      </span>
-
-                      <span
-                        style={styles.price}
-                      >
-                        {plan.monthly.toLocaleString()}
-                      </span>
-
-                      <span
-                        style={styles.period}
-                      >
-                        /month
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span
-                        style={styles.currency}
-                      >
-                        R
-                      </span>
-
-                      <span
-                        style={styles.price}
-                      >
-                        {annualPrice.toLocaleString()}
-                      </span>
-
-                      <span
-                        style={styles.period}
-                      >
-                        /year
-                      </span>
-                    </>
-                  )}
-                </div>
-
-                {billing === "annual" && (
-                  <div
-                    style={styles.annualNote}
-                  >
-                    Equivalent to R
-                    {monthlyEquivalent.toLocaleString()}
-                    /month
-                  </div>
-                )}
-
-                <div
-                  style={styles.divider}
-                />
-
-                <div
-                  style={styles.featureTitle}
-                >
-                  Includes:
-                </div>
-
-                <ul
-                  style={styles.featureList}
-                >
-                  {plan.features.map(
-                    (feature) => (
-                      <li
-                        key={feature}
-                        style={styles.feature}
-                      >
-                        <span
-                          style={
-                            styles.featureCheck
-                          }
-                        >
-                          ✓
-                        </span>
-
-                        <span>
-                          {feature}
-                        </span>
-                      </li>
-                    )
-                  )}
-                </ul>
-
-                <button
-                  type="button"
-                  disabled={isSelecting}
-                  onClick={() =>
-                    choosePlan(plan)
-                  }
-                  style={{
-                    ...styles.planButton,
-                    ...(plan.popular
-                      ? styles.planButtonPrimary
-                      : styles.planButtonSecondary),
-                    ...(isSelecting
-                      ? styles.disabledButton
-                      : {}),
-                  }}
-                >
-                  {isSelecting
-                    ? "Preparing payment..."
-                    : isCurrent
-                    ? "Manage Plan"
-                    : "Choose Plan →"}
-                </button>
-
-                <p
-                  style={
-                    styles.paymentSmall
-                  }
-                >
-                  🔒 Secure payment required
-                  before company registration
-                </p>
-              </article>
-            );
-          })}
         </div>
       </section>
 
       {/* =====================================================
-          HOW IT WORKS
+          BOTTOM INFORMATION
       ====================================================== */}
 
-      <section style={styles.howSection}>
-        <div style={styles.sectionHeading}>
-          <span style={styles.smallBadge}>
-            SIMPLE PROCESS
-          </span>
+      <section style={styles.infoSection}>
+        <div style={styles.infoBox}>
+          <div style={styles.infoIcon}>📋</div>
 
-          <h2>
-            Get your company on GradLink
-          </h2>
+          <div>
+            <h3 style={styles.infoTitle}>
+              Listing limits are based on active listings
+            </h3>
 
-          <p>
-            Your company profile is created only
-            after payment has been successfully
-            verified.
-          </p>
-        </div>
-
-        <div
-          style={styles.steps}
-          className="gl-steps"
-        >
-          <Step
-            number="01"
-            icon="💳"
-            title="Choose a plan"
-            text="Select the plan that matches your recruitment needs."
-          />
-
-          <Step
-            number="02"
-            icon="🔐"
-            title="Complete payment"
-            text="Complete the payment through the secure payment process."
-          />
-
-          <Step
-            number="03"
-            icon="🏢"
-            title="Register your company"
-            text="Once payment is verified, your company profile becomes available."
-          />
-
-          <Step
-            number="04"
-            icon="🚀"
-            title="Start recruiting"
-            text="Post opportunities and manage graduate applications."
-          />
-        </div>
-      </section>
-
-      {/* =====================================================
-          PREMIUM FEATURES
-      ====================================================== */}
-
-      <section style={styles.featureSection}>
-        <div
-          style={styles.featurePanel}
-          className="gl-feature-panel"
-        >
-          <div style={styles.featurePanelText}>
-            <span style={styles.smallBadge}>
-              BUILT FOR RECRUITERS
-            </span>
-
-            <h2>
-              More than just an internship
-              listing platform.
-            </h2>
-
-            <p>
-              GradLink SA is designed to help
-              companies move from posting an
-              opportunity to managing applicants
-              in one place.
+            <p style={styles.infoText}>
+              Your plan determines how many active internship or
+              job listings your company can have at one time.
+              Expired or closed listings do not count toward your
+              active listing limit.
             </p>
-
-            <div
-              style={styles.miniFeatures}
-              className="gl-mini-features"
-            >
-              <div>
-                <strong>
-                  AI Matching
-                </strong>
-
-                <span>
-                  Compare applicant
-                  qualifications, fields and
-                  skills.
-                </span>
-              </div>
-
-              <div>
-                <strong>
-                  Applicant Management
-                </strong>
-
-                <span>
-                  Review and manage applications
-                  from your dashboard.
-                </span>
-              </div>
-
-              <div>
-                <strong>
-                  Document Verification
-                </strong>
-
-                <span>
-                  Advanced verification tools
-                  can help screen submitted
-                  documents.
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div style={styles.featureVisual}>
-            <div style={styles.visualCircle}>
-              <div style={styles.visualIcon}>
-                ✓
-              </div>
-            </div>
-
-            <strong>
-              Professional recruitment
-            </strong>
-
-            <span>
-              One company workspace
-            </span>
           </div>
         </div>
       </section>
@@ -835,227 +337,129 @@ export default function CompanyPricingPage() {
       ====================================================== */}
 
       <footer style={styles.footer}>
-        <div style={styles.footerLogo}>
-          <span style={styles.logoIcon}>
-            G
-          </span>
-
-          GradLink{" "}
-          <strong>SA</strong>
-        </div>
-
         <p>
-          Connecting South African graduates
-          with internship opportunities.
+          © {new Date().getFullYear()} GradLink SA. Connecting
+          South African graduates with opportunities.
         </p>
-
-        <div style={styles.footerLinks}>
-          <Link
-            href="/"
-            style={styles.footerLink}
-          >
-            Home
-          </Link>
-
-          <Link
-            href="/internships"
-            style={styles.footerLink}
-          >
-            Internships
-          </Link>
-
-          <Link
-            href="/jobs"
-            style={styles.footerLink}
-          >
-            Jobs
-          </Link>
-
-          <Link
-            href="/login"
-            style={styles.footerLink}
-          >
-            Login
-          </Link>
-        </div>
-
-        <div style={styles.copyright}>
-          © {new Date().getFullYear()} GradLink
-          SA. All rights reserved.
-        </div>
       </footer>
-
-      {/* =====================================================
-          RESPONSIVE CSS
-      ====================================================== */}
-
-      <style jsx>{`
-        :global(html) {
-          width: 100%;
-          overflow-x: hidden;
-        }
-
-        :global(body) {
-          margin: 0;
-          width: 100%;
-          max-width: 100%;
-          overflow-x: hidden;
-        }
-
-        * {
-          box-sizing: border-box;
-        }
-
-        button,
-        a {
-          -webkit-tap-highlight-color: transparent;
-        }
-
-        button {
-          font-family: inherit;
-        }
-
-        .gl-logo {
-          flex-shrink: 0;
-        }
-
-        @media (max-width: 1000px) {
-          .gl-pricing-grid {
-            grid-template-columns: repeat(
-              2,
-              minmax(0, 1fr)
-            ) !important;
-          }
-
-          .gl-popular-card {
-            transform: none !important;
-          }
-
-          .gl-steps {
-            grid-template-columns: repeat(
-              2,
-              minmax(0, 1fr)
-            ) !important;
-          }
-
-          .gl-feature-panel {
-            grid-template-columns: 1fr !important;
-          }
-
-          .gl-mini-features {
-            grid-template-columns: 1fr !important;
-          }
-        }
-
-        @media (max-width: 850px) {
-          .gl-nav-links {
-            display: none !important;
-          }
-
-          .gl-pricing-grid {
-            gap: 18px !important;
-          }
-
-          .gl-plan-card {
-            padding: 26px !important;
-          }
-        }
-
-        @media (max-width: 700px) {
-          .gl-pricing-grid {
-            grid-template-columns: 1fr !important;
-            width: 100% !important;
-          }
-
-          .gl-plan-card {
-            width: 100% !important;
-            max-width: 100% !important;
-          }
-
-          .gl-popular-card {
-            transform: none !important;
-          }
-
-          .gl-steps {
-            grid-template-columns: 1fr !important;
-          }
-
-          .gl-feature-panel {
-            padding: 32px 24px !important;
-          }
-        }
-
-        @media (max-width: 520px) {
-          .gl-nav-actions {
-            display: none !important;
-          }
-
-          .gl-logo {
-            font-size: 19px !important;
-          }
-
-          .gl-billing-toggle {
-            width: 100% !important;
-            max-width: 360px !important;
-          }
-
-          .gl-security-note {
-            width: 100% !important;
-            justify-content: flex-start !important;
-            text-align: left !important;
-          }
-
-          .gl-price-area {
-            flex-wrap: nowrap !important;
-          }
-
-          .gl-plan-card {
-            padding: 24px 20px !important;
-            border-radius: 20px !important;
-          }
-
-          .gl-popular-badge {
-            top: -12px !important;
-          }
-        }
-
-        @media (max-width: 380px) {
-          .gl-logo {
-            font-size: 17px !important;
-          }
-
-          .gl-billing-toggle {
-            padding: 4px !important;
-          }
-        }
-      `}</style>
     </main>
   );
 }
 
 // ============================================================
-// STEP COMPONENT
+// PLAN CARD
 // ============================================================
 
-function Step({
-  number,
-  icon,
-  title,
-  text,
+function PlanCard({
+  planKey,
+  plan,
+  billing,
+  selectedPlan,
+  onSelect,
+  onContinue,
+  getPrice,
+  getPeriod,
+  popular = false,
+  payPerListing = false,
 }) {
+  const selected = selectedPlan === planKey;
+
   return (
-    <div style={styles.step}>
-      <div style={styles.stepNumber}>
-        {number}
+    <div
+      style={{
+        ...styles.planCard,
+        ...(popular ? styles.popularCard : {}),
+        ...(selected ? styles.selectedCard : {}),
+      }}
+      onClick={() => onSelect(planKey)}
+    >
+      {popular && (
+        <div style={styles.popularBadge}>
+          MOST POPULAR
+        </div>
+      )}
+
+      <div style={styles.planHeader}>
+        <h2 style={styles.planName}>{plan.name}</h2>
+
+        <p style={styles.planDescription}>
+          {plan.description}
+        </p>
       </div>
 
-      <div style={styles.stepIcon}>
-        {icon}
+      <div style={styles.priceArea}>
+        <span style={styles.currency}>R</span>
+
+        <span style={styles.price}>
+          {getPrice(plan).toLocaleString("en-ZA")}
+        </span>
+
+        <span style={styles.period}>
+          / {getPeriod(plan).replace("per ", "")}
+        </span>
       </div>
 
-      <h3>{title}</h3>
+      {planKey !== "pay_per_listing" && billing === "annual" && (
+        <div style={styles.monthlyEquivalent}>
+          Equivalent to R
+          {(plan.annual / 12).toLocaleString("en-ZA")}
+          /month
+        </div>
+      )}
 
-      <p>{text}</p>
+      <div style={styles.listingsBox}>
+        <div style={styles.listingsIcon}>📋</div>
+
+        <div>
+          <div style={styles.listingsLabel}>
+            Listings included
+          </div>
+
+          <div style={styles.listingsValue}>
+            {plan.listings === 1
+              ? "1 listing"
+              : `Up to ${plan.listings} active listings`}
+          </div>
+        </div>
+      </div>
+
+      <div style={styles.featureList}>
+        <div style={styles.feature}>
+          <span>✓</span>
+          <span>Company profile</span>
+        </div>
+
+        <div style={styles.feature}>
+          <span>✓</span>
+          <span>Publish opportunities</span>
+        </div>
+
+        <div style={styles.feature}>
+          <span>✓</span>
+          <span>Receive applications</span>
+        </div>
+
+        <div style={styles.feature}>
+          <span>✓</span>
+          <span>Applicant management</span>
+        </div>
+      </div>
+
+      <button
+        onClick={(event) => {
+          event.stopPropagation();
+          onContinue(planKey);
+        }}
+        style={{
+          ...styles.planButton,
+          ...(popular ? styles.planButtonPopular : {}),
+          ...(selected ? styles.planButtonSelected : {}),
+        }}
+      >
+        {payPerListing
+          ? "Publish a Listing"
+          : "Continue to Payment"}
+      </button>
     </div>
   );
 }
@@ -1065,729 +469,510 @@ function Step({
 // ============================================================
 
 const styles = {
-  // ==========================================================
-  // PAGE
-  // ==========================================================
-
   page: {
     minHeight: "100vh",
     background:
-      "linear-gradient(180deg, #f7fbff 0%, #ffffff 45%, #f8fbff 100%)",
-    color: "#10233f",
+      "linear-gradient(180deg, #f7faff 0%, #ffffff 45%, #f8fbff 100%)",
+    color: "#0f172a",
     fontFamily:
-      "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif",
     overflowX: "hidden",
   },
-
-  // ==========================================================
-  // LOADING
-  // ==========================================================
 
   loadingPage: {
     minHeight: "100vh",
     display: "flex",
+    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    background:
-      "linear-gradient(135deg, #eef6ff 0%, #ffffff 55%, #f5f9ff 100%)",
-    padding: "24px",
+    background: "#f8fbff",
     fontFamily:
-      "Inter, ui-sans-serif, system-ui, sans-serif",
+      "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif",
   },
 
-  loadingBox: {
-    width: "100%",
-    maxWidth: "420px",
-    background: "#ffffff",
-    border: "1px solid #e4edf8",
-    borderRadius: "24px",
-    padding: "42px 28px",
-    textAlign: "center",
-    boxShadow:
-      "0 20px 60px rgba(16, 35, 63, 0.10)",
-  },
-
-  spinner: {
-    width: "54px",
-    height: "54px",
-    margin: "0 auto 18px",
+  loadingSpinner: {
+    width: "38px",
+    height: "38px",
+    border: "4px solid #dbeafe",
+    borderTop: "4px solid #2563eb",
     borderRadius: "50%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background:
-      "linear-gradient(135deg, #0b6bcb, #19a7ff)",
-    color: "#ffffff",
-    fontSize: "30px",
-    fontWeight: "800",
+    animation: "gradlinkSpin 0.8s linear infinite",
   },
 
-  // ==========================================================
-  // NAVBAR
-  // ==========================================================
+  loadingText: {
+    marginTop: "16px",
+    color: "#64748b",
+    fontSize: "14px",
+  },
 
-  navbar: {
+  header: {
     width: "100%",
-    maxWidth: "1240px",
+    background: "rgba(255,255,255,0.96)",
+    borderBottom: "1px solid #e5e7eb",
+    position: "sticky",
+    top: 0,
+    zIndex: 50,
+    backdropFilter: "blur(12px)",
+  },
+
+  headerInner: {
+    width: "100%",
+    maxWidth: "1180px",
     margin: "0 auto",
-    padding: "18px 24px",
+    padding: "14px 22px",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: "24px",
-    position: "relative",
-    zIndex: 20,
+    boxSizing: "border-box",
   },
 
-  logo: {
+  logoButton: {
+    border: "none",
+    background: "transparent",
+    padding: 0,
     display: "flex",
     alignItems: "center",
     gap: "10px",
-    textDecoration: "none",
-    color: "#10233f",
-    fontSize: "22px",
-    fontWeight: "700",
-    letterSpacing: "-0.5px",
+    cursor: "pointer",
+    textAlign: "left",
   },
 
-  logoIcon: {
-    width: "38px",
-    height: "38px",
-    borderRadius: "12px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
+  logoMark: {
+    width: "40px",
+    height: "40px",
+    borderRadius: "11px",
     background:
-      "linear-gradient(135deg, #0868c9, #19a7ff)",
+      "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
     color: "#ffffff",
-    fontSize: "20px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
     fontWeight: "800",
-    boxShadow:
-      "0 8px 22px rgba(8, 104, 201, 0.25)",
+    fontSize: "21px",
+    boxShadow: "0 7px 18px rgba(37,99,235,0.22)",
   },
 
-  navLinks: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "30px",
-    flex: 1,
+  logoText: {
+    fontSize: "17px",
+    fontWeight: "800",
+    color: "#0f172a",
+    lineHeight: "1.1",
   },
 
-  navLink: {
-    color: "#52657d",
-    textDecoration: "none",
-    fontSize: "14px",
-    fontWeight: "600",
-    transition: "0.2s ease",
+  logoSubtext: {
+    fontSize: "10px",
+    color: "#64748b",
+    marginTop: "3px",
   },
 
-  navActions: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "flex-end",
-  },
-
-  loginButton: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "42px",
-    padding: "0 18px",
-    borderRadius: "12px",
+  dashboardButton: {
+    border: "1px solid #dbe3ef",
     background: "#ffffff",
-    border: "1px solid #d9e5f2",
-    color: "#0b5cab",
-    textDecoration: "none",
-    fontSize: "14px",
+    color: "#1d4ed8",
+    padding: "10px 15px",
+    borderRadius: "10px",
+    fontSize: "13px",
     fontWeight: "700",
-    boxShadow:
-      "0 5px 16px rgba(16, 35, 63, 0.06)",
+    cursor: "pointer",
   },
-
-  // ==========================================================
-  // HERO
-  // ==========================================================
 
   hero: {
-    width: "100%",
-    maxWidth: "900px",
+    maxWidth: "920px",
     margin: "0 auto",
-    padding: "70px 24px 34px",
+    padding: "58px 22px 20px",
     textAlign: "center",
+    boxSizing: "border-box",
   },
 
-  heroBadge: {
+  badge: {
     display: "inline-flex",
     alignItems: "center",
-    justifyContent: "center",
-    padding: "8px 14px",
+    padding: "7px 12px",
     borderRadius: "999px",
-    background: "#e9f5ff",
-    border: "1px solid #cfe8ff",
-    color: "#0968c5",
-    fontSize: "12px",
+    background: "#eff6ff",
+    border: "1px solid #dbeafe",
+    color: "#1d4ed8",
+    fontSize: "11px",
     fontWeight: "800",
-    letterSpacing: "0.7px",
-    marginBottom: "18px",
+    letterSpacing: "0.6px",
   },
 
   heroTitle: {
-    margin: 0,
-    fontSize: "clamp(38px, 6vw, 68px)",
-    lineHeight: 1.04,
-    letterSpacing: "-2.5px",
+    margin: "18px auto 0",
+    maxWidth: "780px",
+    fontSize: "clamp(32px, 5vw, 54px)",
+    lineHeight: "1.08",
+    letterSpacing: "-1.5px",
     fontWeight: "850",
-    color: "#10233f",
+    color: "#0f172a",
   },
 
-  gradientText: {
-    background:
-      "linear-gradient(90deg, #0868c9, #18a7ff)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-    backgroundClip: "text",
+  heroAccent: {
+    color: "#2563eb",
   },
 
   heroText: {
     maxWidth: "680px",
-    margin: "22px auto 0",
-    color: "#61738a",
-    fontSize: "17px",
-    lineHeight: 1.7,
+    margin: "18px auto 0",
+    fontSize: "16px",
+    lineHeight: "1.65",
+    color: "#64748b",
   },
 
-  securityNote: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "10px",
-    marginTop: "28px",
-    padding: "12px 17px",
+  importantNotice: {
+    maxWidth: "720px",
+    margin: "28px auto 0",
+    padding: "16px",
     borderRadius: "14px",
-    background: "#ffffff",
-    border: "1px solid #dce9f5",
-    color: "#43566e",
-    fontSize: "13px",
-    lineHeight: 1.5,
-    boxShadow:
-      "0 8px 26px rgba(16, 35, 63, 0.06)",
+    background: "#f8fbff",
+    border: "1px solid #dbeafe",
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "12px",
+    textAlign: "left",
+    boxSizing: "border-box",
   },
 
-  checkCircle: {
-    width: "24px",
-    height: "24px",
-    flexShrink: 0,
-    borderRadius: "50%",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#e5f7ed",
-    color: "#16824d",
-    fontWeight: "900",
-    fontSize: "13px",
+  noticeIcon: {
+    fontSize: "20px",
+    lineHeight: "1",
   },
 
-  // ==========================================================
-  // BILLING
-  // ==========================================================
+  noticeTitle: {
+    fontSize: "13px",
+    color: "#1e3a8a",
+  },
+
+  noticeText: {
+    margin: "5px 0 0",
+    fontSize: "12px",
+    lineHeight: "1.55",
+    color: "#64748b",
+  },
 
   billingSection: {
-    display: "flex",
-    justifyContent: "center",
-    padding: "10px 24px 38px",
+    textAlign: "center",
+    padding: "24px 20px 12px",
   },
 
   billingToggle: {
-    position: "relative",
-    display: "flex",
-    alignItems: "center",
-    gap: "4px",
-    padding: "5px",
-    background: "#eaf2fa",
-    border: "1px solid #dce8f4",
-    borderRadius: "16px",
-    boxShadow:
-      "0 8px 24px rgba(16, 35, 63, 0.06)",
+    display: "inline-flex",
+    padding: "4px",
+    borderRadius: "13px",
+    background: "#eaf0f8",
+    border: "1px solid #dce5f0",
   },
 
   billingButton: {
-    minWidth: "112px",
-    minHeight: "44px",
     border: "none",
-    borderRadius: "12px",
     background: "transparent",
-    color: "#61738a",
-    fontSize: "14px",
-    fontWeight: "750",
+    color: "#64748b",
+    padding: "10px 18px",
+    borderRadius: "9px",
+    fontWeight: "700",
+    fontSize: "13px",
     cursor: "pointer",
-    padding: "0 16px",
   },
 
-  billingActive: {
+  billingButtonActive: {
     background: "#ffffff",
-    color: "#075eb5",
-    boxShadow:
-      "0 4px 14px rgba(16, 35, 63, 0.10)",
+    color: "#1d4ed8",
+    boxShadow: "0 2px 8px rgba(15,23,42,0.08)",
   },
 
   saveBadge: {
-    marginLeft: "5px",
-    marginRight: "5px",
-    padding: "7px 9px",
-    borderRadius: "8px",
-    background: "#dff7e9",
-    color: "#177447",
-    fontSize: "10px",
-    fontWeight: "850",
-    letterSpacing: "0.3px",
-    whiteSpace: "nowrap",
+    marginLeft: "7px",
+    padding: "3px 6px",
+    borderRadius: "999px",
+    background: "#dcfce7",
+    color: "#166534",
+    fontSize: "9px",
+    fontWeight: "800",
   },
 
-  // ==========================================================
-  // MESSAGES
-  // ==========================================================
-
-  successMessage: {
-    width: "calc(100% - 48px)",
-    maxWidth: "700px",
-    margin: "0 auto 24px",
-    padding: "14px 18px",
-    borderRadius: "14px",
-    background: "#eaf9f0",
-    border: "1px solid #c9ecd8",
-    color: "#176b42",
-    textAlign: "center",
-    fontSize: "14px",
-    fontWeight: "650",
+  billingHint: {
+    margin: "10px 0 0",
+    color: "#64748b",
+    fontSize: "11px",
   },
-
-  errorMessage: {
-    width: "calc(100% - 48px)",
-    maxWidth: "700px",
-    margin: "0 auto 24px",
-    padding: "14px 18px",
-    borderRadius: "14px",
-    background: "#fff0f0",
-    border: "1px solid #f3d0d0",
-    color: "#b42323",
-    textAlign: "center",
-    fontSize: "14px",
-    fontWeight: "650",
-  },
-
-  // ==========================================================
-  // PRICING
-  // ==========================================================
 
   pricingSection: {
-    width: "100%",
     maxWidth: "1240px",
     margin: "0 auto",
-    padding: "10px 24px 70px",
+    padding: "26px 20px 40px",
+    boxSizing: "border-box",
   },
 
   pricingGrid: {
-    width: "100%",
     display: "grid",
     gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
-    gap: "24px",
+      "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
+    gap: "18px",
     alignItems: "stretch",
   },
 
   planCard: {
     position: "relative",
-    minWidth: 0,
+    background: "#ffffff",
+    border: "1px solid #e2e8f0",
+    borderRadius: "18px",
+    padding: "25px 21px 21px",
+    boxSizing: "border-box",
     display: "flex",
     flexDirection: "column",
-    background: "#ffffff",
-    border: "1px solid #dfe9f3",
-    borderRadius: "24px",
-    padding: "30px",
-    boxShadow:
-      "0 14px 45px rgba(16, 35, 63, 0.08)",
+    minWidth: 0,
+    cursor: "pointer",
+    transition:
+      "transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease",
+    boxShadow: "0 8px 25px rgba(15,23,42,0.05)",
   },
 
   popularCard: {
-    border:
-      "2px solid #0a75d1",
-    boxShadow:
-      "0 18px 55px rgba(8, 104, 201, 0.16)",
-    transform: "translateY(-8px)",
+    border: "2px solid #2563eb",
+    boxShadow: "0 14px 35px rgba(37,99,235,0.13)",
+  },
+
+  selectedCard: {
+    borderColor: "#2563eb",
+    boxShadow: "0 12px 30px rgba(37,99,235,0.12)",
   },
 
   popularBadge: {
     position: "absolute",
-    top: "-14px",
+    top: "-12px",
     left: "50%",
     transform: "translateX(-50%)",
-    padding: "7px 13px",
-    borderRadius: "999px",
-    background:
-      "linear-gradient(90deg, #0868c9, #18a7ff)",
+    background: "#2563eb",
     color: "#ffffff",
-    fontSize: "10px",
+    padding: "5px 11px",
+    borderRadius: "999px",
+    fontSize: "9px",
     fontWeight: "900",
-    letterSpacing: "0.7px",
+    letterSpacing: "0.6px",
     whiteSpace: "nowrap",
-    boxShadow:
-      "0 8px 20px rgba(8, 104, 201, 0.25)",
   },
 
-  planTop: {
-    minHeight: "176px",
-  },
-
-  planIcon: {
-    width: "46px",
-    height: "46px",
-    borderRadius: "14px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#eef7ff",
-    fontSize: "22px",
-    marginBottom: "15px",
+  planHeader: {
+    minHeight: "93px",
   },
 
   planName: {
     margin: 0,
-    color: "#10233f",
-    fontSize: "24px",
+    fontSize: "21px",
     fontWeight: "800",
-    letterSpacing: "-0.6px",
+    color: "#0f172a",
   },
 
   planDescription: {
-    margin: "10px 0 0",
-    color: "#687b91",
-    fontSize: "13px",
-    lineHeight: 1.6,
+    margin: "8px 0 0",
+    fontSize: "12px",
+    lineHeight: "1.55",
+    color: "#64748b",
   },
 
   priceArea: {
-    minHeight: "72px",
     display: "flex",
     alignItems: "baseline",
     gap: "3px",
-    whiteSpace: "nowrap",
+    marginTop: "18px",
+    minHeight: "48px",
   },
 
   currency: {
-    color: "#0a6bc8",
-    fontSize: "20px",
+    fontSize: "18px",
     fontWeight: "800",
-    alignSelf: "flex-start",
-    marginTop: "10px",
+    color: "#1d4ed8",
   },
 
   price: {
-    color: "#10233f",
-    fontSize: "42px",
+    fontSize: "38px",
+    lineHeight: "1",
     fontWeight: "850",
-    letterSpacing: "-2px",
-    lineHeight: 1,
+    letterSpacing: "-1.5px",
+    color: "#0f172a",
   },
 
   period: {
-    color: "#72849a",
-    fontSize: "13px",
-    fontWeight: "600",
-    marginLeft: "4px",
+    fontSize: "11px",
+    color: "#64748b",
   },
 
-  annualNote: {
-    minHeight: "24px",
-    color: "#197448",
-    fontSize: "12px",
-    fontWeight: "700",
+  monthlyEquivalent: {
+    marginTop: "7px",
+    fontSize: "10px",
+    color: "#64748b",
+  },
+
+  listingsBox: {
+    display: "flex",
+    alignItems: "center",
+    gap: "11px",
+    marginTop: "22px",
+    padding: "13px",
+    background: "#f8fbff",
+    border: "1px solid #e2e8f0",
+    borderRadius: "12px",
+  },
+
+  listingsIcon: {
+    width: "34px",
+    height: "34px",
+    borderRadius: "9px",
+    background: "#eff6ff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    fontSize: "16px",
+  },
+
+  listingsLabel: {
+    fontSize: "10px",
+    textTransform: "uppercase",
+    letterSpacing: "0.5px",
+    color: "#64748b",
+    fontWeight: "800",
+  },
+
+  listingsValue: {
     marginTop: "3px",
-  },
-
-  divider: {
-    width: "100%",
-    height: "1px",
-    background: "#e8eef5",
-    margin: "22px 0",
-  },
-
-  featureTitle: {
-    color: "#263c55",
     fontSize: "13px",
     fontWeight: "800",
-    marginBottom: "14px",
+    color: "#0f172a",
   },
 
   featureList: {
-    listStyle: "none",
-    padding: 0,
-    margin: 0,
+    marginTop: "20px",
     display: "flex",
     flexDirection: "column",
-    gap: "12px",
+    gap: "11px",
     flex: 1,
   },
 
   feature: {
     display: "flex",
-    alignItems: "flex-start",
-    gap: "9px",
-    color: "#53677e",
-    fontSize: "13px",
-    lineHeight: 1.5,
-  },
-
-  featureCheck: {
-    width: "20px",
-    height: "20px",
-    flexShrink: 0,
-    display: "inline-flex",
     alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "50%",
-    background: "#e8f5ff",
-    color: "#0870cb",
-    fontSize: "11px",
-    fontWeight: "900",
-    marginTop: "1px",
+    gap: "9px",
+    fontSize: "12px",
+    color: "#475569",
   },
 
   planButton: {
     width: "100%",
-    minHeight: "50px",
-    marginTop: "28px",
-    borderRadius: "14px",
-    fontSize: "14px",
+    marginTop: "24px",
+    border: "1px solid #2563eb",
+    background: "#ffffff",
+    color: "#1d4ed8",
+    padding: "12px 14px",
+    borderRadius: "10px",
+    fontSize: "13px",
     fontWeight: "800",
     cursor: "pointer",
-    transition:
-      "transform 0.2s ease, box-shadow 0.2s ease",
   },
 
-  planButtonPrimary: {
-    border: "1px solid #0871d1",
-    background:
-      "linear-gradient(135deg, #0868c9, #18a7ff)",
+  planButtonPopular: {
+    background: "#2563eb",
     color: "#ffffff",
-    boxShadow:
-      "0 10px 24px rgba(8, 104, 201, 0.22)",
   },
 
-  planButtonSecondary: {
-    border: "1px solid #cbdbea",
-    background: "#ffffff",
-    color: "#075eb5",
-  },
-
-  disabledButton: {
-    opacity: 0.65,
-    cursor: "not-allowed",
-    boxShadow: "none",
-  },
-
-  paymentSmall: {
-    margin: "12px 0 0",
-    textAlign: "center",
-    color: "#8a99aa",
-    fontSize: "11px",
-    lineHeight: 1.5,
-  },
-
-  // ==========================================================
-  // HOW IT WORKS
-  // ==========================================================
-
-  howSection: {
-    width: "100%",
-    maxWidth: "1180px",
-    margin: "0 auto",
-    padding: "78px 24px",
-  },
-
-  sectionHeading: {
-    maxWidth: "700px",
-    margin: "0 auto 45px",
-    textAlign: "center",
-  },
-
-  smallBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "7px 11px",
-    borderRadius: "999px",
-    background: "#eaf5ff",
-    color: "#0868c9",
-    fontSize: "10px",
-    fontWeight: "850",
-    letterSpacing: "0.8px",
-  },
-
-  steps: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(4, minmax(0, 1fr))",
-    gap: "18px",
-  },
-
-  step: {
-    position: "relative",
-    minWidth: 0,
-    padding: "28px 22px",
-    background: "#ffffff",
-    border: "1px solid #e3ebf4",
-    borderRadius: "20px",
-    textAlign: "center",
-    boxShadow:
-      "0 10px 35px rgba(16, 35, 63, 0.05)",
-  },
-
-  stepNumber: {
-    position: "absolute",
-    top: "15px",
-    right: "17px",
-    color: "#a8bacd",
-    fontSize: "11px",
-    fontWeight: "850",
-  },
-
-  stepIcon: {
-    width: "52px",
-    height: "52px",
-    margin: "0 auto 17px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "16px",
-    background: "#edf7ff",
-    fontSize: "24px",
-  },
-
-  // ==========================================================
-  // FEATURE SECTION
-  // ==========================================================
-
-  featureSection: {
-    width: "100%",
-    maxWidth: "1180px",
-    margin: "0 auto",
-    padding: "20px 24px 85px",
-  },
-
-  featurePanel: {
-    display: "grid",
-    gridTemplateColumns:
-      "minmax(0, 1.5fr) minmax(260px, 0.7fr)",
-    gap: "40px",
-    alignItems: "center",
-    padding: "50px",
-    borderRadius: "30px",
-    background:
-      "linear-gradient(135deg, #0b315e 0%, #075cae 60%, #0788d9 100%)",
-    boxShadow:
-      "0 25px 70px rgba(8, 71, 130, 0.20)",
-    overflow: "hidden",
-  },
-
-  featurePanelText: {
-    minWidth: 0,
-  },
-
-  miniFeatures: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
-    gap: "18px",
-    marginTop: "28px",
-  },
-
-  featureVisual: {
-    minHeight: "260px",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    textAlign: "center",
-    borderRadius: "24px",
-    background:
-      "rgba(255,255,255,0.10)",
-    border:
-      "1px solid rgba(255,255,255,0.18)",
+  planButtonSelected: {
+    background: "#1d4ed8",
     color: "#ffffff",
-    padding: "30px",
   },
 
-  visualCircle: {
-    width: "100px",
-    height: "100px",
-    marginBottom: "22px",
-    borderRadius: "50%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background:
-      "rgba(255,255,255,0.13)",
-    border:
-      "1px solid rgba(255,255,255,0.25)",
+  infoSection: {
+    maxWidth: "920px",
+    margin: "0 auto",
+    padding: "0 20px 50px",
+    boxSizing: "border-box",
   },
 
-  visualIcon: {
-    width: "60px",
-    height: "60px",
+  infoBox: {
     display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: "50%",
+    alignItems: "flex-start",
+    gap: "13px",
+    padding: "18px",
     background: "#ffffff",
-    color: "#0870c9",
-    fontSize: "28px",
-    fontWeight: "900",
-    boxShadow:
-      "0 12px 30px rgba(0,0,0,0.15)",
+    border: "1px solid #e2e8f0",
+    borderRadius: "15px",
+    boxShadow: "0 5px 18px rgba(15,23,42,0.04)",
   },
 
-  // ==========================================================
-  // FOOTER
-  // ==========================================================
+  infoIcon: {
+    width: "38px",
+    height: "38px",
+    borderRadius: "10px",
+    background: "#eff6ff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+
+  infoTitle: {
+    margin: 0,
+    fontSize: "13px",
+    fontWeight: "800",
+    color: "#0f172a",
+  },
+
+  infoText: {
+    margin: "5px 0 0",
+    fontSize: "11px",
+    lineHeight: "1.6",
+    color: "#64748b",
+  },
 
   footer: {
-    width: "100%",
-    padding: "55px 24px 30px",
     textAlign: "center",
-    background: "#081a2f",
-    color: "#ffffff",
-  },
-
-  footerLogo: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "9px",
-    fontSize: "21px",
-    fontWeight: "700",
-  },
-
-  footerLinks: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    flexWrap: "wrap",
-    gap: "22px",
-    marginTop: "25px",
-  },
-
-  footerLink: {
-    color: "#b8c9da",
-    textDecoration: "none",
-    fontSize: "13px",
-    fontWeight: "600",
-  },
-
-  copyright: {
-    marginTop: "28px",
-    paddingTop: "22px",
-    borderTop:
-      "1px solid rgba(255,255,255,0.10)",
-    color: "#8195aa",
-    fontSize: "11px",
+    borderTop: "1px solid #e5e7eb",
+    padding: "22px 20px",
+    color: "#94a3b8",
+    fontSize: "10px",
   },
 };
+
+// ============================================================
+// MOBILE RESPONSIVE CSS
+// ============================================================
+
+if (typeof document !== "undefined") {
+  const styleId = "gradlink-company-pricing-styles";
+
+  if (!document.getElementById(styleId)) {
+    const style = document.createElement("style");
+
+    style.id = styleId;
+
+    style.innerHTML = `
+      @keyframes gradlinkSpin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (max-width: 700px) {
+        .gradlink-pricing-page {
+          overflow-x: hidden;
+        }
+      }
+
+      @media (max-width: 600px) {
+        body {
+          margin: 0;
+        }
+      }
+
+      @media (max-width: 480px) {
+        button {
+          -webkit-tap-highlight-color: transparent;
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+}
