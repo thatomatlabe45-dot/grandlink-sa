@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 
+// ============================================================
+// PLANS
+// ============================================================
+
 const PLANS = {
   starter: {
     name: "Starter",
@@ -25,6 +29,54 @@ const PLANS = {
     price: 250,
   },
 };
+
+// ============================================================
+// PAYFAST URL ENCODING
+// ============================================================
+
+function payFastEncode(value) {
+  return encodeURIComponent(String(value))
+    .replace(/%20/g, "+")
+    .replace(/!/g, "%21")
+    .replace(/'/g, "%27")
+    .replace(/\(/g, "%28")
+    .replace(/\)/g, "%29");
+}
+
+// ============================================================
+// CREATE PAYFAST SIGNATURE
+// ============================================================
+
+function generateSignature(data, passphrase) {
+  const parameterString = Object.entries(data)
+    .filter(
+      ([key, value]) =>
+        key !== "signature" &&
+        value !== undefined &&
+        value !== null &&
+        String(value).trim() !== ""
+    )
+    .map(
+      ([key, value]) =>
+        `${key}=${payFastEncode(String(value).trim())}`
+    )
+    .join("&");
+
+  const stringToHash =
+    `${parameterString}&passphrase=${payFastEncode(
+      String(passphrase).trim()
+    )}`;
+
+  return crypto
+    .createHash("md5")
+    .update(stringToHash, "utf8")
+    .digest("hex")
+    .toLowerCase();
+}
+
+// ============================================================
+// POST
+// ============================================================
 
 export async function POST(request) {
   try {
@@ -93,7 +145,7 @@ export async function POST(request) {
     }
 
     // ----------------------------------------------------------
-    // 5. CALCULATE EXACT PAYMENT AMOUNT
+    // 5. CALCULATE PAYMENT AMOUNT
     // ----------------------------------------------------------
 
     let amount;
@@ -141,7 +193,7 @@ export async function POST(request) {
     }
 
     // ----------------------------------------------------------
-    // 7. PAYFAST URL
+    // 7. PAYFAST CHECKOUT URL
     // ----------------------------------------------------------
 
     const baseUrl =
@@ -150,26 +202,14 @@ export async function POST(request) {
         : "https://www.payfast.co.za";
 
     // ----------------------------------------------------------
-    // 8. CREATE UNIQUE PAYMENT ID
+    // 8. UNIQUE PAYMENT ID
     // ----------------------------------------------------------
-
-    /*
-     * The subscription ID is included in the payment ID.
-     *
-     * Example:
-     *
-     * GL-SUB-123-1750000000000
-     *
-     * This allows the notify route to identify
-     * the exact subscription that belongs to
-     * this payment.
-     */
 
     const paymentId =
       `GL-${subscriptionId}-${Date.now()}`;
 
     // ----------------------------------------------------------
-    // 9. PAYFAST PAYMENT DATA
+    // 9. PAYMENT DATA
     // ----------------------------------------------------------
 
     const paymentData = {
@@ -207,40 +247,20 @@ export async function POST(request) {
     };
 
     // ----------------------------------------------------------
-    // 10. CREATE PAYFAST SIGNATURE
+    // 10. GENERATE PAYFAST SIGNATURE
     // ----------------------------------------------------------
-
-    const signatureString =
-      Object.entries(paymentData)
-        .filter(
-          ([key, value]) =>
-            value !== undefined &&
-            value !== null &&
-            value !== ""
-        )
-        .map(
-          ([key, value]) =>
-            `${key}=${encodeURIComponent(
-              String(value).trim()
-            )}`
-        )
-        .join("&");
-
-    const stringToHash =
-      `${signatureString}&passphrase=${encodeURIComponent(
-        passphrase.trim()
-      )}`;
 
     const signature =
-      crypto
-        .createHash("md5")
-        .update(stringToHash)
-        .digest("hex");
+      generateSignature(
+        paymentData,
+        passphrase
+      );
 
-    paymentData.signature = signature;
+    paymentData.signature =
+      signature;
 
     // ----------------------------------------------------------
-    // 11. RETURN PAYFAST CHECKOUT INFORMATION
+    // 11. RETURN PAYMENT INFORMATION
     // ----------------------------------------------------------
 
     return NextResponse.json({
