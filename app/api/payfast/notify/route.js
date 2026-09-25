@@ -7,15 +7,16 @@ import { createClient } from "@supabase/supabase-js";
 // ============================================================
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !serviceRoleKey) {
-  console.error("Missing Supabase server environment variables.");
-}
+// Support either Supabase's newer secret key or the older
+// service-role key name.
+const supabaseServerKey =
+  process.env.SUPABASE_SECRET_KEY ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const supabase =
-  supabaseUrl && serviceRoleKey
-    ? createClient(supabaseUrl, serviceRoleKey)
+  supabaseUrl && supabaseServerKey
+    ? createClient(supabaseUrl, supabaseServerKey)
     : null;
 
 // ============================================================
@@ -67,11 +68,11 @@ export async function POST(request) {
 
     if (!supabase) {
       console.error(
-        "Supabase server configuration is missing."
+        "Missing Supabase server environment variables."
       );
 
       return new NextResponse(
-        "Server configuration error",
+        "Supabase server configuration error",
         { status: 500 }
       );
     }
@@ -108,7 +109,7 @@ export async function POST(request) {
     const params = new URLSearchParams(rawBody);
 
     // ----------------------------------------------------------
-    // 4. GET RECEIVED SIGNATURE
+    // 4. GET SIGNATURE
     // ----------------------------------------------------------
 
     const receivedSignature =
@@ -191,7 +192,7 @@ export async function POST(request) {
     );
 
     // ----------------------------------------------------------
-    // 7. READ IMPORTANT PAYMENT INFORMATION
+    // 7. READ PAYMENT INFORMATION
     // ----------------------------------------------------------
 
     const paymentStatus =
@@ -200,8 +201,13 @@ export async function POST(request) {
     const receivedMerchantId =
       params.get("merchant_id");
 
-    const paymentId =
+    // GradLink merchant reference
+    const merchantPaymentId =
       params.get("m_payment_id");
+
+    // Actual PayFast payment ID
+    const payfastPaymentId =
+      params.get("pf_payment_id");
 
     const amountGross =
       params.get("amount_gross");
@@ -212,12 +218,40 @@ export async function POST(request) {
     const itemName =
       params.get("item_name");
 
-    console.log("Payment status:", paymentStatus);
-    console.log("Merchant ID:", receivedMerchantId);
-    console.log("Payment ID:", paymentId);
-    console.log("Amount:", amountGross);
-    console.log("Email:", emailAddress);
-    console.log("Item:", itemName);
+    console.log(
+      "Payment status:",
+      paymentStatus
+    );
+
+    console.log(
+      "Merchant ID:",
+      receivedMerchantId
+    );
+
+    console.log(
+      "GradLink payment ID:",
+      merchantPaymentId
+    );
+
+    console.log(
+      "PayFast payment ID:",
+      payfastPaymentId
+    );
+
+    console.log(
+      "Amount:",
+      amountGross
+    );
+
+    console.log(
+      "Email:",
+      emailAddress
+    );
+
+    console.log(
+      "Item:",
+      itemName
+    );
 
     // ----------------------------------------------------------
     // 8. VERIFY MERCHANT ID
@@ -238,10 +272,10 @@ export async function POST(request) {
     }
 
     // ----------------------------------------------------------
-    // 9. PAYMENT ID MUST EXIST
+    // 9. PAYMENT REFERENCE MUST EXIST
     // ----------------------------------------------------------
 
-    if (!paymentId) {
+    if (!merchantPaymentId) {
       console.error(
         "No m_payment_id received."
       );
@@ -275,21 +309,21 @@ export async function POST(request) {
     // ----------------------------------------------------------
     // 11. EXTRACT SUBSCRIPTION ID
     //
-    // Payment ID format:
-    //
+    // Expected:
     // GL-SUBSCRIPTION_UUID-TIMESTAMP
     //
-    // UUIDs contain "-" characters, so DO NOT use
-    // split("-").
+    // UUID contains hyphens, so regex is required.
     // ----------------------------------------------------------
 
     const paymentMatch =
-      paymentId.match(/^GL-(.+)-(\d+)$/);
+      merchantPaymentId.match(
+        /^GL-(.+)-(\d+)$/
+      );
 
     if (!paymentMatch) {
       console.error(
         "Invalid GradLink payment ID format:",
-        paymentId
+        merchantPaymentId
       );
 
       return new NextResponse(
@@ -349,7 +383,7 @@ export async function POST(request) {
     );
 
     // ----------------------------------------------------------
-    // 13. IF ALREADY ACTIVE, DO NOT ACTIVATE AGAIN
+    // 13. PREVENT DOUBLE ACTIVATION
     // ----------------------------------------------------------
 
     if (
@@ -371,7 +405,9 @@ export async function POST(request) {
     // ----------------------------------------------------------
 
     const planId =
-      String(subscription.plan || "").toLowerCase();
+      String(
+        subscription.plan || ""
+      ).toLowerCase();
 
     const selectedPlan =
       PLANS[planId];
@@ -394,11 +430,7 @@ export async function POST(request) {
     );
 
     // ----------------------------------------------------------
-    // 15. VERIFY AMOUNT
-    //
-    // The amount stored in the subscription when the
-    // company selected the plan must match what PayFast
-    // says was paid.
+    // 15. VERIFY PAYMENT AMOUNT
     // ----------------------------------------------------------
 
     const expectedAmount =
@@ -466,11 +498,11 @@ export async function POST(request) {
 
     let periodEnd = null;
 
-    // Pay Per Listing is a one-time payment.
+    // Pay Per Listing = one-time payment
     if (planId === "pay_per_listing") {
       periodEnd = null;
     } else {
-      // Annual plans = 1 year
+      // Annual plan
       if (
         selectedPlan.annual ===
         expectedAmount
@@ -485,7 +517,7 @@ export async function POST(request) {
         periodEnd =
           annualEnd.toISOString();
       } else {
-        // Monthly plans = 1 month
+        // Monthly plan
         const monthlyEnd =
           new Date(now);
 
@@ -499,7 +531,7 @@ export async function POST(request) {
     }
 
     // ----------------------------------------------------------
-    // 17. ACTIVATE EXACT SUBSCRIPTION
+    // 17. ACTIVATE SUBSCRIPTION
     // ----------------------------------------------------------
 
     const {
@@ -509,17 +541,27 @@ export async function POST(request) {
       .from("company_subscriptions")
       .update({
         status: "active",
+
         started_at:
           subscription.started_at ||
           periodStart,
+
         current_period_start:
           periodStart,
+
         current_period_end:
           periodEnd,
+
         payment_provider:
           "payfast",
+
+        // Store the ACTUAL PayFast payment ID.
+        // Fall back to merchant ID if PayFast did not
+        // provide pf_payment_id.
         payment_reference:
-          paymentId,
+          payfastPaymentId ||
+          merchantPaymentId,
+
         updated_at:
           periodStart,
       })
@@ -584,8 +626,9 @@ export async function POST(request) {
     );
 
     console.log(
-      "Payment reference:",
-      paymentId
+      "PayFast payment reference:",
+      payfastPaymentId ||
+        merchantPaymentId
     );
 
     console.log(
@@ -596,6 +639,7 @@ export async function POST(request) {
       "OK",
       { status: 200 }
     );
+
   } catch (error) {
     console.error(
       "PayFast notification error:",
