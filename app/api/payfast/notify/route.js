@@ -652,3 +652,14 @@ export async function POST(request) {
     );
   }
 }
+
+// ============================================================
+// GET - BROWSER TEST
+// ============================================================
+
+export async function GET() {
+  return new NextResponse(
+    "GradLink SA PayFast notification endpoint is online.",
+    { status: 200 }
+  );
+}
