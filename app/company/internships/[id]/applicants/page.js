@@ -33,7 +33,10 @@ function getQualificationLevel(value) {
     return 6;
   }
 
-  if (text.includes("honours") || text.includes("honors")) {
+  if (
+    text.includes("honours") ||
+    text.includes("honors")
+  ) {
     return 5;
   }
 
@@ -115,10 +118,14 @@ function qualificationMatches(
   requiredQualification
 ) {
   const applicantLevel =
-    getQualificationLevel(applicantQualification);
+    getQualificationLevel(
+      applicantQualification
+    );
 
   const requiredLevel =
-    getQualificationLevel(requiredQualification);
+    getQualificationLevel(
+      requiredQualification
+    );
 
   if (!requiredQualification) {
     return true;
@@ -132,7 +139,9 @@ function qualificationMatches(
     return normalizeText(
       applicantQualification
     ).includes(
-      normalizeText(requiredQualification)
+      normalizeText(
+        requiredQualification
+      )
     );
   }
 
@@ -143,7 +152,10 @@ function qualificationMatches(
 // MATCH CALCULATION
 // ============================================================
 
-function calculateMatch(application, internship) {
+function calculateMatch(
+  application,
+  internship
+) {
   const applicantQualification =
     application?.qualification || "";
 
@@ -151,10 +163,14 @@ function calculateMatch(application, internship) {
     internship?.qualification || "";
 
   const applicantField =
-    normalizeText(application?.field_of_study);
+    normalizeText(
+      application?.field_of_study
+    );
 
   const requiredField =
-    normalizeText(internship?.field_of_study);
+    normalizeText(
+      internship?.field_of_study
+    );
 
   const applicantSkills =
     parseSkills(application?.skills);
@@ -190,8 +206,12 @@ function calculateMatch(application, internship) {
   ) {
     fieldScore = 35;
   } else if (
-    applicantField.includes(requiredField) ||
-    requiredField.includes(applicantField)
+    applicantField.includes(
+      requiredField
+    ) ||
+    requiredField.includes(
+      applicantField
+    )
   ) {
     fieldScore = 28;
   } else {
@@ -202,9 +222,10 @@ function calculateMatch(application, internship) {
       applicantField.split(" ");
 
     const overlap =
-      requiredWords.filter((word) =>
-        word.length > 2 &&
-        applicantWords.includes(word)
+      requiredWords.filter(
+        (word) =>
+          word.length > 2 &&
+          applicantWords.includes(word)
       );
 
     if (overlap.length > 0) {
@@ -217,27 +238,39 @@ function calculateMatch(application, internship) {
   // ----------------------------------------------------------
 
   let skillsScore = 0;
+
   const matchedSkills = [];
   const missingSkills = [];
 
   if (requiredSkills.length === 0) {
     skillsScore = 30;
   } else {
-    requiredSkills.forEach((requiredSkill) => {
-      const matched =
-        applicantSkills.some(
-          (applicantSkill) =>
-            applicantSkill === requiredSkill ||
-            applicantSkill.includes(requiredSkill) ||
-            requiredSkill.includes(applicantSkill)
-        );
+    requiredSkills.forEach(
+      (requiredSkill) => {
+        const matched =
+          applicantSkills.some(
+            (applicantSkill) =>
+              applicantSkill ===
+                requiredSkill ||
+              applicantSkill.includes(
+                requiredSkill
+              ) ||
+              requiredSkill.includes(
+                applicantSkill
+              )
+          );
 
-      if (matched) {
-        matchedSkills.push(requiredSkill);
-      } else {
-        missingSkills.push(requiredSkill);
+        if (matched) {
+          matchedSkills.push(
+            requiredSkill
+          );
+        } else {
+          missingSkills.push(
+            requiredSkill
+          );
+        }
       }
-    });
+    );
 
     skillsScore =
       Math.round(
@@ -304,7 +337,9 @@ function calculateMatch(application, internship) {
   if (matchedSkills.length > 0) {
     strengths.push(
       `Matches ${matchedSkills.length} required skill${
-        matchedSkills.length === 1 ? "" : "s"
+        matchedSkills.length === 1
+          ? ""
+          : "s"
       }.`
     );
   }
@@ -312,7 +347,9 @@ function calculateMatch(application, internship) {
   if (missingSkills.length > 0) {
     improvements.push(
       `Missing ${missingSkills.length} required skill${
-        missingSkills.length === 1 ? "" : "s"
+        missingSkills.length === 1
+          ? ""
+          : "s"
       }.`
     );
   }
@@ -348,6 +385,7 @@ function calculateMatch(application, internship) {
 
 // ============================================================
 // STORAGE PATH
+// FIXED VERSION
 // ============================================================
 
 function getStoragePath(value) {
@@ -357,8 +395,28 @@ function getStoragePath(value) {
 
   if (!path) return null;
 
-  // Full Supabase storage URL
-  if (path.includes("/storage/v1/object/")) {
+  // ----------------------------------------------------------
+  // Decode URL if necessary
+  // ----------------------------------------------------------
+
+  try {
+    path = decodeURIComponent(path);
+  } catch (error) {
+    console.log(
+      "Storage path decode warning:",
+      error
+    );
+  }
+
+  // ----------------------------------------------------------
+  // FULL SUPABASE STORAGE URL
+  // ----------------------------------------------------------
+
+  if (
+    path.includes(
+      "/storage/v1/object/"
+    )
+  ) {
     const marker =
       "/storage/v1/object/";
 
@@ -366,23 +424,66 @@ function getStoragePath(value) {
       path.split(marker)[1] || "";
 
     path = path
-      .replace(/^sign\/documents\//, "")
-      .replace(/^public\/documents\//, "")
-      .replace(/^authenticated\/documents\//, "")
-      .replace(/^documents\//, "");
+      .replace(
+        /^sign\/documents\//,
+        ""
+      )
+      .replace(
+        /^public\/documents\//,
+        ""
+      )
+      .replace(
+        /^authenticated\/documents\//,
+        ""
+      )
+      .replace(
+        /^documents\//,
+        ""
+      );
   }
 
-  // Another possible full URL format
-  if (path.includes("/documents/")) {
+  // ----------------------------------------------------------
+  // ANOTHER POSSIBLE FULL URL FORMAT
+  // ----------------------------------------------------------
+
+  if (
+    path.includes("/documents/")
+  ) {
     path =
-      path.split("/documents/")[1] || path;
+      path.split("/documents/")[1] ||
+      path;
   }
 
-  // Remove leading slash
-  path = path.replace(/^\/+/, "");
+  // ----------------------------------------------------------
+  // REMOVE QUERY PARAMETERS
+  // ----------------------------------------------------------
 
-  // Remove bucket name if it is still present
-  path = path.replace(/^documents\//, "");
+  path =
+    path.split("?")[0];
+
+  // ----------------------------------------------------------
+  // REMOVE HASH
+  // ----------------------------------------------------------
+
+  path =
+    path.split("#")[0];
+
+  // ----------------------------------------------------------
+  // REMOVE LEADING SLASHES
+  // ----------------------------------------------------------
+
+  path =
+    path.replace(/^\/+/, "");
+
+  // ----------------------------------------------------------
+  // REMOVE BUCKET NAME
+  // ----------------------------------------------------------
+
+  path =
+    path.replace(
+      /^documents\//i,
+      ""
+    );
 
   return path || null;
 }
@@ -410,7 +511,9 @@ function findCV(application) {
 // FIND QUALIFICATION DOCUMENT
 // ============================================================
 
-function findQualificationDocument(application) {
+function findQualificationDocument(
+  application
+) {
   if (!application) return null;
 
   return (
@@ -429,6 +532,7 @@ function findQualificationDocument(application) {
 
 // ============================================================
 // OPEN SUPABASE DOCUMENT
+// FIXED VERSION
 // ============================================================
 
 async function openStorageDocument(
@@ -439,6 +543,7 @@ async function openStorageDocument(
     alert(
       `This applicant has not uploaded a ${documentName}.`
     );
+
     return;
   }
 
@@ -449,6 +554,7 @@ async function openStorageDocument(
     alert(
       `The ${documentName} file path could not be found.`
     );
+
     return;
   }
 
@@ -458,26 +564,41 @@ async function openStorageDocument(
       cleanPath
     );
 
-    const {
-      data,
-      error,
-    } = await supabase.storage
-      .from("documents")
-      .createSignedUrl(
-        cleanPath,
-        600
-      );
+    // --------------------------------------------------------
+    // CREATE 1-HOUR SIGNED URL
+    // --------------------------------------------------------
 
-    if (error) {
+    const {
+      data: signedData,
+      error: signedError,
+    } =
+      await supabase.storage
+        .from("documents")
+        .createSignedUrl(
+          cleanPath,
+          3600
+        );
+
+    // --------------------------------------------------------
+    // SIGNED URL ERROR
+    // --------------------------------------------------------
+
+    if (signedError) {
       console.error(
         "Supabase signed URL error:",
-        error
+        signedError
       );
 
-      throw error;
+      throw signedError;
     }
 
-    if (!data?.signedUrl) {
+    // --------------------------------------------------------
+    // CHECK SIGNED URL
+    // --------------------------------------------------------
+
+    if (
+      !signedData?.signedUrl
+    ) {
       throw new Error(
         `Could not create a secure link for this ${documentName}.`
       );
@@ -487,10 +608,24 @@ async function openStorageDocument(
       `${documentName} signed URL created successfully`
     );
 
-    // Safari/iPhone friendly:
-    // navigate directly to the signed file.
-    window.location.href =
-      data.signedUrl;
+    console.log(
+      "Opening document on device..."
+    );
+
+    // --------------------------------------------------------
+    // IPHONE / SAFARI FRIENDLY
+    // --------------------------------------------------------
+    //
+    // Do NOT use window.open().
+    //
+    // location.assign() performs a normal browser
+    // navigation and avoids popup blocking on iPhone/Safari.
+    //
+    // --------------------------------------------------------
+
+    window.location.assign(
+      signedData.signedUrl
+    );
 
   } catch (error) {
     console.error(
@@ -574,7 +709,8 @@ export default function ApplicantsPage() {
             user,
           },
           error: authError,
-        } = await supabase.auth.getUser();
+        } =
+          await supabase.auth.getUser();
 
         if (authError) {
           throw authError;
@@ -592,11 +728,15 @@ export default function ApplicantsPage() {
         const {
           data: companyData,
           error: companyError,
-        } = await supabase
-          .from("companies")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
+        } =
+          await supabase
+            .from("companies")
+            .select("*")
+            .eq(
+              "user_id",
+              user.id
+            )
+            .maybeSingle();
 
         if (companyError) {
           throw companyError;
@@ -610,7 +750,9 @@ export default function ApplicantsPage() {
 
         if (cancelled) return;
 
-        setCompany(companyData);
+        setCompany(
+          companyData
+        );
 
         // ------------------------------------------------------
         // SUBSCRIPTION
@@ -619,25 +761,27 @@ export default function ApplicantsPage() {
         const {
           data: subscriptionData,
           error: subscriptionError,
-        } = await supabase
-          .from("subscriptions")
-          .select("*")
-          .eq(
-            "company_id",
-            companyData.id
-          )
-          .order(
-            "created_at",
-            {
-              ascending: false,
-            }
-          )
-          .limit(1)
-          .maybeSingle();
+        } =
+          await supabase
+            .from("subscriptions")
+            .select("*")
+            .eq(
+              "company_id",
+              companyData.id
+            )
+            .order(
+              "created_at",
+              {
+                ascending: false,
+              }
+            )
+            .limit(1)
+            .maybeSingle();
 
         if (
           subscriptionError &&
-          subscriptionError.code !== "PGRST116"
+          subscriptionError.code !==
+            "PGRST116"
         ) {
           console.error(
             "Subscription error:",
@@ -647,11 +791,14 @@ export default function ApplicantsPage() {
 
         if (!cancelled) {
           setSubscription(
-            subscriptionData || null
+            subscriptionData ||
+              null
           );
         }
 
-        setPremiumLoading(false);
+        setPremiumLoading(
+          false
+        );
 
         // ------------------------------------------------------
         // INTERNSHIP
@@ -660,11 +807,15 @@ export default function ApplicantsPage() {
         const {
           data: internshipData,
           error: internshipError,
-        } = await supabase
-          .from("internships")
-          .select("*")
-          .eq("id", internshipId)
-          .maybeSingle();
+        } =
+          await supabase
+            .from("internships")
+            .select("*")
+            .eq(
+              "id",
+              internshipId
+            )
+            .maybeSingle();
 
         if (internshipError) {
           throw internshipError;
@@ -679,6 +830,7 @@ export default function ApplicantsPage() {
         // Security check:
         // Make sure this internship belongs
         // to the logged-in company.
+
         if (
           internshipData.company_name !==
           companyData.company_name
@@ -701,19 +853,20 @@ export default function ApplicantsPage() {
         const {
           data: applicationData,
           error: applicationError,
-        } = await supabase
-          .from("applications")
-          .select("*")
-          .eq(
-            "internship_id",
-            internshipId
-          )
-          .order(
-            "created_at",
-            {
-              ascending: false,
-            }
-          );
+        } =
+          await supabase
+            .from("applications")
+            .select("*")
+            .eq(
+              "internship_id",
+              internshipId
+            )
+            .order(
+              "created_at",
+              {
+                ascending: false,
+              }
+            );
 
         if (applicationError) {
           throw applicationError;
@@ -726,31 +879,33 @@ export default function ApplicantsPage() {
         // LOAD GRADUATE PROFILES
         // ------------------------------------------------------
 
-        const graduateIds =
-          [
-            ...new Set(
-              rawApplications
-                .map(
-                  (application) =>
-                    application.graduate_id
-                )
-                .filter(Boolean)
-            ),
-          ];
+        const graduateIds = [
+          ...new Set(
+            rawApplications
+              .map(
+                (application) =>
+                  application.graduate_id
+              )
+              .filter(Boolean)
+          ),
+        ];
 
         let graduates = [];
 
-        if (graduateIds.length > 0) {
+        if (
+          graduateIds.length > 0
+        ) {
           const {
             data: graduateData,
             error: graduateError,
-          } = await supabase
-            .from("graduates")
-            .select("*")
-            .in(
-              "user_id",
-              graduateIds
-            );
+          } =
+            await supabase
+              .from("graduates")
+              .select("*")
+              .in(
+                "user_id",
+                graduateIds
+              );
 
           if (graduateError) {
             console.error(
@@ -783,7 +938,8 @@ export default function ApplicantsPage() {
               };
 
               // Keep document paths from either
-              // the application or graduate profile.
+              // application or graduate profile.
+
               if (
                 !merged.cv_url &&
                 graduate?.cv_url
@@ -819,6 +975,7 @@ export default function ApplicantsPage() {
           );
 
         // Highest match first
+
         mergedApplications.sort(
           (a, b) =>
             (b.matchScore || 0) -
@@ -845,7 +1002,9 @@ export default function ApplicantsPage() {
       } finally {
         if (!cancelled) {
           setLoading(false);
-          setPremiumLoading(false);
+          setPremiumLoading(
+            false
+          );
         }
       }
     }
@@ -891,15 +1050,16 @@ export default function ApplicantsPage() {
     try {
       const {
         error,
-      } = await supabase
-        .from("applications")
-        .update({
-          status,
-        })
-        .eq(
-          "id",
-          applicationId
-        );
+      } =
+        await supabase
+          .from("applications")
+          .update({
+            status,
+          })
+          .eq(
+            "id",
+            applicationId
+          );
 
       if (error) {
         throw error;
@@ -977,8 +1137,10 @@ export default function ApplicantsPage() {
           background:
             "#f4f7fb",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          alignItems:
+            "center",
+          justifyContent:
+            "center",
           padding: 24,
           fontFamily:
             "Arial, sans-serif",
@@ -986,10 +1148,12 @@ export default function ApplicantsPage() {
       >
         <div
           style={{
-            background: "#ffffff",
+            background:
+              "#ffffff",
             borderRadius: 20,
             padding: 32,
-            textAlign: "center",
+            textAlign:
+              "center",
             boxShadow:
               "0 10px 30px rgba(15, 23, 42, 0.08)",
             width: "100%",
@@ -1052,12 +1216,14 @@ export default function ApplicantsPage() {
             maxWidth: 760,
             margin:
               "60px auto",
-            background: "#ffffff",
+            background:
+              "#ffffff",
             borderRadius: 22,
             padding: 30,
             boxShadow:
               "0 10px 30px rgba(15, 23, 42, 0.08)",
-            textAlign: "center",
+            textAlign:
+              "center",
           }}
         >
           <div
@@ -1104,7 +1270,8 @@ export default function ApplicantsPage() {
               borderRadius: 10,
               background:
                 "#174ea6",
-              color: "#ffffff",
+              color:
+                "#ffffff",
               textDecoration:
                 "none",
               fontWeight: 700,
@@ -1124,7 +1291,8 @@ export default function ApplicantsPage() {
     applications.filter(
       (application) =>
         String(
-          application.status || ""
+          application.status ||
+            ""
         ).toLowerCase() ===
         "shortlisted"
     ).length;
@@ -1133,7 +1301,8 @@ export default function ApplicantsPage() {
     applications.filter(
       (application) =>
         String(
-          application.status || ""
+          application.status ||
+            ""
         ).toLowerCase() ===
         "rejected"
     ).length;
@@ -1151,7 +1320,8 @@ export default function ApplicantsPage() {
           "#f4f7fb",
         fontFamily:
           "Arial, sans-serif",
-        color: "#102a43",
+        color:
+          "#102a43",
       }}
     >
       {/* ======================================================
@@ -1172,7 +1342,8 @@ export default function ApplicantsPage() {
             margin: "0 auto",
             padding:
               "18px 20px",
-            display: "flex",
+            display:
+              "flex",
             alignItems:
               "center",
             justifyContent:
@@ -1189,7 +1360,8 @@ export default function ApplicantsPage() {
                 fontWeight: 800,
                 letterSpacing:
                   "1.5px",
-                color: "#174ea6",
+                color:
+                  "#174ea6",
                 marginBottom: 5,
               }}
             >
@@ -1225,7 +1397,8 @@ export default function ApplicantsPage() {
               borderRadius: 10,
               background:
                 "#ffffff",
-              color: "#174ea6",
+              color:
+                "#174ea6",
               textDecoration:
                 "none",
               fontWeight: 700,
@@ -1257,7 +1430,8 @@ export default function ApplicantsPage() {
             borderRadius: 22,
             padding:
               "28px 24px",
-            color: "#ffffff",
+            color:
+              "#ffffff",
             marginBottom: 20,
             boxShadow:
               "0 12px 30px rgba(23, 78, 166, 0.18)",
@@ -1308,7 +1482,8 @@ export default function ApplicantsPage() {
 
         <section
           style={{
-            display: "grid",
+            display:
+              "grid",
             gridTemplateColumns:
               "repeat(auto-fit, minmax(170px, 1fr))",
             gap: 14,
@@ -1332,13 +1507,17 @@ export default function ApplicantsPage() {
           <SummaryCard
             icon="⭐"
             title="Shortlisted"
-            value={shortlisted}
+            value={
+              shortlisted
+            }
           />
 
           <SummaryCard
             icon="✕"
             title="Rejected"
-            value={rejected}
+            value={
+              rejected
+            }
           />
         </section>
 
@@ -1371,7 +1550,8 @@ export default function ApplicantsPage() {
 
           <div
             style={{
-              display: "grid",
+              display:
+                "grid",
               gridTemplateColumns:
                 "repeat(auto-fit, minmax(220px, 1fr))",
               gap: 16,
@@ -1439,7 +1619,7 @@ export default function ApplicantsPage() {
           }
           onUpgrade={() =>
             router.push(
-              "/company/subscription"
+              "/company-pricing"
             )
           }
         />
@@ -1451,7 +1631,8 @@ export default function ApplicantsPage() {
         <section>
           <div
             style={{
-              display: "flex",
+              display:
+                "flex",
               alignItems:
                 "center",
               justifyContent:
@@ -1476,7 +1657,8 @@ export default function ApplicantsPage() {
                 style={{
                   margin:
                     "5px 0 0",
-                  color: "#64748b",
+                  color:
+                    "#64748b",
                 }}
               >
                 Review candidates who applied
@@ -1522,7 +1704,8 @@ export default function ApplicantsPage() {
               <p
                 style={{
                   margin: 0,
-                  color: "#64748b",
+                  color:
+                    "#64748b",
                   lineHeight: 1.6,
                 }}
               >
@@ -1534,7 +1717,8 @@ export default function ApplicantsPage() {
           ) : (
             <div
               style={{
-                display: "grid",
+                display:
+                  "grid",
                 gap: 18,
               }}
             >
@@ -1591,7 +1775,8 @@ function ApplicantCard({
   isPremium,
 }) {
   const matchDetails =
-    application?.matchDetails || {};
+    application?.matchDetails ||
+    {};
 
   const score =
     application?.matchScore ?? 0;
@@ -1602,7 +1787,8 @@ function ApplicantCard({
 
   const status =
     String(
-      application?.status || "pending"
+      application?.status ||
+        "pending"
     ).toLowerCase();
 
   const cv =
@@ -1617,7 +1803,9 @@ function ApplicantCard({
     Boolean(cv);
 
   const hasQualification =
-    Boolean(qualification);
+    Boolean(
+      qualification
+    );
 
   const fullName =
     application?.full_name ||
@@ -1651,10 +1839,13 @@ function ApplicantCard({
   return (
     <article
       style={{
-        background: "#ffffff",
-        border: "1px solid #e2e8f0",
+        background:
+          "#ffffff",
+        border:
+          "1px solid #e2e8f0",
         borderRadius: 20,
-        overflow: "hidden",
+        overflow:
+          "hidden",
         boxShadow:
           "0 7px 22px rgba(15, 23, 42, 0.06)",
       }}
@@ -1665,24 +1856,31 @@ function ApplicantCard({
 
       <div
         style={{
-          padding: "20px 20px 18px",
+          padding:
+            "20px 20px 18px",
           borderBottom:
             "1px solid #edf1f5",
         }}
       >
         <div
           style={{
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
+            display:
+              "flex",
+            alignItems:
+              "flex-start",
+            justifyContent:
+              "space-between",
             gap: 16,
-            flexWrap: "wrap",
+            flexWrap:
+              "wrap",
           }}
         >
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
+              display:
+                "flex",
+              alignItems:
+                "center",
               gap: 13,
               minWidth: 0,
             }}
@@ -1691,19 +1889,26 @@ function ApplicantCard({
               style={{
                 width: 50,
                 height: 50,
-                borderRadius: "50%",
+                borderRadius:
+                  "50%",
                 background:
                   "linear-gradient(135deg, #174ea6, #3978cf)",
-                color: "#ffffff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
+                color:
+                  "#ffffff",
+                display:
+                  "flex",
+                alignItems:
+                  "center",
+                justifyContent:
+                  "center",
                 fontSize: 20,
                 fontWeight: 800,
                 flexShrink: 0,
               }}
             >
-              {getInitials(fullName)}
+              {getInitials(
+                fullName
+              )}
             </div>
 
             <div
@@ -1714,20 +1919,23 @@ function ApplicantCard({
               <div
                 style={{
                   fontSize: 11,
-                  color: "#94a3b8",
+                  color:
+                    "#94a3b8",
                   fontWeight: 800,
                   letterSpacing:
                     "0.8px",
                   marginBottom: 4,
                 }}
               >
-                APPLICANT #{index + 1}
+                APPLICANT #
+                {index + 1}
               </div>
 
               <h3
                 style={{
                   margin: 0,
-                  color: "#102a43",
+                  color:
+                    "#102a43",
                   fontSize: 21,
                   lineHeight: 1.2,
                   overflowWrap:
@@ -1741,7 +1949,8 @@ function ApplicantCard({
                 style={{
                   margin:
                     "5px 0 0",
-                  color: "#64748b",
+                  color:
+                    "#64748b",
                   fontSize: 14,
                   overflowWrap:
                     "anywhere",
@@ -1754,18 +1963,24 @@ function ApplicantCard({
 
           <div
             style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
+              display:
+                "flex",
+              flexDirection:
+                "column",
+              alignItems:
+                "flex-end",
               gap: 8,
             }}
           >
             <div
               style={{
-                display: "flex",
-                alignItems: "center",
+                display:
+                  "flex",
+                alignItems:
+                  "center",
                 gap: 8,
-                flexWrap: "wrap",
+                flexWrap:
+                  "wrap",
                 justifyContent:
                   "flex-end",
               }}
@@ -1774,7 +1989,8 @@ function ApplicantCard({
                 style={{
                   padding:
                     "6px 10px",
-                  borderRadius: 999,
+                  borderRadius:
+                    999,
                   background:
                     statusConfig.background,
                   color:
@@ -1792,7 +2008,8 @@ function ApplicantCard({
                 style={{
                   padding:
                     "6px 10px",
-                  borderRadius: 999,
+                  borderRadius:
+                    999,
                   background:
                     getMatchBackground(
                       score
@@ -1826,7 +2043,8 @@ function ApplicantCard({
             <div
               style={{
                 fontSize: 11,
-                color: "#94a3b8",
+                color:
+                  "#94a3b8",
               }}
             >
               AI Match
@@ -1846,7 +2064,8 @@ function ApplicantCard({
       >
         <div
           style={{
-            display: "grid",
+            display:
+              "grid",
             gridTemplateColumns:
               "repeat(auto-fit, minmax(210px, 1fr))",
             gap: 14,
@@ -1899,7 +2118,8 @@ function ApplicantCard({
             style={{
               fontSize: 12,
               fontWeight: 800,
-              color: "#64748b",
+              color:
+                "#64748b",
               textTransform:
                 "uppercase",
               letterSpacing:
@@ -1913,8 +2133,10 @@ function ApplicantCard({
           {skills.length > 0 ? (
             <div
               style={{
-                display: "flex",
-                flexWrap: "wrap",
+                display:
+                  "flex",
+                flexWrap:
+                  "wrap",
                 gap: 7,
               }}
             >
@@ -1948,7 +2170,8 @@ function ApplicantCard({
           ) : (
             <span
               style={{
-                color: "#94a3b8",
+                color:
+                  "#94a3b8",
                 fontSize: 13,
               }}
             >
@@ -1974,8 +2197,10 @@ function ApplicantCard({
         >
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
+              display:
+                "flex",
+              alignItems:
+                "center",
               justifyContent:
                 "space-between",
               gap: 12,
@@ -2023,14 +2248,13 @@ function ApplicantCard({
             </div>
           </div>
 
-          {/* Match bar */}
-
           <div
             style={{
               height: 8,
               background:
                 "#e2e8f0",
-              borderRadius: 999,
+              borderRadius:
+                999,
               overflow:
                 "hidden",
               marginBottom: 15,
@@ -2045,7 +2269,8 @@ function ApplicantCard({
                     score
                   )
                 )}%`,
-                height: "100%",
+                height:
+                  "100%",
                 background:
                   getMatchColor(
                     score
@@ -2074,7 +2299,8 @@ function ApplicantCard({
 
           <div
             style={{
-              display: "grid",
+              display:
+                "grid",
               gridTemplateColumns:
                 "repeat(auto-fit, minmax(180px, 1fr))",
               gap: 10,
@@ -2236,7 +2462,8 @@ function ApplicantCard({
 
         <div
           style={{
-            display: "grid",
+            display:
+              "grid",
             gridTemplateColumns:
               "repeat(auto-fit, minmax(210px, 1fr))",
             gap: 10,
@@ -2271,12 +2498,12 @@ function ApplicantCard({
                   ? "#174ea6"
                   : "#9aa5b1"
               ),
-              cursor: hasCV
-                ? "pointer"
-                : "not-allowed",
-              opacity: hasCV
-                ? 1
-                : 0.7,
+              cursor:
+                hasCV
+                  ? "pointer"
+                  : "not-allowed",
+              opacity:
+                hasCV ? 1 : 0.7,
             }}
           >
             📄 Review CV
@@ -2366,7 +2593,8 @@ function ApplicantCard({
                   "1px solid #bbf7d0",
                 borderRadius: 13,
                 padding: 12,
-                display: "flex",
+                display:
+                  "flex",
                 alignItems:
                   "flex-start",
                 gap: 10,
@@ -2417,7 +2645,8 @@ function ApplicantCard({
                   "1px solid #e2e8f0",
                 borderRadius: 13,
                 padding: 12,
-                display: "flex",
+                display:
+                  "flex",
                 alignItems:
                   "flex-start",
                 gap: 10,
@@ -2490,7 +2719,8 @@ function ApplicantCard({
 
           <div
             style={{
-              display: "grid",
+              display:
+                "grid",
               gridTemplateColumns:
                 "repeat(auto-fit, minmax(150px, 1fr))",
               gap: 9,
@@ -2601,8 +2831,10 @@ function SummaryCard({
     >
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
+          display:
+            "flex",
+          alignItems:
+            "center",
           justifyContent:
             "space-between",
           gap: 10,
@@ -2640,7 +2872,8 @@ function SummaryCard({
             borderRadius: 12,
             background:
               "#eef5ff",
-            display: "flex",
+            display:
+              "flex",
             alignItems:
               "center",
             justifyContent:
@@ -2664,7 +2897,8 @@ function Detail({
       <div
         style={{
           fontSize: 11,
-          color: "#94a3b8",
+          color:
+            "#94a3b8",
           fontWeight: 800,
           textTransform:
             "uppercase",
@@ -2678,14 +2912,16 @@ function Detail({
 
       <div
         style={{
-          color: "#334155",
+          color:
+            "#334155",
           fontSize: 14,
           lineHeight: 1.5,
           overflowWrap:
             "anywhere",
         }}
       >
-        {value || "Not provided"}
+        {value ||
+          "Not provided"}
       </div>
     </div>
   );
@@ -2709,7 +2945,8 @@ function InfoBox({
     >
       <div
         style={{
-          display: "flex",
+          display:
+            "flex",
           alignItems:
             "center",
           gap: 7,
@@ -2751,7 +2988,8 @@ function InfoBox({
             "anywhere",
         }}
       >
-        {value || "Not provided"}
+        {value ||
+          "Not provided"}
       </div>
     </div>
   );
@@ -2783,7 +3021,8 @@ function MatchScore({
     >
       <div
         style={{
-          display: "flex",
+          display:
+            "flex",
           justifyContent:
             "space-between",
           gap: 8,
@@ -2818,7 +3057,8 @@ function MatchScore({
           height: 5,
           background:
             "#e2e8f0",
-          borderRadius: 999,
+          borderRadius:
+            999,
           overflow:
             "hidden",
         }}
@@ -2832,7 +3072,8 @@ function MatchScore({
                 percentage
               )
             )}%`,
-            height: "100%",
+            height:
+              "100%",
             background:
               "#174ea6",
             borderRadius:
@@ -2864,7 +3105,8 @@ function PremiumFeature({
           borderRadius: 18,
           padding: 18,
           marginBottom: 24,
-          display: "flex",
+          display:
+            "flex",
           alignItems:
             "center",
           justifyContent:
@@ -2876,7 +3118,8 @@ function PremiumFeature({
       >
         <div
           style={{
-            display: "flex",
+            display:
+              "flex",
             alignItems:
               "center",
             gap: 12,
@@ -2889,7 +3132,8 @@ function PremiumFeature({
               borderRadius: 12,
               background:
                 "#ffffff",
-              display: "flex",
+              display:
+                "flex",
               alignItems:
                 "center",
               justifyContent:
@@ -2939,8 +3183,10 @@ function PremiumFeature({
         borderRadius: 18,
         padding: 20,
         marginBottom: 24,
-        color: "#ffffff",
-        display: "flex",
+        color:
+          "#ffffff",
+        display:
+          "flex",
         alignItems:
           "center",
         justifyContent:
@@ -2954,7 +3200,8 @@ function PremiumFeature({
     >
       <div
         style={{
-          display: "flex",
+          display:
+            "flex",
           alignItems:
             "center",
           gap: 13,
@@ -2967,7 +3214,8 @@ function PremiumFeature({
             borderRadius: 13,
             background:
               "rgba(255,255,255,0.12)",
-            display: "flex",
+            display:
+              "flex",
             alignItems:
               "center",
             justifyContent:
@@ -3023,7 +3271,7 @@ function PremiumFeature({
             "nowrap",
         }}
       >
-        Upgrade
+        View Plans
       </button>
     </section>
   );
@@ -3033,9 +3281,12 @@ function PremiumFeature({
 // STATUS CONFIG
 // ============================================================
 
-function getStatusConfig(status) {
+function getStatusConfig(
+  status
+) {
   if (
-    status === "shortlisted"
+    status ===
+    "shortlisted"
   ) {
     return {
       background:
@@ -3046,7 +3297,8 @@ function getStatusConfig(status) {
   }
 
   if (
-    status === "rejected"
+    status ===
+    "rejected"
   ) {
     return {
       background:
@@ -3084,7 +3336,9 @@ function getMatchColor(score) {
   return "#b91c1c";
 }
 
-function getMatchBackground(score) {
+function getMatchBackground(
+  score
+) {
   if (score >= 85) {
     return "#ecfdf3";
   }
@@ -3114,23 +3368,28 @@ function actionButton(
       "0 13px",
     borderRadius: 10,
     border:
-      background === "#ffffff"
+      background ===
+      "#ffffff"
         ? "1px solid #cbd5e1"
         : "none",
     background,
     color:
-      background === "#ffffff"
+      background ===
+      "#ffffff"
         ? "#334155"
         : "#ffffff",
     fontSize: 13,
     fontWeight: 800,
-    display: "inline-flex",
+    display:
+      "inline-flex",
     alignItems:
       "center",
     justifyContent:
       "center",
-    textAlign: "center",
-    cursor: "pointer",
+    textAlign:
+      "center",
+    cursor:
+      "pointer",
     transition:
       "all 0.15s ease",
     boxSizing:
@@ -3142,18 +3401,24 @@ function actionButton(
 // INITIALS
 // ============================================================
 
-function getInitials(name) {
+function getInitials(
+  name
+) {
   const words =
     String(name || "")
       .trim()
       .split(/\s+/)
       .filter(Boolean);
 
-  if (words.length === 0) {
+  if (
+    words.length === 0
+  ) {
     return "G";
   }
 
-  if (words.length === 1) {
+  if (
+    words.length === 1
+  ) {
     return words[0]
       .substring(0, 2)
       .toUpperCase();
@@ -3161,7 +3426,9 @@ function getInitials(name) {
 
   return (
     words[0][0] +
-    words[words.length - 1][0]
+    words[
+      words.length - 1
+    ][0]
   ).toUpperCase();
 }
 
@@ -3169,7 +3436,9 @@ function getInitials(name) {
 // DATE
 // ============================================================
 
-function formatDate(value) {
+function formatDate(
+  value
+) {
   if (!value) {
     return "Not provided";
   }
