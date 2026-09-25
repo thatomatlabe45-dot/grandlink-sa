@@ -2,25 +2,104 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+const serviceRoleKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !serviceRoleKey) {
+  console.error(
+    "Supabase server environment variables are missing."
+  );
+}
+
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  supabaseUrl,
+  serviceRoleKey
 );
+
+// ============================================================
+// PLAN PRICES
+// ============================================================
+
+const PLANS = {
+  starter: {
+    monthly: 500,
+    annual: 5000,
+  },
+
+  professional: {
+    monthly: 950,
+    annual: 9500,
+  },
+
+  enterprise: {
+    monthly: 1500,
+    annual: 15000,
+  },
+
+  pay_per_listing: {
+    listing: 250,
+  },
+};
+
+// ============================================================
+// POST
+// ============================================================
 
 export async function POST(request) {
   try {
     // ----------------------------------------------------------
-    // 1. Receive PayFast notification
+    // 1. CHECK SERVER CONFIGURATION
     // ----------------------------------------------------------
 
-    const rawBody = await request.text();
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error(
+        "Missing Supabase server environment variables."
+      );
 
-    const params = new URLSearchParams(rawBody);
+      return new NextResponse(
+        "Server configuration error",
+        { status: 500 }
+      );
+    }
+
+    const merchantId =
+      process.env.PAYFAST_MERCHANT_ID;
+
+    const passphrase =
+      process.env.PAYFAST_PASSPHRASE;
+
+    if (!merchantId || !passphrase) {
+      console.error(
+        "PayFast environment variables are missing."
+      );
+
+      return new NextResponse(
+        "PayFast configuration error",
+        { status: 500 }
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 2. RECEIVE PAYFAST NOTIFICATION
+    // ----------------------------------------------------------
+
+    const rawBody =
+      await request.text();
+
+    const params =
+      new URLSearchParams(rawBody);
 
     const receivedSignature =
       params.get("signature");
 
     if (!receivedSignature) {
+      console.error(
+        "PayFast notification has no signature."
+      );
+
       return new NextResponse(
         "Missing signature",
         { status: 400 }
@@ -28,7 +107,7 @@ export async function POST(request) {
     }
 
     // ----------------------------------------------------------
-    // 2. Rebuild the PayFast signature
+    // 3. REBUILD PAYFAST SIGNATURE
     // ----------------------------------------------------------
 
     const paymentData = {};
@@ -39,31 +118,26 @@ export async function POST(request) {
       }
     }
 
-    const signatureString = Object.entries(
-      paymentData
-    )
-      .filter(
-        ([key, value]) =>
-          value !== undefined &&
-          value !== null &&
-          value !== ""
-      )
-      .map(
-        ([key, value]) =>
-          `${key}=${encodeURIComponent(
-            String(value).trim()
-          )}`
-      )
-      .join("&");
+    const signatureString =
+      Object.entries(paymentData)
+        .filter(
+          ([key, value]) =>
+            value !== undefined &&
+            value !== null &&
+            value !== ""
+        )
+        .map(
+          ([key, value]) =>
+            `${key}=${encodeURIComponent(
+              String(value).trim()
+            )}`
+        )
+        .join("&");
 
-    const passphrase =
-      process.env.PAYFAST_PASSPHRASE;
-
-    const stringToHash = passphrase
-      ? `${signatureString}&passphrase=${encodeURIComponent(
-          passphrase.trim()
-        )}`
-      : signatureString;
+    const stringToHash =
+      `${signatureString}&passphrase=${encodeURIComponent(
+        passphrase.trim()
+      )}`;
 
     const calculatedSignature =
       crypto
@@ -72,12 +146,12 @@ export async function POST(request) {
         .digest("hex");
 
     // ----------------------------------------------------------
-    // 3. Compare signatures
+    // 4. VERIFY SIGNATURE
     // ----------------------------------------------------------
 
     if (
-      calculatedSignature !==
-      receivedSignature
+      calculatedSignature.toLowerCase() !==
+      receivedSignature.toLowerCase()
     ) {
       console.error(
         "PayFast signature verification failed."
@@ -90,13 +164,13 @@ export async function POST(request) {
     }
 
     // ----------------------------------------------------------
-    // 4. Read payment information
+    // 5. READ PAYMENT INFORMATION
     // ----------------------------------------------------------
 
     const paymentStatus =
       params.get("payment_status");
 
-    const merchantId =
+    const receivedMerchantId =
       params.get("merchant_id");
 
     const paymentId =
@@ -105,19 +179,19 @@ export async function POST(request) {
     const amountGross =
       params.get("amount_gross");
 
-    const emailAddress =
-      params.get("email_address");
-
     const itemName =
       params.get("item_name");
 
+    const emailAddress =
+      params.get("email_address");
+
     // ----------------------------------------------------------
-    // 5. Verify merchant ID
+    // 6. VERIFY MERCHANT
     // ----------------------------------------------------------
 
     if (
-      merchantId !==
-      process.env.PAYFAST_MERCHANT_ID
+      receivedMerchantId !==
+      merchantId
     ) {
       console.error(
         "PayFast merchant ID mismatch."
@@ -130,72 +204,103 @@ export async function POST(request) {
     }
 
     // ----------------------------------------------------------
-    // 6. Only successful payments can activate
+    // 7. PAYMENT ID REQUIRED
     // ----------------------------------------------------------
-
-    if (paymentStatus !== "COMPLETE") {
-      console.log(
-        "PayFast payment not complete:",
-        paymentStatus
-      );
-
-      return new NextResponse("OK", {
-        status: 200,
-      });
-    }
-
-    // ----------------------------------------------------------
-    // 7. Find the subscription
-    // ----------------------------------------------------------
-
-    /*
-     * Our payment ID is generated by create-payment
-     * in this format:
-     *
-     * GL-xxxxxxxxxxxxx
-     *
-     * The company subscription was created as
-     * inactive before PayFast checkout.
-     */
 
     if (!paymentId) {
+      console.error(
+        "PayFast payment ID is missing."
+      );
+
       return new NextResponse(
         "Missing payment ID",
         { status: 400 }
       );
     }
 
+    // ----------------------------------------------------------
+    // 8. ONLY COMPLETE PAYMENTS CAN ACTIVATE
+    // ----------------------------------------------------------
+
+    if (
+      paymentStatus !== "COMPLETE"
+    ) {
+      console.log(
+        "PayFast payment is not complete:",
+        paymentStatus
+      );
+
+      return new NextResponse(
+        "OK",
+        { status: 200 }
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 9. EXTRACT SUBSCRIPTION ID
+    // ----------------------------------------------------------
+
     /*
-     * Extract the timestamp from:
+     * Payment ID format created by create-payment:
      *
-     * GL-1750000000000
+     * GL-SUBSCRIPTION_ID-TIMESTAMP
+     *
+     * Example:
+     *
+     * GL-12345-1750000000000
      */
 
-    const timestamp =
-      paymentId.replace("GL-", "");
+    if (!paymentId.startsWith("GL-")) {
+      console.error(
+        "Invalid GradLink payment ID."
+      );
 
-    if (!timestamp) {
       return new NextResponse(
         "Invalid payment ID",
         { status: 400 }
       );
     }
 
+    const paymentParts =
+      paymentId.split("-");
+
+    if (paymentParts.length < 3) {
+      console.error(
+        "Invalid GradLink payment ID format."
+      );
+
+      return new NextResponse(
+        "Invalid payment ID",
+        { status: 400 }
+      );
+    }
+
+    const subscriptionId =
+      paymentParts[1];
+
+    if (!subscriptionId) {
+      console.error(
+        "Subscription ID could not be extracted."
+      );
+
+      return new NextResponse(
+        "Invalid subscription ID",
+        { status: 400 }
+      );
+    }
+
     // ----------------------------------------------------------
-    // 8. Find recent inactive subscriptions
+    // 10. FIND EXACT SUBSCRIPTION
     // ----------------------------------------------------------
 
     const {
-      data: subscriptions,
+      data: subscription,
       error: subscriptionError,
     } = await supabase
       .from("company_subscriptions")
       .select("*")
-      .eq("status", "inactive")
-      .order("created_at", {
-        ascending: false,
-      })
-      .limit(20);
+      .eq("id", subscriptionId)
+      .maybeSingle();
 
     if (subscriptionError) {
       console.error(
@@ -209,12 +314,10 @@ export async function POST(request) {
       );
     }
 
-    if (
-      !subscriptions ||
-      subscriptions.length === 0
-    ) {
+    if (!subscription) {
       console.error(
-        "No inactive subscription found."
+        "Subscription not found:",
+        subscriptionId
       );
 
       return new NextResponse(
@@ -224,119 +327,127 @@ export async function POST(request) {
     }
 
     // ----------------------------------------------------------
-    // 9. Determine the plan from PayFast item name
+    // 11. PREVENT DUPLICATE ACTIVATION
     // ----------------------------------------------------------
 
-    let planId = null;
-
     if (
-      itemName &&
-      itemName
-        .toLowerCase()
-        .includes("starter")
+      String(subscription.status).toLowerCase() ===
+      "active"
     ) {
-      planId = "starter";
-    }
-
-    if (
-      itemName &&
-      itemName
-        .toLowerCase()
-        .includes("professional")
-    ) {
-      planId = "professional";
-    }
-
-    if (
-      itemName &&
-      itemName
-        .toLowerCase()
-        .includes("enterprise")
-    ) {
-      planId = "enterprise";
-    }
-
-    if (!planId) {
-      console.error(
-        "Could not identify GradLink plan."
+      console.log(
+        "Subscription already active:",
+        subscription.id
       );
 
       return new NextResponse(
-        "Plan not identified",
+        "OK",
+        { status: 200 }
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 12. IDENTIFY PLAN
+    // ----------------------------------------------------------
+
+    const planId =
+      String(subscription.plan || "")
+        .toLowerCase();
+
+    const plan =
+      PLANS[planId];
+
+    if (!plan) {
+      console.error(
+        "Unknown subscription plan:",
+        planId
+      );
+
+      return new NextResponse(
+        "Invalid plan",
         { status: 400 }
       );
     }
 
     // ----------------------------------------------------------
-    // 10. Find matching subscription
+    // 13. DETERMINE EXPECTED AMOUNT
     // ----------------------------------------------------------
 
-    const subscription =
-      subscriptions.find(
-        (item) => item.plan === planId
+    let expectedAmount = null;
+
+    const subscriptionPrice =
+      Number(
+        subscription.monthly_price
       );
 
-    if (!subscription) {
+    /*
+     * monthly_price stores the actual amount
+     * selected on the pricing/payment page.
+     *
+     * This lets us verify the exact amount
+     * associated with this subscription.
+     */
+
+    if (
+      Number.isFinite(subscriptionPrice) &&
+      subscriptionPrice > 0
+    ) {
+      expectedAmount =
+        subscriptionPrice;
+    }
+
+    if (expectedAmount === null) {
       console.error(
-        "Matching subscription not found."
+        "Subscription has no valid payment amount."
       );
 
       return new NextResponse(
-        "Matching subscription not found",
-        { status: 404 }
+        "Invalid subscription amount",
+        { status: 400 }
       );
     }
 
     // ----------------------------------------------------------
-    // 11. Prevent duplicate processing
+    // 14. VERIFY PAYMENT AMOUNT
     // ----------------------------------------------------------
+
+    const paidAmount =
+      Number(amountGross);
 
     if (
-      subscription.status?.toLowerCase() ===
-      "active"
+      !Number.isFinite(paidAmount)
     ) {
-      return new NextResponse("OK", {
-        status: 200,
-      });
+      console.error(
+        "Invalid PayFast payment amount."
+      );
+
+      return new NextResponse(
+        "Invalid payment amount",
+        { status: 400 }
+      );
     }
 
-    // ----------------------------------------------------------
-    // 12. Verify payment amount
-    // ----------------------------------------------------------
+    /*
+     * Compare to cents to avoid floating-point
+     * problems.
+     */
 
-    const paidAmount = Number(
-      amountGross
-    );
+    const paidCents =
+      Math.round(paidAmount * 100);
 
-    const expectedMonthlyPrices = {
-      starter: 500,
-      professional: 950,
-      enterprise: 1500,
-    };
+    const expectedCents =
+      Math.round(expectedAmount * 100);
 
-    const expectedMonthly =
-      expectedMonthlyPrices[planId];
-
-    const expectedMonthlyAmount =
-      Number(expectedMonthly);
-
-    const expectedAnnualAmount =
-      Number(expectedMonthly * 10);
-
-    const validAmount =
-      paidAmount ===
-        expectedMonthlyAmount ||
-      paidAmount ===
-        expectedAnnualAmount;
-
-    if (!validAmount) {
+    if (
+      paidCents !== expectedCents
+    ) {
       console.error(
         "Payment amount mismatch.",
         {
+          paymentId,
+          subscriptionId,
           planId,
           paidAmount,
-          expectedMonthlyAmount,
-          expectedAnnualAmount,
+          expectedAmount,
         }
       );
 
@@ -347,21 +458,84 @@ export async function POST(request) {
     }
 
     // ----------------------------------------------------------
-    // 13. Activate subscription
+    // 15. DETERMINE PERIOD
     // ----------------------------------------------------------
 
-    const { error: updateError } =
-      await supabase
-        .from("company_subscriptions")
-        .update({
-          status: "active",
-          payment_provider: "payfast",
-          payment_reference: paymentId,
-          updated_at:
-            new Date().toISOString(),
-        })
-        .eq("company_id", subscription.company_id)
-        .eq("status", "inactive");
+    const now =
+      new Date();
+
+    const periodStart =
+      now.toISOString();
+
+    let periodEnd =
+      new Date(now);
+
+    /*
+     * Annual plans:
+     * 12 months access.
+     *
+     * Monthly plans:
+     * 1 month access.
+     *
+     * Pay per listing:
+     * no subscription period is required.
+     */
+
+    if (
+      planId === "pay_per_listing"
+    ) {
+      periodEnd = null;
+    } else if (
+      expectedAmount ===
+      plan.annual
+    ) {
+      periodEnd.setFullYear(
+        periodEnd.getFullYear() + 1
+      );
+    } else {
+      periodEnd.setMonth(
+        periodEnd.getMonth() + 1
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 16. ACTIVATE SUBSCRIPTION
+    // ----------------------------------------------------------
+
+    const updateData = {
+      status: "active",
+
+      payment_provider:
+        "payfast",
+
+      payment_reference:
+        paymentId,
+
+      started_at:
+        periodStart,
+
+      current_period_start:
+        periodStart,
+
+      current_period_end:
+        periodEnd
+          ? periodEnd.toISOString()
+          : null,
+
+      updated_at:
+        new Date().toISOString(),
+    };
+
+    const {
+      data: updatedSubscription,
+      error: updateError,
+    } = await supabase
+      .from("company_subscriptions")
+      .update(updateData)
+      .eq("id", subscription.id)
+      .eq("status", "inactive")
+      .select()
+      .maybeSingle();
 
     if (updateError) {
       console.error(
@@ -375,23 +549,47 @@ export async function POST(request) {
       );
     }
 
+    /*
+     * If no row was returned, another notification
+     * may have processed the payment first.
+     */
+
+    if (!updatedSubscription) {
+      console.log(
+        "Subscription was already processed:",
+        subscription.id
+      );
+
+      return new NextResponse(
+        "OK",
+        { status: 200 }
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 17. LOG SUCCESS
+    // ----------------------------------------------------------
+
     console.log(
       "GradLink SA PayFast payment verified successfully.",
       {
         paymentId,
+        subscriptionId,
         planId,
         amount: paidAmount,
         email: emailAddress,
+        itemName,
       }
     );
 
     // ----------------------------------------------------------
-    // 14. Tell PayFast the notification was processed
+    // 18. RESPOND TO PAYFAST
     // ----------------------------------------------------------
 
-    return new NextResponse("OK", {
-      status: 200,
-    });
+    return new NextResponse(
+      "OK",
+      { status: 200 }
+    );
   } catch (error) {
     console.error(
       "PayFast notification error:",
