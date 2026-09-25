@@ -179,7 +179,7 @@ function calculateMatch(
     parseSkills(internship?.skills);
 
   // ----------------------------------------------------------
-  // Qualification - 35%
+  // QUALIFICATION - 35%
   // ----------------------------------------------------------
 
   const qualificationMatch =
@@ -192,7 +192,7 @@ function calculateMatch(
     qualificationMatch ? 35 : 0;
 
   // ----------------------------------------------------------
-  // Field of study - 35%
+  // FIELD OF STUDY - 35%
   // ----------------------------------------------------------
 
   let fieldScore = 0;
@@ -234,7 +234,7 @@ function calculateMatch(
   }
 
   // ----------------------------------------------------------
-  // Skills - 30%
+  // SKILLS - 30%
   // ----------------------------------------------------------
 
   let skillsScore = 0;
@@ -281,7 +281,7 @@ function calculateMatch(
   }
 
   // ----------------------------------------------------------
-  // Total
+  // TOTAL
   // ----------------------------------------------------------
 
   const score = Math.min(
@@ -304,7 +304,7 @@ function calculateMatch(
   }
 
   // ----------------------------------------------------------
-  // Strengths
+  // STRENGTHS
   // ----------------------------------------------------------
 
   const strengths = [];
@@ -385,7 +385,6 @@ function calculateMatch(
 
 // ============================================================
 // STORAGE PATH
-// FIXED VERSION
 // ============================================================
 
 function getStoragePath(value) {
@@ -395,21 +394,33 @@ function getStoragePath(value) {
 
   if (!path) return null;
 
+  console.log(
+    "Original storage value:",
+    path
+  );
+
   // ----------------------------------------------------------
-  // Decode URL if necessary
+  // REMOVE QUERY PARAMETERS AND HASH
+  // ----------------------------------------------------------
+
+  path = path.split("?")[0];
+  path = path.split("#")[0];
+
+  // ----------------------------------------------------------
+  // DECODE URL-ENCODED CHARACTERS
   // ----------------------------------------------------------
 
   try {
     path = decodeURIComponent(path);
   } catch (error) {
     console.log(
-      "Storage path decode warning:",
+      "Storage decode warning:",
       error
     );
   }
 
   // ----------------------------------------------------------
-  // FULL SUPABASE STORAGE URL
+  // SUPABASE STORAGE URL
   // ----------------------------------------------------------
 
   if (
@@ -417,63 +428,94 @@ function getStoragePath(value) {
       "/storage/v1/object/"
     )
   ) {
-    const marker =
-      "/storage/v1/object/";
-
     path =
-      path.split(marker)[1] || "";
+      path.split(
+        "/storage/v1/object/"
+      )[1] || "";
 
-    path = path
-      .replace(
-        /^sign\/documents\//,
-        ""
-      )
-      .replace(
-        /^public\/documents\//,
-        ""
-      )
-      .replace(
-        /^authenticated\/documents\//,
-        ""
-      )
-      .replace(
-        /^documents\//,
-        ""
-      );
+    // Remove access type
+    path = path.replace(
+      /^sign\//i,
+      ""
+    );
+
+    path = path.replace(
+      /^public\//i,
+      ""
+    );
+
+    path = path.replace(
+      /^authenticated\//i,
+      ""
+    );
+
+    // Remove bucket name
+    path = path.replace(
+      /^documents\//i,
+      ""
+    );
   }
 
   // ----------------------------------------------------------
-  // ANOTHER POSSIBLE FULL URL FORMAT
+  // URL CONTAINING /documents/
   // ----------------------------------------------------------
 
   if (
-    path.includes("/documents/")
+    path.includes(
+      "/documents/"
+    )
   ) {
     path =
-      path.split("/documents/")[1] ||
-      path;
+      path.split(
+        "/documents/"
+      )[1] || path;
   }
 
   // ----------------------------------------------------------
-  // REMOVE QUERY PARAMETERS
+  // POSSIBLE STORAGE URL WITHOUT /documents/
   // ----------------------------------------------------------
 
-  path =
-    path.split("?")[0];
+  if (
+    path.includes(
+      "/object/sign/"
+    )
+  ) {
+    path =
+      path.split(
+        "/object/sign/"
+      )[1] || path;
 
-  // ----------------------------------------------------------
-  // REMOVE HASH
-  // ----------------------------------------------------------
+    path = path.replace(
+      /^documents\//i,
+      ""
+    );
+  }
 
-  path =
-    path.split("#")[0];
+  if (
+    path.includes(
+      "/object/public/"
+    )
+  ) {
+    path =
+      path.split(
+        "/object/public/"
+      )[1] || path;
+
+    path = path.replace(
+      /^documents\//i,
+      ""
+    );
+  }
 
   // ----------------------------------------------------------
   // REMOVE LEADING SLASHES
   // ----------------------------------------------------------
 
   path =
-    path.replace(/^\/+/, "");
+    path.replace(
+      /^\/+/,
+      ""
+    );
 
   // ----------------------------------------------------------
   // REMOVE BUCKET NAME
@@ -484,6 +526,20 @@ function getStoragePath(value) {
       /^documents\//i,
       ""
     );
+
+  // ----------------------------------------------------------
+  // FINAL QUERY/HASH CLEANUP
+  // ----------------------------------------------------------
+
+  path = path.split("?")[0];
+  path = path.split("#")[0];
+
+  path = path.trim();
+
+  console.log(
+    "Final clean storage path:",
+    path
+  );
 
   return path || null;
 }
@@ -532,45 +588,53 @@ function findQualificationDocument(
 
 // ============================================================
 // OPEN SUPABASE DOCUMENT
-// FIXED VERSION
 // ============================================================
 
 async function openStorageDocument(
   value,
   documentName
 ) {
-  if (!value) {
-    alert(
-      `This applicant has not uploaded a ${documentName}.`
-    );
-
-    return;
-  }
-
-  const cleanPath =
-    getStoragePath(value);
-
-  if (!cleanPath) {
-    alert(
-      `The ${documentName} file path could not be found.`
-    );
-
-    return;
-  }
-
   try {
     console.log(
-      `${documentName} storage path:`,
+      "===================================="
+    );
+
+    console.log(
+      `Opening ${documentName}`
+    );
+
+    console.log(
+      "Original document value:",
+      value
+    );
+
+    const cleanPath =
+      getStoragePath(value);
+
+    console.log(
+      "Clean storage path:",
       cleanPath
     );
 
     // --------------------------------------------------------
-    // CREATE 1-HOUR SIGNED URL
+    // NO PATH
+    // --------------------------------------------------------
+
+    if (!cleanPath) {
+      alert(
+        `${documentName} is not available.`
+      );
+
+      return;
+    }
+
+    // --------------------------------------------------------
+    // CREATE SIGNED URL
     // --------------------------------------------------------
 
     const {
-      data: signedData,
-      error: signedError,
+      data,
+      error,
     } =
       await supabase.storage
         .from("documents")
@@ -580,62 +644,61 @@ async function openStorageDocument(
         );
 
     // --------------------------------------------------------
-    // SIGNED URL ERROR
+    // ERROR
     // --------------------------------------------------------
 
-    if (signedError) {
+    if (error) {
       console.error(
         "Supabase signed URL error:",
-        signedError
+        error
       );
 
-      throw signedError;
+      alert(
+        `Could not open ${documentName}.`
+      );
+
+      return;
     }
 
     // --------------------------------------------------------
-    // CHECK SIGNED URL
+    // CHECK RESULT
     // --------------------------------------------------------
 
     if (
-      !signedData?.signedUrl
+      !data ||
+      !data.signedUrl
     ) {
-      throw new Error(
-        `Could not create a secure link for this ${documentName}.`
+      console.error(
+        "No signed URL returned:",
+        data
       );
+
+      alert(
+        `Could not create a link for ${documentName}.`
+      );
+
+      return;
     }
 
     console.log(
-      `${documentName} signed URL created successfully`
-    );
-
-    console.log(
-      "Opening document on device..."
+      `${documentName} signed URL created successfully.`
     );
 
     // --------------------------------------------------------
-    // IPHONE / SAFARI FRIENDLY
-    // --------------------------------------------------------
-    //
-    // Do NOT use window.open().
-    //
-    // location.assign() performs a normal browser
-    // navigation and avoids popup blocking on iPhone/Safari.
-    //
+    // IPHONE / SAFARI
     // --------------------------------------------------------
 
-    window.location.assign(
-      signedData.signedUrl
-    );
+    window.location.href =
+      data.signedUrl;
 
   } catch (error) {
     console.error(
-      `${documentName} opening error:`,
+      `Error opening ${documentName}:`,
       error
     );
 
     alert(
-      error?.message ||
-        `Could not open the ${documentName}.`
+      `Could not open the ${documentName}.`
     );
   }
 }
@@ -827,9 +890,9 @@ export default function ApplicantsPage() {
           );
         }
 
-        // Security check:
-        // Make sure this internship belongs
-        // to the logged-in company.
+        // ------------------------------------------------------
+        // SECURITY CHECK
+        // ------------------------------------------------------
 
         if (
           internshipData.company_name !==
@@ -937,8 +1000,9 @@ export default function ApplicantsPage() {
                 ...application,
               };
 
-              // Keep document paths from either
-              // application or graduate profile.
+              // ------------------------------------------------
+              // DOCUMENT FALLBACKS
+              // ------------------------------------------------
 
               if (
                 !merged.cv_url &&
@@ -974,7 +1038,9 @@ export default function ApplicantsPage() {
             }
           );
 
-        // Highest match first
+        // ------------------------------------------------------
+        // HIGHEST MATCH FIRST
+        // ------------------------------------------------------
 
         mergedApplications.sort(
           (a, b) =>
@@ -2470,9 +2536,9 @@ function ApplicantCard({
             marginBottom: 16,
           }}
         >
-          {/* --------------------------------------------------
+          {/* ==================================================
               REVIEW CV
-          -------------------------------------------------- */}
+          ================================================== */}
 
           <button
             type="button"
@@ -2509,9 +2575,9 @@ function ApplicantCard({
             📄 Review CV
           </button>
 
-          {/* --------------------------------------------------
+          {/* ==================================================
               QUALIFICATION
-          -------------------------------------------------- */}
+          ================================================== */}
 
           <button
             type="button"
@@ -2554,9 +2620,9 @@ function ApplicantCard({
             🎓 View Qualification
           </button>
 
-          {/* --------------------------------------------------
+          {/* ==================================================
               FULL APPLICATION
-          -------------------------------------------------- */}
+          ================================================== */}
 
           <Link
             href={`/company/internships/${internshipId}/applicants/${application.id}`}
