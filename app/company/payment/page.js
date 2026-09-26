@@ -13,10 +13,6 @@ import {
 
 import { createClient } from "@supabase/supabase-js";
 
-// ============================================================
-// SUPABASE
-// ============================================================
-
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -57,7 +53,7 @@ const PLANS = {
 };
 
 // ============================================================
-// MAIN CONTENT
+// PAYMENT CONTENT
 // ============================================================
 
 function PaymentContent() {
@@ -65,48 +61,28 @@ function PaymentContent() {
   const searchParams = useSearchParams();
 
   const planId = searchParams.get("plan");
-  const billing =
-    searchParams.get("billing") || "monthly";
-  const subscriptionId =
-    searchParams.get("subscription");
-  const paymentResult =
-    searchParams.get("payment");
+  const billing = searchParams.get("billing") || "monthly";
+  const subscriptionId = searchParams.get("subscription");
+  const paymentResult = searchParams.get("payment");
 
   const [user, setUser] = useState(null);
-  const [subscription, setSubscription] =
-    useState(null);
+  const [subscription, setSubscription] = useState(null);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+  const [checking, setChecking] = useState(false);
 
-  const [processing, setProcessing] =
-    useState(false);
+  const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState("");
 
-  const [checking, setChecking] =
-    useState(false);
-
-  const [message, setMessage] =
-    useState("");
-
-  const [messageType, setMessageType] =
-    useState("");
+  const plan = planId ? PLANS[planId] : null;
 
   // ==========================================================
-  // SELECTED PLAN
-  // ==========================================================
-
-  const plan = planId
-    ? PLANS[planId]
-    : null;
-
-  // ==========================================================
-  // GET AMOUNT
+  // AMOUNT
   // ==========================================================
 
   function getAmount() {
-    if (!plan) {
-      return 0;
-    }
+    if (!plan) return 0;
 
     if (planId === "pay_per_listing") {
       return plan.listing;
@@ -120,7 +96,7 @@ function PaymentContent() {
   }
 
   // ==========================================================
-  // LOAD USER + SUBSCRIPTION
+  // LOAD PAYMENT DETAILS
   // ==========================================================
 
   useEffect(() => {
@@ -129,30 +105,22 @@ function PaymentContent() {
         setLoading(true);
 
         const {
-          data: {
-            user: currentUser,
-          },
+          data: { user: currentUser },
         } = await supabase.auth.getUser();
 
         if (!currentUser) {
           router.replace(
-            "/login?redirect=/company-pricing"
+            `/login?redirect=/company-pricing`
           );
-
           return;
         }
 
         setUser(currentUser);
 
-        // ------------------------------------------------------
-        // Validate URL
-        // ------------------------------------------------------
-
         if (!planId || !plan) {
           setMessage(
             "No valid payment plan was selected."
           );
-
           setMessageType("error");
           return;
         }
@@ -161,14 +129,9 @@ function PaymentContent() {
           setMessage(
             "No subscription was found for this payment."
           );
-
           setMessageType("error");
           return;
         }
-
-        // ------------------------------------------------------
-        // Get exact subscription
-        // ------------------------------------------------------
 
         const {
           data: subscriptionData,
@@ -177,16 +140,11 @@ function PaymentContent() {
           .from("company_subscriptions")
           .select("*")
           .eq("id", subscriptionId)
-          .eq(
-            "company_id",
-            currentUser.id
-          )
+          .eq("company_id", currentUser.id)
           .maybeSingle();
 
         if (subscriptionError) {
-          console.error(
-            subscriptionError
-          );
+          console.error(subscriptionError);
 
           setMessage(
             "We could not load your payment information."
@@ -205,18 +163,11 @@ function PaymentContent() {
           return;
         }
 
-        setSubscription(
-          subscriptionData
-        );
-
-        // ------------------------------------------------------
-        // Already active
-        // ------------------------------------------------------
+        setSubscription(subscriptionData);
 
         const isActive =
-          String(
-            subscriptionData.status
-          ).toLowerCase() === "active";
+          String(subscriptionData.status).toLowerCase() ===
+          "active";
 
         if (
           isActive &&
@@ -226,23 +177,15 @@ function PaymentContent() {
           return;
         }
 
-        // ------------------------------------------------------
-        // Payment return messages
-        // ------------------------------------------------------
-
-        if (
-          paymentResult === "success"
-        ) {
+        if (paymentResult === "success") {
           setMessage(
-            "PayFast has returned you to GradLink SA. Your payment is now being verified."
+            "PayFast has returned you to GradLink SA. Your payment is now being verified. Please check the payment status below."
           );
 
           setMessageType("success");
         }
 
-        if (
-          paymentResult === "cancelled"
-        ) {
+        if (paymentResult === "cancelled") {
           setMessage(
             "The PayFast payment was cancelled. Your subscription has not been activated."
           );
@@ -299,10 +242,7 @@ function PaymentContent() {
         .from("company_subscriptions")
         .select("*")
         .eq("id", subscriptionId)
-        .eq(
-          "company_id",
-          user.id
-        )
+        .eq("company_id", user.id)
         .maybeSingle();
 
       if (error) {
@@ -328,9 +268,7 @@ function PaymentContent() {
       setSubscription(data);
 
       const status =
-        String(
-          data.status
-        ).toLowerCase();
+        String(data.status).toLowerCase();
 
       if (status === "active") {
         setMessage(
@@ -388,9 +326,7 @@ function PaymentContent() {
       setMessageType("");
 
       const currentStatus =
-        String(
-          subscription.status
-        ).toLowerCase();
+        String(subscription.status).toLowerCase();
 
       if (
         currentStatus === "active" &&
@@ -400,41 +336,32 @@ function PaymentContent() {
         return;
       }
 
-      // ------------------------------------------------------
-      // Create PayFast payment
-      // ------------------------------------------------------
+      const response = await fetch(
+        "/api/payfast/create-payment",
+        {
+          method: "POST",
 
-      const response =
-        await fetch(
-          "/api/payfast/create-payment",
-          {
-            method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
 
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
+          body: JSON.stringify({
+            plan: planId,
 
-            body: JSON.stringify({
-              plan: planId,
+            billing:
+              planId === "pay_per_listing"
+                ? "listing"
+                : billing,
 
-              billing:
-                planId ===
-                "pay_per_listing"
-                  ? "listing"
-                  : billing,
+            subscriptionId:
+              subscription.id,
 
-              subscriptionId:
-                subscription.id,
+            email: user.email,
+          }),
+        }
+      );
 
-              email:
-                user.email,
-            }),
-          }
-        );
-
-      const result =
-        await response.json();
+      const result = await response.json();
 
       if (
         !response.ok ||
@@ -466,40 +393,29 @@ function PaymentContent() {
         );
       }
 
-      // ------------------------------------------------------
-      // POST form to PayFast
-      // ------------------------------------------------------
-
       const form =
-        document.createElement(
-          "form"
-        );
+        document.createElement("form");
 
       form.method = "POST";
       form.action = paymentUrl;
       form.style.display = "none";
 
-      Object.entries(
-        paymentData
-      ).forEach(
+      Object.entries(paymentData).forEach(
         ([key, value]) => {
           const input =
-            document.createElement(
-              "input"
-            );
+            document.createElement("input");
 
           input.type = "hidden";
           input.name = key;
-          input.value =
-            String(value ?? "");
+          input.value = String(
+            value ?? ""
+          );
 
           form.appendChild(input);
         }
       );
 
-      document.body.appendChild(
-        form
-      );
+      document.body.appendChild(form);
 
       form.submit();
     } catch (error) {
@@ -534,8 +450,7 @@ function PaymentContent() {
           </h2>
 
           <p style={styles.loadingText}>
-            Preparing your GradLink SA
-            payment details...
+            Preparing your GradLink SA payment details...
           </p>
         </div>
       </main>
@@ -560,8 +475,8 @@ function PaymentContent() {
             </h1>
 
             <p style={styles.errorText}>
-              Please return to the pricing
-              page and select a valid plan.
+              Please return to the pricing page
+              and select a valid plan.
             </p>
 
             <button
@@ -619,9 +534,7 @@ function PaymentContent() {
     <main style={styles.page}>
       <div style={styles.container}>
 
-        {/* ================================================== */}
         {/* HEADER */}
-        {/* ================================================== */}
 
         <header style={styles.header}>
           <button
@@ -652,9 +565,7 @@ function PaymentContent() {
           </div>
         </header>
 
-        {/* ================================================== */}
         {/* TITLE */}
-        {/* ================================================== */}
 
         <section style={styles.titleSection}>
           <div style={styles.secureBadge}>
@@ -671,34 +582,30 @@ function PaymentContent() {
           </p>
         </section>
 
-        {/* ================================================== */}
         {/* MESSAGE */}
-        {/* ================================================== */}
 
         {message && (
           <div
             style={{
               ...styles.message,
-              ...(messageType ===
-              "success"
+
+              ...(messageType === "success"
                 ? styles.successMessage
                 : {}),
-              ...(messageType ===
-              "error"
+
+              ...(messageType === "error"
                 ? styles.errorMessage
                 : {}),
-              ...(messageType ===
-              "warning"
+
+              ...(messageType === "warning"
                 ? styles.warningMessage
                 : {}),
             }}
           >
             <span style={styles.messageIcon}>
-              {messageType ===
-              "success"
+              {messageType === "success"
                 ? "✓"
-                : messageType ===
-                  "error"
+                : messageType === "error"
                 ? "!"
                 : "i"}
             </span>
@@ -707,13 +614,17 @@ function PaymentContent() {
           </div>
         )}
 
-        {/* ================================================== */}
-        {/* CARD 1 — ORDER SUMMARY */}
-        {/* ================================================== */}
+        {/* ====================================================
+            TOP CARD — PLAN SUMMARY
+        ==================================================== */}
 
-        <section style={styles.mainCard}>
-
-          <div style={styles.cardTop}>
+        <section
+          style={styles.mainCard}
+          className="gradlink-main-card"
+        >
+          <div
+            style={styles.cardTop}
+          >
             <div>
               <p style={styles.eyebrow}>
                 YOUR PLAN
@@ -725,127 +636,203 @@ function PaymentContent() {
             </div>
 
             {plan.popular && (
-              <span style={styles.popularBadge}>
+              <span
+                style={styles.popularBadge}
+              >
                 POPULAR
               </span>
             )}
           </div>
 
-          <div style={styles.summaryMain}>
+          <div
+            style={styles.summaryMain}
+            className="gradlink-summary-main"
+          >
+            {/* PRICE */}
 
-            <div style={styles.priceBlock}>
-              <div style={styles.priceLine}>
-                <span style={styles.currency}>
+            <div
+              style={styles.priceBlock}
+              className="gradlink-price-block"
+            >
+              <div
+                style={styles.priceLine}
+              >
+                <span
+                  style={styles.currency}
+                >
                   R
                 </span>
 
-                <span style={styles.price}>
+                <span
+                  style={styles.price}
+                >
                   {formattedAmount}
                 </span>
               </div>
 
-              <span style={styles.billingText}>
+              <span
+                style={styles.billingText}
+              >
                 {billingLabel}
               </span>
             </div>
 
-            <div style={styles.planDetails}>
+            {/* DETAILS */}
 
-              <div style={styles.detailItem}>
-                <span style={styles.detailIcon}>
+            <div
+              style={styles.planDetails}
+              className="gradlink-plan-details"
+            >
+              <div
+                style={styles.detailItem}
+              >
+                <span
+                  style={styles.detailIcon}
+                >
                   ✓
                 </span>
 
                 <div>
-                  <span style={styles.detailLabel}>
+                  <span
+                    style={styles.detailLabel}
+                  >
                     Listings included
                   </span>
 
-                  <strong style={styles.detailValue}>
+                  <strong
+                    style={styles.detailValue}
+                  >
                     {plan.listings}
                   </strong>
                 </div>
               </div>
 
-              <div style={styles.detailItem}>
-                <span style={styles.detailIcon}>
+              <div
+                style={styles.detailItem}
+              >
+                <span
+                  style={styles.detailIcon}
+                >
                   ✓
                 </span>
 
                 <div>
-                  <span style={styles.detailLabel}>
+                  <span
+                    style={styles.detailLabel}
+                  >
                     Billing
                   </span>
 
-                  <strong style={styles.detailValue}>
+                  <strong
+                    style={styles.detailValue}
+                  >
                     {billingLabel}
                   </strong>
                 </div>
               </div>
 
-              <div style={styles.detailItem}>
-                <span style={styles.detailIcon}>
+              <div
+                style={styles.detailItem}
+              >
+                <span
+                  style={styles.detailIcon}
+                >
                   ✓
                 </span>
 
                 <div>
-                  <span style={styles.detailLabel}>
+                  <span
+                    style={styles.detailLabel}
+                  >
                     Payment provider
                   </span>
 
-                  <strong style={styles.detailValue}>
+                  <strong
+                    style={styles.detailValue}
+                  >
                     PayFast
                   </strong>
                 </div>
               </div>
-
             </div>
           </div>
 
-          <div style={styles.secureStrip}>
-            <span style={styles.secureStripIcon}>
+          {/* SECURITY STRIP */}
+
+          <div
+            style={styles.secureStrip}
+          >
+            <span
+              style={styles.secureStripIcon}
+            >
               🔐
             </span>
 
             <div>
-              <strong style={styles.secureStripTitle}>
+              <strong
+                style={
+                  styles.secureStripTitle
+                }
+              >
                 Secure payment
               </strong>
 
-              <p style={styles.secureStripText}>
+              <p
+                style={
+                  styles.secureStripText
+                }
+              >
                 You will be redirected to
                 PayFast to complete your
                 payment securely.
               </p>
             </div>
           </div>
-
         </section>
 
-        {/* ================================================== */}
-        {/* CARD 2 — PAYFAST + STATUS */}
-        {/* ================================================== */}
+        {/* ====================================================
+            BOTTOM CARD — PAYFAST CHECKOUT
+        ==================================================== */}
 
-        <section style={styles.checkoutCard}>
-
-          <div style={styles.checkoutHeader}>
+        <section
+          style={styles.checkoutCard}
+          className="gradlink-checkout-card"
+        >
+          <div
+            style={styles.checkoutHeader}
+            className="gradlink-checkout-header"
+          >
             <div>
-              <p style={styles.checkoutEyebrow}>
+              <p
+                style={
+                  styles.checkoutEyebrow
+                }
+              >
                 PAYMENT
               </p>
 
-              <h2 style={styles.checkoutTitle}>
+              <h2
+                style={styles.checkoutTitle}
+              >
                 Pay with PayFast
               </h2>
 
-              <p style={styles.checkoutText}>
-                Continue to PayFast to securely
-                complete your payment.
+              <p
+                style={styles.checkoutText}
+              >
+                Continue to PayFast to
+                securely complete your
+                payment.
               </p>
             </div>
 
-            <div style={styles.payfastMark}>
-              <span style={styles.payfastP}>
+            <div
+              style={styles.payfastMark}
+              className="gradlink-payfast-mark"
+            >
+              <span
+                style={styles.payfastP}
+              >
                 P
               </span>
 
@@ -855,24 +842,42 @@ function PaymentContent() {
             </div>
           </div>
 
-          <div style={styles.checkoutContent}>
+          <div
+            style={styles.checkoutContent}
+          >
 
-            <div style={styles.paymentMethods}>
-              <div style={styles.method}>
+            {/* PAYMENT METHODS */}
+
+            <div
+              style={styles.paymentMethods}
+              className="gradlink-payment-methods"
+            >
+              <div
+                style={styles.method}
+                className="gradlink-method"
+              >
                 <span>💳</span>
                 <span>Card</span>
               </div>
 
-              <div style={styles.method}>
+              <div
+                style={styles.method}
+                className="gradlink-method"
+              >
                 <span>🏦</span>
                 <span>EFT</span>
               </div>
 
-              <div style={styles.method}>
+              <div
+                style={styles.method}
+                className="gradlink-method"
+              >
                 <span>📱</span>
                 <span>Instant EFT</span>
               </div>
             </div>
+
+            {/* PAY BUTTON */}
 
             <button
               onClick={
@@ -884,6 +889,7 @@ function PaymentContent() {
               }
               style={{
                 ...styles.payButton,
+
                 ...(processing
                   ? styles.disabledButton
                   : {}),
@@ -894,8 +900,14 @@ function PaymentContent() {
                 : `Continue to PayFast — R${formattedAmount}`}
             </button>
 
+            {/* ACTIVE NOTICE */}
+
             {status === "active" && (
-              <div style={styles.activeNotice}>
+              <div
+                style={
+                  styles.activeNotice
+                }
+              >
                 <span>✓</span>
 
                 <span>
@@ -905,18 +917,35 @@ function PaymentContent() {
               </div>
             )}
 
-            <div style={styles.verificationArea}>
+            {/* VERIFICATION */}
 
+            <div
+              style={styles.verificationArea}
+              className="gradlink-verification"
+            >
               <div>
-                <p style={styles.verificationEyebrow}>
+                <p
+                  style={
+                    styles.verificationEyebrow
+                  }
+                >
                   PAYMENT VERIFICATION
                 </p>
 
-                <h3 style={styles.verificationTitle}>
-                  Already completed payment?
+                <h3
+                  style={
+                    styles.verificationTitle
+                  }
+                >
+                  Already completed
+                  payment?
                 </h3>
 
-                <p style={styles.verificationText}>
+                <p
+                  style={
+                    styles.verificationText
+                  }
+                >
                   PayFast may take a short
                   moment to send the payment
                   confirmation to GradLink SA.
@@ -928,21 +957,32 @@ function PaymentContent() {
                   checkPaymentStatus
                 }
                 disabled={checking}
-                style={styles.checkButton}
+                style={
+                  styles.checkButton
+                }
+                className="gradlink-check-button"
               >
                 {checking
                   ? "Checking..."
                   : "Check Payment Status"}
               </button>
-
             </div>
-
           </div>
 
-          <div style={styles.disclaimerBox}>
-            <span>ℹ</span>
+          {/* DISCLAIMER */}
 
-            <p>
+          <div
+            style={styles.disclaimerBox}
+          >
+            <span
+              style={styles.disclaimerIcon}
+            >
+              ℹ
+            </span>
+
+            <p
+              style={styles.disclaimerText}
+            >
               Selecting a plan does not
               activate your company account.
               Access becomes active only
@@ -950,32 +990,34 @@ function PaymentContent() {
               successful payment.
             </p>
           </div>
-
         </section>
 
-        {/* ================================================== */}
         {/* FOOTER */}
-        {/* ================================================== */}
 
         <footer style={styles.footer}>
-
           <div>
-            <strong style={styles.footerBrand}>
+            <strong
+              style={styles.footerBrand}
+            >
               GradLink SA
             </strong>
 
-            <span style={styles.footerText}>
+            <span
+              style={styles.footerText}
+            >
               Connecting South African
               graduates with opportunities.
             </span>
           </div>
 
-          <div style={styles.footerRight}>
-            🔒 Secure payments powered by PayFast
+          <div
+            style={styles.footerRight}
+            className="gradlink-footer-right"
+          >
+            🔒 Secure payments powered by
+            PayFast
           </div>
-
         </footer>
-
       </div>
     </main>
   );
@@ -990,10 +1032,16 @@ export default function PaymentPage() {
     <Suspense
       fallback={
         <main style={styles.page}>
-          <div style={styles.loadingBox}>
-            <div style={styles.spinner}></div>
+          <div
+            style={styles.loadingBox}
+          >
+            <div
+              style={styles.spinner}
+            ></div>
 
-            <h2 style={styles.loadingTitle}>
+            <h2
+              style={styles.loadingTitle}
+            >
               Loading...
             </h2>
           </div>
@@ -1019,6 +1067,7 @@ const styles = {
       "Inter, Arial, sans-serif",
     padding:
       "18px 16px 45px",
+    boxSizing: "border-box",
   },
 
   container: {
@@ -1027,9 +1076,9 @@ const styles = {
     margin: "0 auto",
   },
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // HEADER
-  // ----------------------------------------------------------
+  // ==========================================================
 
   header: {
     display: "flex",
@@ -1084,9 +1133,9 @@ const styles = {
     marginTop: "2px",
   },
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // TITLE
-  // ----------------------------------------------------------
+  // ==========================================================
 
   titleSection: {
     textAlign: "center",
@@ -1121,9 +1170,9 @@ const styles = {
     lineHeight: 1.6,
   },
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // MESSAGE
-  // ----------------------------------------------------------
+  // ==========================================================
 
   message: {
     maxWidth: "900px",
@@ -1137,6 +1186,7 @@ const styles = {
     lineHeight: 1.5,
     border: "1px solid #dbe5f1",
     background: "#ffffff",
+    boxSizing: "border-box",
   },
 
   messageIcon: {
@@ -1163,9 +1213,9 @@ const styles = {
     color: "#92400e",
   },
 
-  // ----------------------------------------------------------
-  // CARD 1
-  // ----------------------------------------------------------
+  // ==========================================================
+  // TOP CARD
+  // ==========================================================
 
   mainCard: {
     background: "#ffffff",
@@ -1174,6 +1224,7 @@ const styles = {
     padding: "28px",
     boxShadow:
       "0 12px 35px rgba(15,23,42,0.07)",
+    boxSizing: "border-box",
   },
 
   cardTop: {
@@ -1218,7 +1269,8 @@ const styles = {
 
   priceBlock: {
     paddingRight: "20px",
-    borderRight: "1px solid #e2e8f0",
+    borderRight:
+      "1px solid #e2e8f0",
   },
 
   priceLine: {
@@ -1295,6 +1347,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: "11px",
+    boxSizing: "border-box",
   },
 
   secureStripIcon: {
@@ -1314,9 +1367,9 @@ const styles = {
     lineHeight: 1.5,
   },
 
-  // ----------------------------------------------------------
-  // CARD 2
-  // ----------------------------------------------------------
+  // ==========================================================
+  // BOTTOM CARD
+  // ==========================================================
 
   checkoutCard: {
     marginTop: "18px",
@@ -1327,6 +1380,7 @@ const styles = {
     color: "#ffffff",
     boxShadow:
       "0 18px 45px rgba(15,47,104,0.20)",
+    boxSizing: "border-box",
   },
 
   checkoutHeader: {
@@ -1405,6 +1459,7 @@ const styles = {
     color: "#ffffff",
     fontSize: "12px",
     fontWeight: "700",
+    boxSizing: "border-box",
   },
 
   payButton: {
@@ -1420,6 +1475,7 @@ const styles = {
     cursor: "pointer",
     boxShadow:
       "0 8px 20px rgba(0,0,0,0.15)",
+    boxSizing: "border-box",
   },
 
   disabledButton: {
@@ -1497,28 +1553,32 @@ const styles = {
     display: "flex",
     gap: "9px",
     alignItems: "flex-start",
+    boxSizing: "border-box",
   },
 
-  disclaimerBox: {
-    marginTop: "18px",
-    padding: "12px 14px",
-    borderRadius: "11px",
-    background:
-      "rgba(255,255,255,0.07)",
-    display: "flex",
-    gap: "9px",
-    alignItems: "flex-start",
+  disclaimerIcon: {
+    color: "#93c5fd",
+    fontWeight: "900",
+    fontSize: "13px",
+    flexShrink: 0,
+  },
+
+  disclaimerText: {
+    margin: 0,
     color: "#bfdbfe",
+    fontSize: "11px",
+    lineHeight: 1.5,
   },
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // FOOTER
-  // ----------------------------------------------------------
+  // ==========================================================
 
   footer: {
     marginTop: "25px",
     paddingTop: "18px",
-    borderTop: "1px solid #dbe5f1",
+    borderTop:
+      "1px solid #dbe5f1",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
@@ -1542,9 +1602,9 @@ const styles = {
     textAlign: "right",
   },
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // LOADING
-  // ----------------------------------------------------------
+  // ==========================================================
 
   loadingBox: {
     minHeight: "70vh",
@@ -1559,8 +1619,7 @@ const styles = {
   spinner: {
     width: "38px",
     height: "38px",
-    border:
-      "4px solid #dbeafe",
+    border: "4px solid #dbeafe",
     borderTop:
       "4px solid #2563eb",
     borderRadius: "50%",
@@ -1579,20 +1638,22 @@ const styles = {
     fontSize: "14px",
   },
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // ERROR
-  // ----------------------------------------------------------
+  // ==========================================================
 
   errorBox: {
     maxWidth: "600px",
     margin: "80px auto",
     background: "#ffffff",
-    border: "1px solid #e2e8f0",
+    border:
+      "1px solid #e2e8f0",
     borderRadius: "20px",
     padding: "35px",
     textAlign: "center",
     boxShadow:
       "0 15px 40px rgba(15,23,42,0.08)",
+    boxSizing: "border-box",
   },
 
   errorIcon: {
@@ -1665,70 +1726,13 @@ if (
         }
       }
 
+      * {
+        box-sizing: border-box;
+      }
+
       @media (max-width: 760px) {
-
-        .gradlink-payment-mobile {
-          display: block;
-        }
-
-      }
-
-      @media (max-width: 700px) {
-
-        body {
-          overflow-x: hidden;
-        }
-
-        section {
-          box-sizing: border-box;
-        }
-
-        /* Top plan card */
-
-        .gradlink-payment-summary {
-          grid-template-columns: 1fr !important;
-        }
-
-        /* Checkout header */
-
-        .gradlink-checkout-header {
-          flex-direction: column !important;
-          align-items: flex-start !important;
-        }
-
-        /* Payment verification */
-
-        .gradlink-verification {
-          flex-direction: column !important;
-          align-items: stretch !important;
-        }
-
-        .gradlink-check-button {
-          width: 100% !important;
-        }
-      }
-
-      @media (max-width: 520px) {
-
-        main {
-          padding-left: 11px !important;
-          padding-right: 11px !important;
-        }
-
-        header {
-          align-items: flex-start !important;
-        }
-
-        /* Make cards tighter on iPhone */
-
-        section {
-          border-radius: 17px !important;
-        }
-
-        /* Plan card */
-
         .gradlink-summary-main {
-          display: block !important;
+          grid-template-columns: 1fr !important;
         }
 
         .gradlink-price-block {
@@ -1739,23 +1743,47 @@ if (
         }
 
         .gradlink-plan-details {
-          display: grid !important;
           grid-template-columns: 1fr !important;
           margin-top: 20px !important;
         }
 
-        /* Checkout */
+        .gradlink-checkout-header {
+          align-items: flex-start !important;
+          flex-direction: column !important;
+        }
 
-        .gradlink-checkout-card {
-          padding: 22px !important;
+        .gradlink-verification {
+          align-items: stretch !important;
+          flex-direction: column !important;
+        }
+
+        .gradlink-check-button {
+          width: 100% !important;
+        }
+      }
+
+      @media (max-width: 520px) {
+        body {
+          overflow-x: hidden;
         }
 
         .gradlink-main-card {
-          padding: 22px !important;
+          padding: 21px !important;
+          border-radius: 17px !important;
         }
 
-        .gradlink-payfast-mark {
-          margin-top: 4px !important;
+        .gradlink-checkout-card {
+          padding: 21px !important;
+          border-radius: 17px !important;
+        }
+
+        .gradlink-summary-main {
+          display: block !important;
+        }
+
+        .gradlink-plan-details {
+          display: grid !important;
+          grid-template-columns: 1fr !important;
         }
 
         .gradlink-payment-methods {
@@ -1763,8 +1791,13 @@ if (
           grid-template-columns: 1fr 1fr !important;
         }
 
-        .gradlink-payment-methods .gradlink-method:last-child {
+        .gradlink-payment-methods
+        .gradlink-method:last-child {
           grid-column: 1 / -1;
+        }
+
+        .gradlink-payfast-mark {
+          margin-top: 3px !important;
         }
 
         .gradlink-footer-right {
