@@ -1,26 +1,8 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { createClient } from "@supabase/supabase-js";
 
 // ============================================================
-// SUPABASE SERVER CLIENT
-// ============================================================
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-// Support either Supabase's newer secret key or the older
-// service-role key name.
-const supabaseServerKey =
-  process.env.SUPABASE_SECRET_KEY ||
-  process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-const supabase =
-  supabaseUrl && supabaseServerKey
-    ? createClient(supabaseUrl, supabaseServerKey)
-    : null;
-
-// ============================================================
-// GRADLINK SA PLANS
+// GRADLINK SA PAYFAST CONFIGURATION
 // ============================================================
 
 const PLANS = {
@@ -53,43 +35,47 @@ const PLANS = {
 };
 
 // ============================================================
+// PAYFAST CONFIGURATION
+// ============================================================
+
+const PAYFAST_MERCHANT_ID =
+  process.env.PAYFAST_MERCHANT_ID;
+
+const PAYFAST_PASSPHRASE =
+  process.env.PAYFAST_PASSPHRASE;
+
+// ============================================================
+// SUPABASE EDGE FUNCTION
+// ============================================================
+
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+const PAYFAST_ACTIVATION_FUNCTION =
+  `${SUPABASE_URL}/functions/v1/activate-payfast`;
+
+// ============================================================
 // POST - PAYFAST NOTIFICATION
 // ============================================================
 
 export async function POST(request) {
   try {
     console.log("========================================");
-    console.log("GradLink SA PayFast notification received");
+    console.log(
+      "GradLink SA PayFast notification received"
+    );
     console.log("========================================");
 
     // ----------------------------------------------------------
-    // 1. CHECK SUPABASE CONFIGURATION
+    // 1. CHECK CONFIGURATION
     // ----------------------------------------------------------
 
-    if (!supabase) {
+    if (
+      !PAYFAST_MERCHANT_ID ||
+      !PAYFAST_PASSPHRASE
+    ) {
       console.error(
-        "Missing Supabase server environment variables."
-      );
-
-      return new NextResponse(
-        "Supabase server configuration error",
-        { status: 500 }
-      );
-    }
-
-    // ----------------------------------------------------------
-    // 2. CHECK PAYFAST CONFIGURATION
-    // ----------------------------------------------------------
-
-    const merchantId =
-      process.env.PAYFAST_MERCHANT_ID;
-
-    const passphrase =
-      process.env.PAYFAST_PASSPHRASE;
-
-    if (!merchantId || !passphrase) {
-      console.error(
-        "Missing PayFast environment variables."
+        "PayFast environment variables are missing."
       );
 
       return new NextResponse(
@@ -98,18 +84,33 @@ export async function POST(request) {
       );
     }
 
+    if (!SUPABASE_URL) {
+      console.error(
+        "NEXT_PUBLIC_SUPABASE_URL is missing."
+      );
+
+      return new NextResponse(
+        "Supabase URL configuration error",
+        { status: 500 }
+      );
+    }
+
     // ----------------------------------------------------------
-    // 3. READ PAYFAST BODY
+    // 2. READ PAYFAST BODY
     // ----------------------------------------------------------
 
-    const rawBody = await request.text();
+    const rawBody =
+      await request.text();
 
-    console.log("Raw PayFast notification received.");
+    console.log(
+      "Raw PayFast notification received."
+    );
 
-    const params = new URLSearchParams(rawBody);
+    const params =
+      new URLSearchParams(rawBody);
 
     // ----------------------------------------------------------
-    // 4. GET SIGNATURE
+    // 3. GET SIGNATURE
     // ----------------------------------------------------------
 
     const receivedSignature =
@@ -127,7 +128,7 @@ export async function POST(request) {
     }
 
     // ----------------------------------------------------------
-    // 5. RECREATE PAYFAST SIGNATURE
+    // 4. RECREATE PAYFAST SIGNATURE
     // ----------------------------------------------------------
 
     const signatureParts = [];
@@ -150,7 +151,7 @@ export async function POST(request) {
 
     signatureString +=
       `&passphrase=${encodeURIComponent(
-        passphrase.trim()
+        PAYFAST_PASSPHRASE.trim()
       ).replace(/%20/g, "+")}`;
 
     const calculatedSignature =
@@ -170,7 +171,7 @@ export async function POST(request) {
     );
 
     // ----------------------------------------------------------
-    // 6. VERIFY SIGNATURE
+    // 5. VERIFY SIGNATURE
     // ----------------------------------------------------------
 
     if (
@@ -192,7 +193,7 @@ export async function POST(request) {
     );
 
     // ----------------------------------------------------------
-    // 7. READ PAYMENT INFORMATION
+    // 6. READ PAYMENT INFORMATION
     // ----------------------------------------------------------
 
     const paymentStatus =
@@ -201,11 +202,9 @@ export async function POST(request) {
     const receivedMerchantId =
       params.get("merchant_id");
 
-    // GradLink merchant reference
     const merchantPaymentId =
       params.get("m_payment_id");
 
-    // Actual PayFast payment ID
     const payfastPaymentId =
       params.get("pf_payment_id");
 
@@ -254,12 +253,12 @@ export async function POST(request) {
     );
 
     // ----------------------------------------------------------
-    // 8. VERIFY MERCHANT ID
+    // 7. VERIFY MERCHANT
     // ----------------------------------------------------------
 
     if (
       receivedMerchantId !==
-      merchantId
+      PAYFAST_MERCHANT_ID
     ) {
       console.error(
         "Merchant ID does not match."
@@ -272,7 +271,7 @@ export async function POST(request) {
     }
 
     // ----------------------------------------------------------
-    // 9. PAYMENT REFERENCE MUST EXIST
+    // 8. REQUIRE MERCHANT PAYMENT ID
     // ----------------------------------------------------------
 
     if (!merchantPaymentId) {
@@ -287,10 +286,12 @@ export async function POST(request) {
     }
 
     // ----------------------------------------------------------
-    // 10. ONLY COMPLETE PAYMENTS ARE ACTIVATED
+    // 9. ONLY COMPLETE PAYMENTS
     // ----------------------------------------------------------
 
-    if (paymentStatus !== "COMPLETE") {
+    if (
+      paymentStatus !== "COMPLETE"
+    ) {
       console.log(
         "Payment is not COMPLETE:",
         paymentStatus
@@ -307,12 +308,12 @@ export async function POST(request) {
     );
 
     // ----------------------------------------------------------
-    // 11. EXTRACT SUBSCRIPTION ID
+    // 10. EXTRACT SUBSCRIPTION ID
     //
     // Expected:
+    //
     // GL-SUBSCRIPTION_UUID-TIMESTAMP
     //
-    // UUID contains hyphens, so regex is required.
     // ----------------------------------------------------------
 
     const paymentMatch =
@@ -341,140 +342,39 @@ export async function POST(request) {
     );
 
     // ----------------------------------------------------------
-    // 12. FIND EXACT SUBSCRIPTION
+    // 11. VALIDATE UUID
     // ----------------------------------------------------------
 
-    const {
-      data: subscription,
-      error: subscriptionError,
-    } = await supabase
-      .from("company_subscriptions")
-      .select("*")
-      .eq("id", subscriptionId)
-      .maybeSingle();
-
-    if (subscriptionError) {
-      console.error(
-        "Subscription lookup error:",
-        subscriptionError
-      );
-
-      return new NextResponse(
-        "Subscription lookup failed",
-        { status: 500 }
-      );
-    }
-
-    if (!subscription) {
-      console.error(
-        "Subscription not found:",
-        subscriptionId
-      );
-
-      return new NextResponse(
-        "Subscription not found",
-        { status: 404 }
-      );
-    }
-
-    console.log(
-      "Subscription found for company:",
-      subscription.company_id
-    );
-
-    // ----------------------------------------------------------
-    // 13. PREVENT DOUBLE ACTIVATION
-    // ----------------------------------------------------------
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
     if (
-      String(subscription.status).toLowerCase() ===
-      "active"
+      !uuidRegex.test(subscriptionId)
     ) {
-      console.log(
-        "Subscription is already active."
-      );
-
-      return new NextResponse(
-        "Already active",
-        { status: 200 }
-      );
-    }
-
-    // ----------------------------------------------------------
-    // 14. VERIFY PLAN
-    // ----------------------------------------------------------
-
-    const planId =
-      String(
-        subscription.plan || ""
-      ).toLowerCase();
-
-    const selectedPlan =
-      PLANS[planId];
-
-    if (!selectedPlan) {
       console.error(
-        "Unknown subscription plan:",
-        planId
+        "Subscription ID is not a valid UUID."
       );
 
       return new NextResponse(
-        "Invalid plan",
+        "Invalid subscription ID",
         { status: 400 }
       );
     }
 
-    console.log(
-      "Subscription plan:",
-      planId
-    );
-
     // ----------------------------------------------------------
-    // 15. VERIFY PAYMENT AMOUNT
+    // 12. VERIFY PAYMENT AMOUNT EXISTS
     // ----------------------------------------------------------
-
-    const expectedAmount =
-      Number(subscription.monthly_price);
 
     const paidAmount =
       Number(amountGross);
 
     if (
-      !Number.isFinite(expectedAmount) ||
-      !Number.isFinite(paidAmount)
+      !Number.isFinite(paidAmount) ||
+      paidAmount <= 0
     ) {
       console.error(
-        "Invalid payment amount."
-      );
-
-      return new NextResponse(
-        "Invalid amount",
-        { status: 400 }
-      );
-    }
-
-    const expectedCents =
-      Math.round(expectedAmount * 100);
-
-    const paidCents =
-      Math.round(paidAmount * 100);
-
-    console.log(
-      "Expected amount:",
-      expectedAmount
-    );
-
-    console.log(
-      "Paid amount:",
-      paidAmount
-    );
-
-    if (
-      expectedCents !==
-      paidCents
-    ) {
-      console.error(
-        "Payment amount does not match subscription."
+        "Invalid PayFast amount:",
+        amountGross
       );
 
       return new NextResponse(
@@ -484,96 +384,61 @@ export async function POST(request) {
     }
 
     console.log(
-      "Payment amount verified."
+      "Verified PayFast amount:",
+      paidAmount
     );
 
     // ----------------------------------------------------------
-    // 16. CALCULATE SUBSCRIPTION PERIOD
+    // 13. CALL SUPABASE EDGE FUNCTION
     // ----------------------------------------------------------
 
-    const now = new Date();
+    console.log(
+      "Calling Supabase activate-payfast function..."
+    );
 
-    const periodStart =
-      now.toISOString();
+    const activationResponse =
+      await fetch(
+        PAYFAST_ACTIVATION_FUNCTION,
+        {
+          method: "POST",
 
-    let periodEnd = null;
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
 
-    // Pay Per Listing = one-time payment
-    if (planId === "pay_per_listing") {
-      periodEnd = null;
-    } else {
-      // Annual plan
-      if (
-        selectedPlan.annual ===
-        expectedAmount
-      ) {
-        const annualEnd =
-          new Date(now);
+          body: JSON.stringify({
+            subscription_id:
+              subscriptionId,
 
-        annualEnd.setFullYear(
-          annualEnd.getFullYear() + 1
-        );
+            payment_reference:
+              payfastPaymentId ||
+              merchantPaymentId,
 
-        periodEnd =
-          annualEnd.toISOString();
-      } else {
-        // Monthly plan
-        const monthlyEnd =
-          new Date(now);
+            amount:
+              paidAmount,
+          }),
+        }
+      );
 
-        monthlyEnd.setMonth(
-          monthlyEnd.getMonth() + 1
-        );
+    const activationText =
+      await activationResponse.text();
 
-        periodEnd =
-          monthlyEnd.toISOString();
-      }
-    }
+    console.log(
+      "Supabase activation response:",
+      activationText
+    );
 
     // ----------------------------------------------------------
-    // 17. ACTIVATE SUBSCRIPTION
+    // 14. CHECK EDGE FUNCTION RESPONSE
     // ----------------------------------------------------------
 
-    const {
-      data: updatedSubscription,
-      error: updateError,
-    } = await supabase
-      .from("company_subscriptions")
-      .update({
-        status: "active",
-
-        started_at:
-          subscription.started_at ||
-          periodStart,
-
-        current_period_start:
-          periodStart,
-
-        current_period_end:
-          periodEnd,
-
-        payment_provider:
-          "payfast",
-
-        // Store the ACTUAL PayFast payment ID.
-        // Fall back to merchant ID if PayFast did not
-        // provide pf_payment_id.
-        payment_reference:
-          payfastPaymentId ||
-          merchantPaymentId,
-
-        updated_at:
-          periodStart,
-      })
-      .eq("id", subscriptionId)
-      .eq("status", "inactive")
-      .select()
-      .maybeSingle();
-
-    if (updateError) {
+    if (
+      !activationResponse.ok
+    ) {
       console.error(
-        "Subscription activation error:",
-        updateError
+        "Supabase activation failed:",
+        activationText
       );
 
       return new NextResponse(
@@ -582,19 +447,40 @@ export async function POST(request) {
       );
     }
 
-    if (!updatedSubscription) {
+    let activationResult;
+
+    try {
+      activationResult =
+        JSON.parse(
+          activationText
+        );
+    } catch {
+      activationResult = {
+        raw: activationText,
+      };
+    }
+
+    // ----------------------------------------------------------
+    // 15. CHECK DATABASE RESULT
+    // ----------------------------------------------------------
+
+    if (
+      activationResult &&
+      activationResult.success === false
+    ) {
       console.error(
-        "Subscription was not updated."
+        "Database rejected activation:",
+        activationResult
       );
 
       return new NextResponse(
-        "Subscription activation failed",
-        { status: 500 }
+        "Subscription activation rejected",
+        { status: 400 }
       );
     }
 
     // ----------------------------------------------------------
-    // 18. SUCCESS
+    // 16. SUCCESS
     // ----------------------------------------------------------
 
     console.log(
@@ -611,22 +497,12 @@ export async function POST(request) {
     );
 
     console.log(
-      "Company:",
-      subscription.company_id
-    );
-
-    console.log(
-      "Plan:",
-      planId
-    );
-
-    console.log(
       "Amount:",
       paidAmount
     );
 
     console.log(
-      "PayFast payment reference:",
+      "PayFast reference:",
       payfastPaymentId ||
         merchantPaymentId
     );
