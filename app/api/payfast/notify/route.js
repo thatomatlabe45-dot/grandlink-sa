@@ -17,11 +17,14 @@ import crypto from "crypto";
 //       ↓
 // Confirm COMPLETE
 //       ↓
+// Extract GradLink subscription ID
+//       ↓
 // Call Supabase activate-payfast Edge Function
 //       ↓
 // company_subscriptions becomes ACTIVE
 //
 // ============================================================
+
 
 // ============================================================
 // PAYFAST CONFIGURATION
@@ -46,6 +49,7 @@ const PAYFAST_BASE_URL =
     ? "https://sandbox.payfast.co.za"
     : "https://www.payfast.co.za";
 
+
 // ============================================================
 // SUPABASE CONFIGURATION
 // ============================================================
@@ -58,6 +62,7 @@ const ACTIVATION_FUNCTION_URL =
     ? `${SUPABASE_URL}/functions/v1/activate-payfast`
     : null;
 
+
 // ============================================================
 // HELPER - PAYFAST URL ENCODING
 // ============================================================
@@ -67,6 +72,7 @@ function payfastEncode(value) {
     String(value ?? "")
   ).replace(/%20/g, "+");
 }
+
 
 // ============================================================
 // HELPER - CREATE PAYFAST SIGNATURE
@@ -104,6 +110,7 @@ function createPayFastSignature(
     .digest("hex");
 }
 
+
 // ============================================================
 // HELPER - SAFE RESPONSE
 // ============================================================
@@ -124,6 +131,7 @@ function response(
   );
 }
 
+
 // ============================================================
 // POST - PAYFAST ITN
 // ============================================================
@@ -141,6 +149,7 @@ export async function POST(request) {
     console.log(
       "========================================"
     );
+
 
     // ========================================================
     // 1. CHECK SERVER CONFIGURATION
@@ -190,6 +199,7 @@ export async function POST(request) {
       );
     }
 
+
     console.log(
       "PayFast mode:",
       PAYFAST_MODE
@@ -199,6 +209,7 @@ export async function POST(request) {
       "PayFast endpoint:",
       PAYFAST_BASE_URL
     );
+
 
     // ========================================================
     // 2. READ RAW ITN BODY
@@ -222,6 +233,7 @@ export async function POST(request) {
       );
     }
 
+
     // ========================================================
     // 3. PARSE PAYFAST PARAMETERS
     // ========================================================
@@ -233,6 +245,7 @@ export async function POST(request) {
       "PayFast parameters received:",
       Array.from(params.keys())
     );
+
 
     // ========================================================
     // 4. READ SIGNATURE
@@ -251,6 +264,7 @@ export async function POST(request) {
         400
       );
     }
+
 
     // ========================================================
     // 5. RECREATE SIGNATURE
@@ -271,6 +285,7 @@ export async function POST(request) {
       "Received signature:",
       receivedSignature
     );
+
 
     // ========================================================
     // 6. VERIFY SIGNATURE
@@ -293,6 +308,7 @@ export async function POST(request) {
     console.log(
       "PayFast signature verified."
     );
+
 
     // ========================================================
     // 7. READ PAYMENT INFORMATION
@@ -320,6 +336,7 @@ export async function POST(request) {
 
     const itemName =
       params.get("item_name");
+
 
     console.log(
       "----------------------------------------"
@@ -364,6 +381,7 @@ export async function POST(request) {
       "----------------------------------------"
     );
 
+
     // ========================================================
     // 8. VERIFY MERCHANT ID
     // ========================================================
@@ -396,6 +414,7 @@ export async function POST(request) {
       "Merchant ID verified."
     );
 
+
     // ========================================================
     // 9. REQUIRE m_payment_id
     // ========================================================
@@ -411,6 +430,7 @@ export async function POST(request) {
       );
     }
 
+
     // ========================================================
     // 10. ONLY ACTIVATE COMPLETE PAYMENTS
     // ========================================================
@@ -425,8 +445,6 @@ export async function POST(request) {
         paymentStatus
       );
 
-      // PayFast notification was successfully received.
-      // We do not activate an incomplete payment.
       return response(
         "Notification received - payment not complete",
         200
@@ -437,15 +455,9 @@ export async function POST(request) {
       "Payment status is COMPLETE."
     );
 
+
     // ========================================================
     // 11. VALIDATE ITN WITH PAYFAST
-    // ========================================================
-    //
-    // This is the server-to-server validation step.
-    //
-    // We send the exact received notification back to
-    // PayFast's /eng/query/validate endpoint.
-    //
     // ========================================================
 
     console.log(
@@ -484,6 +496,7 @@ export async function POST(request) {
       "PayFast ITN validation response:",
       validationText
     );
+
 
     // ========================================================
     // 12. REQUIRE VALID PAYFAST RESPONSE
@@ -525,11 +538,12 @@ export async function POST(request) {
       "PayFast ITN validation PASSED."
     );
 
+
     // ========================================================
     // 13. EXTRACT GRADLINK SUBSCRIPTION ID
     // ========================================================
     //
-    // Expected m_payment_id:
+    // Expected:
     //
     // GL-SUBSCRIPTION_UUID-TIMESTAMP
     //
@@ -564,6 +578,7 @@ export async function POST(request) {
       subscriptionId
     );
 
+
     // ========================================================
     // 14. VERIFY AMOUNT
     // ========================================================
@@ -590,6 +605,7 @@ export async function POST(request) {
       "Verified payment amount:",
       paidAmount
     );
+
 
     // ========================================================
     // 15. CALL SUPABASE EDGE FUNCTION
@@ -629,6 +645,11 @@ export async function POST(request) {
         }
       );
 
+
+    // ========================================================
+    // 16. READ ACTIVATION RESPONSE
+    // ========================================================
+
     const activationText =
       await activationResponse.text();
 
@@ -642,8 +663,9 @@ export async function POST(request) {
       activationText
     );
 
+
     // ========================================================
-    // 16. CHECK EDGE FUNCTION
+    // 17. CHECK EDGE FUNCTION HTTP STATUS
     // ========================================================
 
     if (
@@ -659,8 +681,9 @@ export async function POST(request) {
       );
     }
 
+
     // ========================================================
-    // 17. PARSE EDGE FUNCTION RESPONSE
+    // 18. PARSE EDGE FUNCTION RESPONSE
     // ========================================================
 
     let activationResult = null;
@@ -676,8 +699,9 @@ export async function POST(request) {
       );
     }
 
+
     // ========================================================
-    // 18. CHECK EXPLICIT FAILURE
+    // 19. CHECK EXPLICIT FAILURE
     // ========================================================
 
     if (
@@ -698,8 +722,9 @@ export async function POST(request) {
       );
     }
 
+
     // ========================================================
-    // 19. SUCCESS
+    // 20. SUCCESS
     // ========================================================
 
     console.log(
@@ -723,12 +748,13 @@ export async function POST(request) {
     console.log(
       "PayFast reference:",
       payfastPaymentId ||
-        merchantPaymentId
+      merchantPaymentId
     );
 
     console.log(
       "========================================"
     );
+
 
     // IMPORTANT:
     // PayFast must receive HTTP 200.
@@ -738,6 +764,7 @@ export async function POST(request) {
     );
 
   } catch (error) {
+
     console.error(
       "========================================"
     );
@@ -760,6 +787,7 @@ export async function POST(request) {
     );
   }
 }
+
 
 // ============================================================
 // GET - BROWSER TEST
