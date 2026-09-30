@@ -2,26 +2,34 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 
 // ============================================================
-// GRADLINK SA - PAYFAST NOTIFICATION / ITN
+// GRADLINK SA - PAYFAST ITN / NOTIFICATION
 // ============================================================
 //
-// FLOW:
+// Supports:
+// - multipart/form-data
+// - application/x-www-form-urlencoded
 //
-// PayFast payment
-//       ↓
-// PayFast sends ITN to this route
-//       ↓
-// Verify PayFast signature
-//       ↓
+// Flow:
+//
+// PayFast
+//   ↓
+// Receive ITN
+//   ↓
+// Parse form data correctly
+//   ↓
+// Verify signature
+//   ↓
+// Verify merchant
+//   ↓
+// Check COMPLETE
+//   ↓
 // Validate ITN with PayFast
-//       ↓
-// Confirm COMPLETE
-//       ↓
+//   ↓
 // Extract GradLink subscription ID
-//       ↓
-// Call Supabase activate-payfast Edge Function
-//       ↓
-// company_subscriptions becomes ACTIVE
+//   ↓
+// Call activate-payfast Edge Function
+//   ↓
+// Subscription becomes ACTIVE
 //
 // ============================================================
 
@@ -69,7 +77,7 @@ const ACTIVATION_FUNCTION_URL =
 
 function payfastEncode(value) {
   return encodeURIComponent(
-    String(value ?? "")
+    String(value ?? "").trim()
   ).replace(/%20/g, "+");
 }
 
@@ -100,9 +108,14 @@ function createPayFastSignature(
   if (passphrase) {
     signatureString +=
       `&passphrase=${payfastEncode(
-        passphrase.trim()
+        passphrase
       )}`;
   }
+
+  console.log(
+    "PayFast signature parameter count:",
+    signatureParts.length
+  );
 
   return crypto
     .createHash("md5")
@@ -129,6 +142,140 @@ function response(
       },
     }
   );
+}
+
+
+// ============================================================
+// HELPER - PARSE PAYFAST REQUEST
+// ============================================================
+
+async function parsePayFastRequest(request) {
+  const contentType =
+    String(
+      request.headers.get("content-type") || ""
+    ).toLowerCase();
+
+  console.log(
+    "PayFast Content-Type:",
+    contentType
+  );
+
+
+  // ==========================================================
+  // MULTIPART/FORM-DATA
+  // ==========================================================
+
+  if (
+    contentType.includes(
+      "multipart/form-data"
+    )
+  ) {
+    console.log(
+      "Parsing PayFast notification as multipart/form-data."
+    );
+
+    const formData =
+      await request.formData();
+
+    const params =
+      new URLSearchParams();
+
+    for (const [key, value] of formData.entries()) {
+      // PayFast fields should normally be text.
+      // If a File somehow appears, convert it safely.
+      if (
+        typeof value === "string"
+      ) {
+        params.append(
+          key,
+          value
+        );
+      } else {
+        params.append(
+          key,
+          value?.name || ""
+        );
+      }
+    }
+
+    return {
+      params,
+      rawBody: params.toString(),
+      contentType,
+    };
+  }
+
+
+  // ==========================================================
+  // URL-ENCODED FORM DATA
+  // ==========================================================
+
+  if (
+    contentType.includes(
+      "application/x-www-form-urlencoded"
+    )
+  ) {
+    console.log(
+      "Parsing PayFast notification as application/x-www-form-urlencoded."
+    );
+
+    const rawBody =
+      await request.text();
+
+    const params =
+      new URLSearchParams(rawBody);
+
+    return {
+      params,
+      rawBody,
+      contentType,
+    };
+  }
+
+
+  // ==========================================================
+  // FALLBACK
+  // ==========================================================
+
+  console.log(
+    "Unknown PayFast content type. Attempting formData()."
+  );
+
+  try {
+    const formData =
+      await request.formData();
+
+    const params =
+      new URLSearchParams();
+
+    for (const [key, value] of formData.entries()) {
+      if (
+        typeof value === "string"
+      ) {
+        params.append(
+          key,
+          value
+        );
+      } else {
+        params.append(
+          key,
+          value?.name || ""
+        );
+      }
+    }
+
+    return {
+      params,
+      rawBody: params.toString(),
+      contentType,
+    };
+  } catch {
+    console.error(
+      "Unable to parse PayFast notification body."
+    );
+
+    return null;
+  }
 }
 
 
@@ -212,19 +359,56 @@ export async function POST(request) {
 
 
     // ========================================================
-    // 2. READ RAW ITN BODY
+    // 2. PARSE PAYFAST REQUEST
     // ========================================================
 
-    const rawBody =
-      await request.text();
+    const parsed =
+      await parsePayFastRequest(request);
+
+    if (!parsed) {
+      return response(
+        "Unable to parse notification",
+        400
+      );
+    }
+
+    const {
+      params,
+      rawBody,
+      contentType,
+    } = parsed;
+
 
     console.log(
-      "PayFast raw body received."
+      "PayFast request parsed successfully."
     );
 
-    if (!rawBody) {
+    console.log(
+      "PayFast content type:",
+      contentType
+    );
+
+
+    // ========================================================
+    // 3. CHECK PARAMETERS
+    // ========================================================
+
+    const parameterKeys =
+      Array.from(
+        params.keys()
+      );
+
+    console.log(
+      "PayFast parameters received:",
+      parameterKeys
+    );
+
+
+    if (
+      parameterKeys.length === 0
+    ) {
       console.error(
-        "PayFast sent an empty notification body."
+        "PayFast sent no parameters."
       );
 
       return response(
@@ -232,19 +416,6 @@ export async function POST(request) {
         400
       );
     }
-
-
-    // ========================================================
-    // 3. PARSE PAYFAST PARAMETERS
-    // ========================================================
-
-    const params =
-      new URLSearchParams(rawBody);
-
-    console.log(
-      "PayFast parameters received:",
-      Array.from(params.keys())
-    );
 
 
     // ========================================================
@@ -259,11 +430,20 @@ export async function POST(request) {
         "PayFast signature was not received."
       );
 
+      console.error(
+        "Available PayFast parameters:",
+        parameterKeys
+      );
+
       return response(
         "Missing signature",
         400
       );
     }
+
+    console.log(
+      "PayFast signature was received."
+    );
 
 
     // ========================================================
@@ -317,7 +497,7 @@ export async function POST(request) {
     const paymentStatus =
       String(
         params.get("payment_status") || ""
-      ).toUpperCase();
+      ).trim().toUpperCase();
 
     const merchantId =
       params.get("merchant_id");
@@ -387,20 +567,20 @@ export async function POST(request) {
     // ========================================================
 
     if (
-      String(merchantId || "") !==
-      String(PAYFAST_MERCHANT_ID)
+      String(merchantId || "").trim() !==
+      String(PAYFAST_MERCHANT_ID).trim()
     ) {
       console.error(
         "PayFast merchant ID does not match."
       );
 
       console.error(
-        "Expected:",
+        "Expected merchant ID:",
         PAYFAST_MERCHANT_ID
       );
 
       console.error(
-        "Received:",
+        "Received merchant ID:",
         merchantId
       );
 
@@ -435,7 +615,9 @@ export async function POST(request) {
     // 10. ONLY ACTIVATE COMPLETE PAYMENTS
     // ========================================================
 
-    if (paymentStatus !== "COMPLETE") {
+    if (
+      paymentStatus !== "COMPLETE"
+    ) {
       console.log(
         "Payment is not COMPLETE."
       );
@@ -467,6 +649,18 @@ export async function POST(request) {
     const validationUrl =
       `${PAYFAST_BASE_URL}/eng/query/validate`;
 
+
+    // PayFast validation requires the
+    // same form parameters that were received.
+    //
+    // IMPORTANT:
+    // Send the parsed fields back as form data,
+    // rather than sending the multipart boundary
+    // received from PayFast.
+
+    const validationBody =
+      params.toString();
+
     const validationResponse =
       await fetch(
         validationUrl,
@@ -476,16 +670,22 @@ export async function POST(request) {
           headers: {
             "Content-Type":
               "application/x-www-form-urlencoded",
+
+            "Accept":
+              "text/plain",
           },
 
-          body: rawBody,
+          body:
+            validationBody,
         }
       );
+
 
     const validationText =
       (
         await validationResponse.text()
       ).trim();
+
 
     console.log(
       "PayFast ITN validation HTTP status:",
@@ -554,6 +754,7 @@ export async function POST(request) {
         /^GL-([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})-(\d+)$/i
       );
 
+
     if (!paymentMatch) {
       console.error(
         "Could not extract subscription ID from m_payment_id."
@@ -570,8 +771,10 @@ export async function POST(request) {
       );
     }
 
+
     const subscriptionId =
       paymentMatch[1];
+
 
     console.log(
       "Subscription ID:",
@@ -585,6 +788,7 @@ export async function POST(request) {
 
     const paidAmount =
       Number(amountGross);
+
 
     if (
       !Number.isFinite(paidAmount) ||
@@ -600,6 +804,7 @@ export async function POST(request) {
         400
       );
     }
+
 
     console.log(
       "Verified payment amount:",
@@ -620,6 +825,7 @@ export async function POST(request) {
       ACTIVATION_FUNCTION_URL
     );
 
+
     const activationResponse =
       await fetch(
         ACTIVATION_FUNCTION_URL,
@@ -631,17 +837,18 @@ export async function POST(request) {
               "application/json",
           },
 
-          body: JSON.stringify({
-            subscription_id:
-              subscriptionId,
+          body:
+            JSON.stringify({
+              subscription_id:
+                subscriptionId,
 
-            payment_reference:
-              payfastPaymentId ||
-              merchantPaymentId,
+              payment_reference:
+                payfastPaymentId ||
+                merchantPaymentId,
 
-            amount:
-              paidAmount,
-          }),
+              amount:
+                paidAmount,
+            }),
         }
       );
 
@@ -652,6 +859,7 @@ export async function POST(request) {
 
     const activationText =
       await activationResponse.text();
+
 
     console.log(
       "Activation HTTP status:",
@@ -686,7 +894,8 @@ export async function POST(request) {
     // 18. PARSE EDGE FUNCTION RESPONSE
     // ========================================================
 
-    let activationResult = null;
+    let activationResult =
+      null;
 
     try {
       activationResult =
@@ -756,12 +965,12 @@ export async function POST(request) {
     );
 
 
-    // IMPORTANT:
     // PayFast must receive HTTP 200.
     return response(
       "OK",
       200
     );
+
 
   } catch (error) {
 
