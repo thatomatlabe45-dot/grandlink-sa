@@ -594,27 +594,135 @@ async function openStorageDocument(
   value,
   documentName
 ) {
+  const cleanPath =
+    getStoragePath(value);
+
+  if (!cleanPath) {
+    alert(
+      `This applicant has not uploaded a ${documentName}.`
+    );
+    return;
+  }
+
+  // Open the new tab immediately.
+  // This helps Safari/iPhone avoid blocking the document.
+  const documentWindow =
+    window.open(
+      "",
+      "_blank"
+    );
+
   try {
-    console.log(
-      "===================================="
-    );
+    if (!documentWindow) {
+      throw new Error(
+        "Your browser blocked the document window. Please allow pop-ups and try again."
+      );
+    }
+
+    // Temporary loading page
+    documentWindow.document.write(`
+      <html>
+        <head>
+          <title>Opening ${documentName}...</title>
+        </head>
+
+        <body style="
+          margin:0;
+          min-height:100vh;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          font-family:Arial,sans-serif;
+          background:#f5f9ff;
+          color:#174ea6;
+        ">
+          <div style="
+            text-align:center;
+            padding:30px;
+          ">
+            <div style="
+              font-size:50px;
+              margin-bottom:15px;
+            ">
+              📄
+            </div>
+
+            <h2>
+              Opening ${documentName}...
+            </h2>
+
+            <p style="
+              color:#64748b;
+              line-height:1.6;
+            ">
+              Please wait while the document is loaded.
+            </p>
+          </div>
+        </body>
+      </html>
+    `);
 
     console.log(
-      `Opening ${documentName}`
-    );
-
-    console.log(
-      "Original document value:",
-      value
-    );
-
-    const cleanPath =
-      getStoragePath(value);
-
-    console.log(
-      "Clean storage path:",
+      `${documentName} storage path:`,
       cleanPath
     );
+
+    // Create secure signed URL
+    const {
+      data,
+      error,
+    } =
+      await supabase.storage
+        .from("documents")
+        .createSignedUrl(
+          cleanPath,
+          600
+        );
+
+    if (error) {
+      console.error(
+        `${documentName} signed URL error:`,
+        error
+      );
+
+      throw error;
+    }
+
+    if (
+      !data?.signedUrl
+    ) {
+      throw new Error(
+        `Could not create a secure link for this ${documentName}.`
+      );
+    }
+
+    console.log(
+      `${documentName} signed URL created successfully`
+    );
+
+    // Load document into the already-opened tab
+    documentWindow.location.href =
+      data.signedUrl;
+
+  } catch (error) {
+    console.error(
+      `Error opening ${documentName}:`,
+      error
+    );
+
+    if (
+      documentWindow &&
+      !documentWindow.closed
+    ) {
+      documentWindow.close();
+    }
+
+    alert(
+      error?.message ||
+        `Could not open the ${documentName}.`
+    );
+  }
+}
 
     // --------------------------------------------------------
     // NO PATH
