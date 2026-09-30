@@ -399,17 +399,11 @@ function getStoragePath(value) {
     path
   );
 
-  // ----------------------------------------------------------
-  // REMOVE QUERY PARAMETERS AND HASH
-  // ----------------------------------------------------------
-
+  // Remove query parameters and hash
   path = path.split("?")[0];
   path = path.split("#")[0];
 
-  // ----------------------------------------------------------
-  // DECODE URL-ENCODED CHARACTERS
-  // ----------------------------------------------------------
-
+  // Decode URL-encoded characters
   try {
     path = decodeURIComponent(path);
   } catch (error) {
@@ -419,10 +413,7 @@ function getStoragePath(value) {
     );
   }
 
-  // ----------------------------------------------------------
-  // SUPABASE STORAGE URL
-  // ----------------------------------------------------------
-
+  // Supabase storage URL
   if (
     path.includes(
       "/storage/v1/object/"
@@ -433,7 +424,6 @@ function getStoragePath(value) {
         "/storage/v1/object/"
       )[1] || "";
 
-    // Remove access type
     path = path.replace(
       /^sign\//i,
       ""
@@ -449,17 +439,13 @@ function getStoragePath(value) {
       ""
     );
 
-    // Remove bucket name
     path = path.replace(
       /^documents\//i,
       ""
     );
   }
 
-  // ----------------------------------------------------------
-  // URL CONTAINING /documents/
-  // ----------------------------------------------------------
-
+  // URL containing /documents/
   if (
     path.includes(
       "/documents/"
@@ -471,10 +457,7 @@ function getStoragePath(value) {
       )[1] || path;
   }
 
-  // ----------------------------------------------------------
-  // POSSIBLE STORAGE URL WITHOUT /documents/
-  // ----------------------------------------------------------
-
+  // Possible storage URL without /documents/
   if (
     path.includes(
       "/object/sign/"
@@ -507,33 +490,23 @@ function getStoragePath(value) {
     );
   }
 
-  // ----------------------------------------------------------
-  // REMOVE LEADING SLASHES
-  // ----------------------------------------------------------
-
+  // Remove leading slashes
   path =
     path.replace(
       /^\/+/,
       ""
     );
 
-  // ----------------------------------------------------------
-  // REMOVE BUCKET NAME
-  // ----------------------------------------------------------
-
+  // Remove bucket name
   path =
     path.replace(
       /^documents\//i,
       ""
     );
 
-  // ----------------------------------------------------------
-  // FINAL QUERY/HASH CLEANUP
-  // ----------------------------------------------------------
-
+  // Final cleanup
   path = path.split("?")[0];
   path = path.split("#")[0];
-
   path = path.trim();
 
   console.log(
@@ -724,93 +697,6 @@ async function openStorageDocument(
   }
 }
 
-    // --------------------------------------------------------
-    // NO PATH
-    // --------------------------------------------------------
-
-    if (!cleanPath) {
-      alert(
-        `${documentName} is not available.`
-      );
-
-      return;
-    }
-
-    // --------------------------------------------------------
-    // CREATE SIGNED URL
-    // --------------------------------------------------------
-
-    const {
-      data,
-      error,
-    } =
-      await supabase.storage
-        .from("documents")
-        .createSignedUrl(
-          cleanPath,
-          3600
-        );
-
-    // --------------------------------------------------------
-    // ERROR
-    // --------------------------------------------------------
-
-    if (error) {
-      console.error(
-        "Supabase signed URL error:",
-        error
-      );
-
-      alert(
-        `Could not open ${documentName}.`
-      );
-
-      return;
-    }
-
-    // --------------------------------------------------------
-    // CHECK RESULT
-    // --------------------------------------------------------
-
-    if (
-      !data ||
-      !data.signedUrl
-    ) {
-      console.error(
-        "No signed URL returned:",
-        data
-      );
-
-      alert(
-        `Could not create a link for ${documentName}.`
-      );
-
-      return;
-    }
-
-    console.log(
-      `${documentName} signed URL created successfully.`
-    );
-
-    // --------------------------------------------------------
-    // IPHONE / SAFARI
-    // --------------------------------------------------------
-
-    window.location.href =
-      data.signedUrl;
-
-  } catch (error) {
-    console.error(
-      `Error opening ${documentName}:`,
-      error
-    );
-
-    alert(
-      `Could not open the ${documentName}.`
-    );
-  }
-}
-
 // ============================================================
 // PAGE
 // ============================================================
@@ -871,10 +757,7 @@ export default function ApplicantsPage() {
         setLoading(true);
         setErrorMessage("");
 
-        // ------------------------------------------------------
         // AUTH
-        // ------------------------------------------------------
-
         const {
           data: {
             user,
@@ -892,10 +775,7 @@ export default function ApplicantsPage() {
           return;
         }
 
-        // ------------------------------------------------------
         // COMPANY
-        // ------------------------------------------------------
-
         const {
           data: companyData,
           error: companyError,
@@ -925,10 +805,7 @@ export default function ApplicantsPage() {
           companyData
         );
 
-        // ------------------------------------------------------
         // SUBSCRIPTION
-        // ------------------------------------------------------
-
         const {
           data: subscriptionData,
           error: subscriptionError,
@@ -971,10 +848,7 @@ export default function ApplicantsPage() {
           false
         );
 
-        // ------------------------------------------------------
         // INTERNSHIP
-        // ------------------------------------------------------
-
         const {
           data: internshipData,
           error: internshipError,
@@ -998,10 +872,7 @@ export default function ApplicantsPage() {
           );
         }
 
-        // ------------------------------------------------------
         // SECURITY CHECK
-        // ------------------------------------------------------
-
         if (
           internshipData.company_name !==
           companyData.company_name
@@ -1017,10 +888,7 @@ export default function ApplicantsPage() {
           internshipData
         );
 
-        // ------------------------------------------------------
         // APPLICATIONS
-        // ------------------------------------------------------
-
         const {
           data: applicationData,
           error: applicationError,
@@ -1046,10 +914,7 @@ export default function ApplicantsPage() {
         const rawApplications =
           applicationData || [];
 
-        // ------------------------------------------------------
         // LOAD GRADUATE PROFILES
-        // ------------------------------------------------------
-
         const graduateIds = [
           ...new Set(
             rawApplications
@@ -1089,10 +954,7 @@ export default function ApplicantsPage() {
           }
         }
 
-        // ------------------------------------------------------
         // MERGE APPLICATION + PROFILE
-        // ------------------------------------------------------
-
         const mergedApplications =
           rawApplications.map(
             (application) => {
@@ -1108,10 +970,7 @@ export default function ApplicantsPage() {
                 ...application,
               };
 
-              // ------------------------------------------------
               // DOCUMENT FALLBACKS
-              // ------------------------------------------------
-
               if (
                 !merged.cv_url &&
                 graduate?.cv_url
@@ -1146,10 +1005,7 @@ export default function ApplicantsPage() {
             }
           );
 
-        // ------------------------------------------------------
         // HIGHEST MATCH FIRST
-        // ------------------------------------------------------
-
         mergedApplications.sort(
           (a, b) =>
             (b.matchScore || 0) -
@@ -2644,9 +2500,7 @@ function ApplicantCard({
             marginBottom: 16,
           }}
         >
-          {/* ==================================================
-              REVIEW CV
-          ================================================== */}
+          {/* REVIEW CV */}
 
           <button
             type="button"
@@ -2683,9 +2537,7 @@ function ApplicantCard({
             📄 Review CV
           </button>
 
-          {/* ==================================================
-              QUALIFICATION
-          ================================================== */}
+          {/* QUALIFICATION */}
 
           <button
             type="button"
@@ -2728,9 +2580,7 @@ function ApplicantCard({
             🎓 View Qualification
           </button>
 
-          {/* ==================================================
-              FULL APPLICATION
-          ================================================== */}
+          {/* FULL APPLICATION */}
 
           <Link
             href={`/company/internships/${internshipId}/applicants/${application.id}`}
@@ -2749,9 +2599,7 @@ function ApplicantCard({
           </Link>
         </div>
 
-        {/* ====================================================
-            PREMIUM DOCUMENT VERIFICATION
-        ==================================================== */}
+        {/* PREMIUM DOCUMENT VERIFICATION */}
 
         <div
           style={{
@@ -2864,9 +2712,7 @@ function ApplicantCard({
           )}
         </div>
 
-        {/* ====================================================
-            STATUS ACTIONS
-        ==================================================== */}
+        {/* STATUS ACTIONS */}
 
         <div
           style={{
