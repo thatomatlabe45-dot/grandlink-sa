@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 
@@ -9,275 +10,318 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-/* =========================================================
-   HELPERS
-========================================================= */
+// ============================================================
+// QUALIFICATION LEVEL
+// ============================================================
 
-function normalise(value) {
+function getQualificationLevel(value) {
+  const text = String(value || "").toLowerCase().trim();
+
+  if (!text) return 0;
+
+  if (
+    text.includes("phd") ||
+    text.includes("doctorate") ||
+    text.includes("doctoral")
+  ) {
+    return 5;
+  }
+
+  if (
+    text.includes("master") ||
+    text.includes("masters") ||
+    text.includes("mba") ||
+    text.includes("m.sc") ||
+    text.includes("msc")
+  ) {
+    return 4;
+  }
+
+  if (
+    text.includes("honours") ||
+    text.includes("honors") ||
+    text.includes("postgraduate diploma") ||
+    text.includes("pgdip")
+  ) {
+    return 3;
+  }
+
+  if (
+    text.includes("degree") ||
+    text.includes("bachelor") ||
+    text.includes("bachelors") ||
+    text.includes("bsc") ||
+    text.includes("ba ") ||
+    text === "ba" ||
+    text.includes("bcom") ||
+    text.includes("llb")
+  ) {
+    return 2;
+  }
+
+  if (
+    text.includes("diploma") ||
+    text.includes("higher certificate")
+  ) {
+    return 1;
+  }
+
+  return 0;
+}
+
+// ============================================================
+// TEXT HELPERS
+// ============================================================
+
+function normalizeText(value) {
   return String(value || "")
-    .trim()
-    .toLowerCase();
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
-function getStoragePath(value) {
-  if (!value) return "";
-
-  let path = String(value).trim();
-
-  if (!path) return "";
-
-  try {
-    path = decodeURIComponent(path);
-  } catch {
-    // Keep original value if decoding fails.
+function parseSkills(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((skill) => String(skill).trim())
+      .filter(Boolean);
   }
 
-  // Remove query string and hash.
-  path = path.split("?")[0].split("#")[0];
-
-  // Handle complete Supabase storage URLs.
-  path = path.replace(
-    /^https?:\/\/[^/]+\/storage\/v1\/object\/(?:sign|public|authenticated)\//i,
-    ""
-  );
-
-  // Remove storage path prefixes.
-  path = path.replace(
-    /^\/?storage\/v1\/object\/(?:sign|public|authenticated)\//i,
-    ""
-  );
-
-  // Remove bucket name if included.
-  path = path.replace(/^\/?documents\//i, "");
-
-  // Remove leading slash.
-  path = path.replace(/^\/+/, "");
-
-  return path.trim();
+  return String(value || "")
+    .split(/[,;\n|]+/)
+    .map((skill) => skill.trim())
+    .filter(Boolean);
 }
 
-function findCV(application) {
-  if (!application) return "";
+// ============================================================
+// QUALIFICATION MATCH
+// ============================================================
 
-  const possibleValues = [
-    application.cv_url,
-    application.cv,
-    application.resume_url,
-    application.resume,
-    application.document_url,
-    application.cvUrl,
-    application.resumeUrl,
+function qualificationMatches(applicantQualification, jobQualification) {
+  const applicant = normalizeText(applicantQualification);
+  const job = normalizeText(jobQualification);
 
-    application.graduate?.cv_url,
-    application.graduate?.cv,
-    application.graduate?.resume_url,
-    application.graduate?.resume,
+  if (!applicant || !job) return false;
 
-    application.profile?.cv_url,
-    application.profile?.cv,
-    application.profile?.resume_url,
-    application.profile?.resume,
-  ];
+  if (applicant === job) return true;
 
-  return (
-    possibleValues.find(
-      (value) => String(value || "").trim().length > 0
-    ) || ""
-  );
+  if (applicant.includes(job) || job.includes(applicant)) {
+    return true;
+  }
+
+  const applicantLevel = getQualificationLevel(applicant);
+  const jobLevel = getQualificationLevel(job);
+
+  if (applicantLevel > 0 && jobLevel > 0) {
+    return applicantLevel >= jobLevel;
+  }
+
+  return false;
 }
 
-function findQualificationDocument(application) {
-  if (!application) return "";
+// ============================================================
+// MATCH SCORE
+// Qualification = 35
+// Field = 35
+// Skills = 30
+// ============================================================
 
-  const possibleValues = [
-    application.qualification_url,
-    application.qualification_document_url,
-    application.qualification_document,
-    application.qualification_file,
-    application.qualificationUrl,
-    application.certificate_url,
-    application.certificate,
-    application.academic_record_url,
-    application.academic_record,
+function calculateMatch(applicant, internship) {
+  let score = 0;
 
-    application.graduate?.qualification_url,
-    application.graduate?.qualification_document_url,
-    application.graduate?.qualification_document,
-    application.graduate?.qualification_file,
-    application.graduate?.certificate_url,
-    application.graduate?.certificate,
-    application.graduate?.academic_record_url,
-    application.graduate?.academic_record,
+  const applicantQualification =
+    applicant?.qualification || "";
 
-    application.profile?.qualification_url,
-    application.profile?.qualification_document_url,
-    application.profile?.qualification_document,
-    application.profile?.qualification_file,
-    application.profile?.certificate_url,
-    application.profile?.certificate,
-    application.profile?.academic_record_url,
-    application.profile?.academic_record,
-  ];
+  const jobQualification =
+    internship?.qualification || "";
 
-  return (
-    possibleValues.find(
-      (value) => String(value || "").trim().length > 0
-    ) || ""
-  );
-}
-
-function getMatchLabel(score) {
-  if (score >= 85) return "Strong";
-  if (score >= 70) return "Good";
-  if (score >= 40) return "Possible";
-  return "Weak";
-}
-
-function getMatchScore(application, internship) {
-  if (!application || !internship) return 0;
-
-  const graduate =
-    application.graduate ||
-    application.profile ||
-    application;
-
-  const qualification = normalise(
-    graduate.qualification
+  const qualificationMatch = qualificationMatches(
+    applicantQualification,
+    jobQualification
   );
 
-  const internshipQualification = normalise(
-    internship.qualification
+  if (qualificationMatch) {
+    score += 35;
+  }
+
+  const applicantField = normalizeText(
+    applicant?.field_of_study || ""
   );
 
-  const field = normalise(
-    graduate.field_of_study
+  const jobField = normalizeText(
+    internship?.field_of_study || ""
   );
 
-  const internshipField = normalise(
-    internship.field_of_study
-  );
+  let fieldMatch = false;
 
-  const graduateSkills = String(
-    graduate.skills || ""
-  )
-    .split(",")
-    .map((skill) => normalise(skill))
+  if (applicantField && jobField) {
+    fieldMatch =
+      applicantField === jobField ||
+      applicantField.includes(jobField) ||
+      jobField.includes(applicantField);
+  }
+
+  if (fieldMatch) {
+    score += 35;
+  }
+
+  const applicantSkills = parseSkills(applicant?.skills)
+    .map(normalizeText)
     .filter(Boolean);
 
-  const internshipSkills = String(
-    internship.skills || ""
-  )
-    .split(",")
-    .map((skill) => normalise(skill))
+  const jobSkills = parseSkills(internship?.skills)
+    .map(normalizeText)
     .filter(Boolean);
 
-  let qualificationScore = 0;
-  let fieldScore = 0;
-  let skillsScore = 0;
+  let matchingSkills = [];
 
-  if (
-    qualification &&
-    internshipQualification &&
-    (
-      qualification === internshipQualification ||
-      qualification.includes(internshipQualification) ||
-      internshipQualification.includes(qualification)
-    )
-  ) {
-    qualificationScore = 35;
-  }
-
-  if (
-    field &&
-    internshipField &&
-    (
-      field === internshipField ||
-      field.includes(internshipField) ||
-      internshipField.includes(field)
-    )
-  ) {
-    fieldScore = 35;
-  }
-
-  if (
-    graduateSkills.length > 0 &&
-    internshipSkills.length > 0
-  ) {
-    const matchedSkills = internshipSkills.filter(
-      (internshipSkill) =>
-        graduateSkills.some(
-          (graduateSkill) =>
-            graduateSkill.includes(internshipSkill) ||
-            internshipSkill.includes(graduateSkill)
-        )
-    );
-
-    skillsScore = Math.round(
-      (matchedSkills.length /
-        internshipSkills.length) *
-        30
+  if (applicantSkills.length && jobSkills.length) {
+    matchingSkills = applicantSkills.filter((applicantSkill) =>
+      jobSkills.some(
+        (jobSkill) =>
+          applicantSkill === jobSkill ||
+          applicantSkill.includes(jobSkill) ||
+          jobSkill.includes(applicantSkill)
+      )
     );
   }
 
-  return qualificationScore + fieldScore + skillsScore;
-}
+  let skillScore = 0;
 
-/* =========================================================
-   BUTTON STYLE
-========================================================= */
+  if (jobSkills.length > 0 && matchingSkills.length > 0) {
+    skillScore =
+      (matchingSkills.length / jobSkills.length) * 30;
+  }
 
-function actionButton(background) {
+  score += Math.min(30, Math.round(skillScore));
+
+  let label = "Weak";
+
+  if (score >= 85) {
+    label = "Strong";
+  } else if (score >= 70) {
+    label = "Good";
+  } else if (score >= 40) {
+    label = "Possible";
+  }
+
   return {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "100%",
-    minHeight: 46,
-    padding: "11px 14px",
-    border: "none",
-    borderRadius: 10,
-    background,
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: 700,
-    cursor: "pointer",
-    WebkitTapHighlightColor: "transparent",
-    touchAction: "manipulation",
-    userSelect: "none",
-    WebkitUserSelect: "none",
-    textDecoration: "none",
+    score,
+    label,
+    qualificationMatch,
+    fieldMatch,
+    matchingSkills,
   };
 }
 
-/* =========================================================
-   DOCUMENT OPENING
-========================================================= */
+// ============================================================
+// STORAGE PATH HELPER
+// ============================================================
 
-async function openStorageDocument(
-  value,
-  documentName
-) {
-  const cleanPath = getStoragePath(value);
+function getStoragePath(value) {
+  if (!value) return null;
 
-  console.log(
-    `${documentName} original value:`,
-    value
+  let path = String(value).trim();
+
+  if (!path) return null;
+
+  try {
+    if (
+      path.startsWith("http://") ||
+      path.startsWith("https://")
+    ) {
+      const url = new URL(path);
+      path = url.pathname;
+    }
+  } catch {
+    // Keep original value if it is not a valid URL.
+  }
+
+  path = path.split("?")[0];
+  path = path.split("#")[0];
+
+  path = path.replace(/^\/+/, "");
+
+  path = path.replace(
+    /^storage\/v1\/object\/(public|sign|authenticated)\//i,
+    ""
   );
 
-  console.log(
-    `${documentName} cleaned storage path:`,
-    cleanPath
-  );
+  path = path.replace(/^documents\//i, "");
 
-  if (!cleanPath) {
-    alert(
-      `This applicant has not uploaded a ${documentName}.`
-    );
+  return path || null;
+}
+
+// ============================================================
+// DOCUMENT FINDERS
+// ============================================================
+
+function findCV(application, graduate) {
+  const possibleValues = [
+    application?.cv_url,
+    application?.cv,
+    application?.resume_url,
+    application?.resume,
+    graduate?.cv_url,
+    graduate?.cv,
+    graduate?.resume_url,
+    graduate?.resume,
+  ];
+
+  for (const value of possibleValues) {
+    if (value) {
+      const path = getStoragePath(value);
+
+      if (path) {
+        return path;
+      }
+    }
+  }
+
+  return null;
+}
+
+function findQualificationDocument(application, graduate) {
+  const possibleValues = [
+    application?.qualification_url,
+    application?.qualification,
+    application?.qualification_document,
+    graduate?.qualification_url,
+    graduate?.qualification_document,
+    graduate?.qualification_file,
+  ];
+
+  for (const value of possibleValues) {
+    if (value) {
+      const path = getStoragePath(value);
+
+      if (path) {
+        return path;
+      }
+    }
+  }
+
+  return null;
+}
+
+// ============================================================
+// OPEN SUPABASE DOCUMENT
+// ============================================================
+
+async function openStorageDocument(path, label = "document") {
+  if (!path) {
+    alert(`No ${label} was uploaded for this application.`);
     return;
   }
 
-  // Open immediately so Safari/iPhone does not treat
-  // the later signed URL as an unwanted popup.
+  const cleanPath = getStoragePath(path);
+
+  if (!cleanPath) {
+    alert(`The ${label} file path is invalid.`);
+    return;
+  }
+
   const documentWindow = window.open(
     "",
     "_blank"
@@ -285,1518 +329,1992 @@ async function openStorageDocument(
 
   if (!documentWindow) {
     alert(
-      "Your browser blocked the document window. Please allow pop-ups and try again."
+      "Your browser blocked the document window. Please allow pop-ups for GradLink SA."
     );
     return;
   }
 
+  documentWindow.document.write(`
+    <html>
+      <head>
+        <title>Opening ${label}...</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </head>
+      <body style="
+        font-family: Arial, sans-serif;
+        padding: 30px;
+        text-align: center;
+        color: #1e293b;
+      ">
+        <h3>Opening ${label}...</h3>
+        <p>Please wait.</p>
+      </body>
+    </html>
+  `);
+
   try {
-    documentWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Opening ${documentName}</title>
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <style>
-            body {
-              margin: 0;
-              min-height: 100vh;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-family: Arial, sans-serif;
-              background: #f8fafc;
-              color: #0f172a;
-            }
-            .box {
-              text-align: center;
-              padding: 30px;
-            }
-            .title {
-              font-size: 18px;
-              font-weight: 700;
-              margin-bottom: 8px;
-            }
-            .text {
-              font-size: 14px;
-              color: #64748b;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="box">
-            <div class="title">
-              Opening ${documentName}...
-            </div>
-            <div class="text">
-              Please wait.
-            </div>
-          </div>
-        </body>
-      </html>
-    `);
-    documentWindow.document.close();
+    const candidates = [];
 
-    const {
-      data,
-      error,
-    } = await supabase.storage
-      .from("documents")
-      .createSignedUrl(
-        cleanPath,
-        3600
-      );
+    if (cleanPath) {
+      candidates.push(cleanPath);
+    }
 
-    if (error) {
+    if (
+      cleanPath &&
+      cleanPath.startsWith("cv/")
+    ) {
+      candidates.push(cleanPath);
+    }
+
+    if (
+      cleanPath &&
+      cleanPath.startsWith("qualifications/")
+    ) {
+      candidates.push(cleanPath);
+    }
+
+    let signedUrl = null;
+    let lastError = null;
+
+    for (const candidate of [
+      ...new Set(candidates),
+    ]) {
+      const { data, error } =
+        await supabase.storage
+          .from("documents")
+          .createSignedUrl(candidate, 3600);
+
+      if (!error && data?.signedUrl) {
+        signedUrl = data.signedUrl;
+        break;
+      }
+
+      lastError = error;
+    }
+
+    if (!signedUrl) {
       console.error(
-        `Could not create ${documentName} signed URL:`,
-        error
+        `Could not open ${label}:`,
+        lastError
       );
 
-      throw new Error(
-        error.message ||
-          `Could not create a secure link for this ${documentName}.`
+      documentWindow.close();
+
+      alert(
+        `Could not open the ${label}. Please check that the uploaded file exists.`
       );
+
+      return;
     }
 
-    if (!data?.signedUrl) {
-      throw new Error(
-        `Could not create a secure link for this ${documentName}.`
-      );
-    }
-
-    console.log(
-      `${documentName} signed URL created successfully`
-    );
-
-    documentWindow.location.href =
-      data.signedUrl;
+    documentWindow.location.replace(signedUrl);
   } catch (error) {
     console.error(
-      `Could not open ${documentName}:`,
+      `Error opening ${label}:`,
       error
     );
 
-    if (
-      documentWindow &&
-      !documentWindow.closed
-    ) {
-      documentWindow.close();
-    }
+    documentWindow.close();
 
     alert(
-      error?.message ||
-        `Could not open the ${documentName}.`
+      `Could not open the ${label}. Please try again.`
     );
   }
 }
 
-/* =========================================================
-   MAIN PAGE
-========================================================= */
+// ============================================================
+// STATUS HELPERS
+// ============================================================
 
-export default function ApplicantsPage({
-  params,
-}) {
-  const [internshipId, setInternshipId] =
-    useState(null);
+function getStatusLabel(status) {
+  const value = String(status || "pending").toLowerCase();
 
-  const [loading, setLoading] =
-    useState(true);
+  if (value === "shortlisted") {
+    return "Shortlisted";
+  }
 
-  const [error, setError] =
-    useState("");
+  if (value === "rejected") {
+    return "Rejected";
+  }
 
-  const [internship, setInternship] =
-    useState(null);
+  if (value === "accepted") {
+    return "Accepted";
+  }
 
-  const [company, setCompany] =
-    useState(null);
+  return "Pending";
+}
 
-  const [applications, setApplications] =
-    useState([]);
+function getStatusClass(status) {
+  const value = String(status || "pending").toLowerCase();
 
-  const [subscription, setSubscription] =
-    useState(null);
+  if (value === "shortlisted") {
+    return "status-shortlisted";
+  }
 
-  const [search, setSearch] =
-    useState("");
+  if (value === "rejected") {
+    return "status-rejected";
+  }
 
-  const [statusFilter, setStatusFilter] =
-    useState("all");
+  if (value === "accepted") {
+    return "status-accepted";
+  }
+
+  return "status-pending";
+}
+
+// ============================================================
+// MAIN PAGE
+// ============================================================
+
+export default function ApplicantsPage() {
+  const params = useParams();
+  const router = useRouter();
+
+  const internshipId = params?.id;
+
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(null);
+
+  const [user, setUser] = useState(null);
+  const [companyData, setCompanyData] = useState(null);
+  const [internship, setInternship] = useState(null);
+
+  const [applications, setApplications] = useState([]);
+
+  const [subscription, setSubscription] = useState(null);
+  const [premiumLoading, setPremiumLoading] = useState(true);
+
+  const [errorMessage, setErrorMessage] = useState("");
+
+  // ==========================================================
+  // LOAD DATA
+  // ==========================================================
 
   useEffect(() => {
-    let active = true;
+    let cancelled = false;
 
-    async function loadParams() {
+    async function loadPage() {
+      setLoading(true);
+      setErrorMessage("");
+
       try {
-        const resolvedParams =
-          await params;
+        const {
+          data: {
+            user: authUser,
+          },
+          error: authError,
+        } = await supabase.auth.getUser();
 
-        if (active) {
-          setInternshipId(
-            resolvedParams?.id
+        if (authError) {
+          throw authError;
+        }
+
+        if (!authUser) {
+          router.push("/login");
+          return;
+        }
+
+        if (cancelled) return;
+
+        setUser(authUser);
+
+        // ------------------------------------------------------
+        // COMPANY
+        // ------------------------------------------------------
+
+        const {
+          data: company,
+          error: companyError,
+        } = await supabase
+          .from("companies")
+          .select("*")
+          .eq("user_id", authUser.id)
+          .maybeSingle();
+
+        if (companyError) {
+          console.error(
+            "Company profile error:",
+            companyError
           );
         }
-      } catch (err) {
+
+        if (!company) {
+          throw new Error(
+            "Your company profile could not be found."
+          );
+        }
+
+        if (cancelled) return;
+
+        setCompanyData(company);
+
+        // ------------------------------------------------------
+        // SUBSCRIPTION
+        // company_id = auth user id
+        // ------------------------------------------------------
+
+        const {
+          data: subscriptionData,
+          error: subscriptionError,
+        } = await supabase
+          .from("company_subscriptions")
+          .select("*")
+          .eq("company_id", authUser.id)
+          .order("created_at", {
+            ascending: false,
+          })
+          .limit(1)
+          .maybeSingle();
+
+        if (subscriptionError) {
+          console.error(
+            "Company subscription error:",
+            subscriptionError
+          );
+        }
+
+        if (!cancelled) {
+          setSubscription(
+            subscriptionData || null
+          );
+        }
+
+        setPremiumLoading(false);
+
+        // ------------------------------------------------------
+        // INTERNSHIP
+        // ------------------------------------------------------
+
+        const {
+          data: internshipData,
+          error: internshipError,
+        } = await supabase
+          .from("internships")
+          .select("*")
+          .eq("id", internshipId)
+          .maybeSingle();
+
+        if (internshipError) {
+          throw internshipError;
+        }
+
+        if (!internshipData) {
+          throw new Error(
+            "This internship could not be found."
+          );
+        }
+
+        // ------------------------------------------------------
+        // SECURITY CHECK
+        // Make sure this internship belongs to the company.
+        // ------------------------------------------------------
+
+        const companyName = normalizeText(
+          company.company_name
+        );
+
+        const internshipCompanyName =
+          normalizeText(
+            internshipData.company_name
+          );
+
+        if (
+          companyName &&
+          internshipCompanyName &&
+          companyName !== internshipCompanyName
+        ) {
+          throw new Error(
+            "You do not have permission to view these applicants."
+          );
+        }
+
+        if (cancelled) return;
+
+        setInternship(internshipData);
+
+        // ------------------------------------------------------
+        // APPLICATIONS
+        // ------------------------------------------------------
+
+        const {
+          data: applicationData,
+          error: applicationsError,
+        } = await supabase
+          .from("applications")
+          .select("*")
+          .eq("internship_id", internshipId)
+          .order("created_at", {
+            ascending: false,
+          });
+
+        if (applicationsError) {
+          throw applicationsError;
+        }
+
+        const rawApplications =
+          applicationData || [];
+
+        // ------------------------------------------------------
+        // GRADUATE IDS
+        // ------------------------------------------------------
+
+        const graduateIds = [
+          ...new Set(
+            rawApplications
+              .map(
+                (application) =>
+                  application.graduate_id
+              )
+              .filter(Boolean)
+          ),
+        ];
+
+        let graduates = [];
+
+        if (graduateIds.length > 0) {
+          const {
+            data: graduateData,
+            error: graduateError,
+          } = await supabase
+            .from("graduates")
+            .select("*")
+            .in("id", graduateIds);
+
+          if (graduateError) {
+            console.error(
+              "Graduate profile error:",
+              graduateError
+            );
+          }
+
+          graduates = graduateData || [];
+        }
+
+        // ------------------------------------------------------
+        // MERGE APPLICATION + GRADUATE
+        // ------------------------------------------------------
+
+        const graduateMap = new Map(
+          graduates.map((graduate) => [
+            graduate.id,
+            graduate,
+          ])
+        );
+
+        const mergedApplications =
+          rawApplications.map((application) => {
+            const graduate =
+              graduateMap.get(
+                application.graduate_id
+              ) || {};
+
+            const applicant = {
+              ...graduate,
+              ...application,
+              graduate,
+            };
+
+            const match = calculateMatch(
+              applicant,
+              internshipData
+            );
+
+            return {
+              ...application,
+              graduate,
+              applicant,
+              match,
+            };
+          });
+
+        // ------------------------------------------------------
+        // SORT BY MATCH SCORE
+        // ------------------------------------------------------
+
+        mergedApplications.sort(
+          (a, b) =>
+            (b.match?.score || 0) -
+            (a.match?.score || 0)
+        );
+
+        if (!cancelled) {
+          setApplications(
+            mergedApplications
+          );
+        }
+      } catch (error) {
         console.error(
-          "Could not read route parameters:",
-          err
+          "Applicants page error:",
+          error
         );
-        setError(
-          "Could not load this internship."
-        );
-        setLoading(false);
+
+        if (!cancelled) {
+          setErrorMessage(
+            error?.message ||
+              "Could not load applicants."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
-    loadParams();
+    if (internshipId) {
+      loadPage();
+    }
 
     return () => {
-      active = false;
+      cancelled = true;
     };
-  }, [params]);
+  }, [internshipId, router]);
 
-  useEffect(() => {
-    if (!internshipId) return;
+  // ==========================================================
+  // PREMIUM
+  // ==========================================================
 
-    loadApplicants(internshipId);
-  }, [internshipId]);
+  const subscriptionStatus =
+    String(
+      subscription?.status || ""
+    ).toLowerCase();
 
-  async function loadApplicants(id) {
+  const subscriptionPlan =
+    String(
+      subscription?.plan || ""
+    ).toLowerCase();
+
+  const isPremium =
+    subscriptionStatus === "active" &&
+    [
+      "professional",
+      "premium",
+      "pro",
+      "enterprise",
+    ].includes(subscriptionPlan);
+
+  // ==========================================================
+  // STATS
+  // ==========================================================
+
+  const stats = useMemo(() => {
+    const total = applications.length;
+
+    const shortlisted =
+      applications.filter(
+        (application) =>
+          String(
+            application.status || ""
+          ).toLowerCase() === "shortlisted"
+      ).length;
+
+    const rejected =
+      applications.filter(
+        (application) =>
+          String(
+            application.status || ""
+          ).toLowerCase() === "rejected"
+      ).length;
+
+    const strongMatches =
+      applications.filter(
+        (application) =>
+          (application.match?.score || 0) >= 85
+      ).length;
+
+    return {
+      total,
+      shortlisted,
+      rejected,
+      strongMatches,
+    };
+  }, [applications]);
+
+  // ==========================================================
+  // UPDATE APPLICATION STATUS
+  // ==========================================================
+
+  async function updateStatus(
+    applicationId,
+    status
+  ) {
+    if (!applicationId) {
+      alert("Application ID is missing.");
+      return;
+    }
+
+    setActionLoading(
+      `${applicationId}-${status}`
+    );
+
     try {
-      setLoading(true);
-      setError("");
+      const { error } = await supabase
+        .from("applications")
+        .update({ status })
+        .eq("id", applicationId);
 
-      const {
-        data: {
-          user,
-        },
-        error: userError,
-      } = await supabase.auth.getUser();
+      if (error) {
+        console.error(
+          "Application status error:",
+          error
+        );
 
-      if (userError) {
-        throw userError;
-      }
+        alert(
+          error.message ||
+            "Could not update application status."
+        );
 
-      if (!user) {
-        window.location.href =
-          `/login?redirect=/company/internships/${id}/applicants`;
         return;
       }
 
-      /* =================================================
-         COMPANY
-      ================================================= */
-
-      const {
-        data: companyData,
-        error: companyError,
-      } = await supabase
-        .from("companies")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (companyError) {
-        throw companyError;
-      }
-
-      if (!companyData) {
-        throw new Error(
-          "Company profile not found."
-        );
-      }
-
-      setCompany(companyData);
-
-      /* =================================================
-         SUBSCRIPTION
-      ================================================= */
-
-      const {
-        data: subscriptionData,
-        error: subscriptionError,
-      } = await supabase
-        .from("subscriptions")
-        .select("*")
-        .eq("company_id", user.id)
-        .order("created_at", {
-          ascending: false,
-        })
-        .limit(1)
-        .maybeSingle();
-
-      if (
-        subscriptionError &&
-        subscriptionError.code !==
-          "PGRST116"
-      ) {
-        console.warn(
-          "Subscription lookup warning:",
-          subscriptionError
-        );
-      }
-
-      setSubscription(
-        subscriptionData || null
-      );
-
-      /* =================================================
-         INTERNSHIP
-      ================================================= */
-
-      const {
-        data: internshipData,
-        error: internshipError,
-      } = await supabase
-        .from("internships")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
-
-      if (internshipError) {
-        throw internshipError;
-      }
-
-      if (!internshipData) {
-        throw new Error(
-          "Internship not found."
-        );
-      }
-
-      if (
-        normalise(
-          internshipData.company_name
-        ) !==
-        normalise(
-          companyData.company_name
+      setApplications((current) =>
+        current.map((application) =>
+          application.id === applicationId
+            ? {
+                ...application,
+                status,
+              }
+            : application
         )
-      ) {
-        throw new Error(
-          "You do not have access to these applicants."
-        );
-      }
-
-      setInternship(internshipData);
-
-      /* =================================================
-         APPLICATIONS
-      ================================================= */
-
-      const {
-        data: applicationData,
-        error: applicationError,
-      } = await supabase
-        .from("applications")
-        .select("*")
-        .eq("internship_id", id)
-        .order("created_at", {
-          ascending: false,
-        });
-
-      if (applicationError) {
-        throw applicationError;
-      }
-
-      const rawApplications =
-        applicationData || [];
-
-      /* =================================================
-         GRADUATE PROFILES
-      ================================================= */
-
-      const graduateIds =
-        rawApplications
-          .map(
-            (application) =>
-              application.graduate_id
-          )
-          .filter(Boolean);
-
-      let graduateProfiles = [];
-
-      if (graduateIds.length > 0) {
-        const {
-          data: graduatesData,
-          error: graduatesError,
-        } = await supabase
-          .from("graduates")
-          .select("*")
-          .in(
-            "user_id",
-            graduateIds
-          );
-
-        if (graduatesError) {
-          console.warn(
-            "Graduate lookup warning:",
-            graduatesError
-          );
-        } else {
-          graduateProfiles =
-            graduatesData || [];
-        }
-      }
-
-      /* =================================================
-         MERGE APPLICATION + GRADUATE
-      ================================================= */
-
-      const mergedApplications =
-        rawApplications.map(
-          (application) => {
-            const graduate =
-              graduateProfiles.find(
-                (profile) =>
-                  profile.user_id ===
-                  application.graduate_id
-              ) || null;
-
-            const merged = {
-              ...application,
-              graduate,
-              profile: graduate,
-            };
-
-            // Graduate table fallback for
-            // document fields.
-            if (
-              graduate?.cv_url &&
-              !merged.cv_url
-            ) {
-              merged.cv_url =
-                graduate.cv_url;
-            }
-
-            if (
-              graduate?.qualification_url &&
-              !merged.qualification_url
-            ) {
-              merged.qualification_url =
-                graduate.qualification_url;
-            }
-
-            return {
-              ...merged,
-              matchScore:
-                getMatchScore(
-                  merged,
-                  internshipData
-                ),
-            };
-          }
-        );
-
-      mergedApplications.sort(
-        (a, b) =>
-          (b.matchScore || 0) -
-          (a.matchScore || 0)
       );
-
-      if (
-        typeof window !== "undefined"
-      ) {
-        console.log(
-          "APPLICATION DOCUMENT DEBUG:",
-          mergedApplications.map(
-            (application) => ({
-              id: application.id,
-              graduate_id:
-                application.graduate_id,
-              cv_url:
-                application.cv_url,
-              qualification_url:
-                application.qualification_url,
-              graduate_cv:
-                application.graduate
-                  ?.cv_url,
-              graduate_qualification:
-                application.graduate
-                  ?.qualification_url,
-            })
-          )
-        );
-      }
-
-      setApplications(
-        mergedApplications
-      );
-    } catch (err) {
+    } catch (error) {
       console.error(
-        "Applicants page error:",
-        err
+        "Status update error:",
+        error
       );
 
-      setError(
-        err?.message ||
-          "Could not load applicants."
+      alert(
+        error?.message ||
+          "Could not update application status."
       );
     } finally {
-      setLoading(false);
+      setActionLoading(null);
     }
   }
 
-  async function reviewCV(application) {
-    const cv = findCV(application);
+  // ==========================================================
+  // DOCUMENT ACTIONS
+  // ==========================================================
 
-    console.log(
-      "REVIEW CV:",
-      application
-    );
-
-    console.log(
-      "CV VALUE FOUND:",
-      cv
+  async function handleCV(application) {
+    const path = findCV(
+      application,
+      application?.graduate
     );
 
     await openStorageDocument(
-      cv,
+      path,
       "CV"
     );
   }
 
-  async function viewQualification(
+  async function handleQualification(
     application
   ) {
-    const qualification =
+    const path =
       findQualificationDocument(
-        application
+        application,
+        application?.graduate
       );
 
-    console.log(
-      "VIEW QUALIFICATION:",
-      application
-    );
-
-    console.log(
-      "QUALIFICATION VALUE FOUND:",
-      qualification
-    );
-
     await openStorageDocument(
-      qualification,
-      "qualification document"
+      path,
+      "qualification"
     );
   }
+
+  // ==========================================================
+  // LOADING
+  // ==========================================================
 
   if (loading) {
     return (
-      <main
-        style={{
-          minHeight: "100vh",
-          background:
-            "linear-gradient(180deg,#eff6ff,#ffffff)",
-          padding: 24,
-          fontFamily:
-            "Arial, sans-serif",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 1100,
-            margin: "0 auto",
-            textAlign: "center",
-            paddingTop: 80,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 18,
-              fontWeight: 700,
-              color: "#0f172a",
-            }}
-          >
-            Loading applicants...
+      <>
+        <style jsx>{`
+          .loading-page {
+            min-height: 100vh;
+            background: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            font-family:
+              Arial,
+              Helvetica,
+              sans-serif;
+          }
+
+          .loading-box {
+            text-align: center;
+          }
+
+          .spinner {
+            width: 42px;
+            height: 42px;
+            border: 4px solid #dbeafe;
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 18px;
+          }
+
+          @keyframes spin {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+
+          .loading-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: #0f172a;
+            margin-bottom: 6px;
+          }
+
+          .loading-text {
+            color: #64748b;
+            font-size: 14px;
+          }
+        `}</style>
+
+        <main className="loading-page">
+          <div className="loading-box">
+            <div className="spinner" />
+            <div className="loading-title">
+              Loading applicants
+            </div>
+            <div className="loading-text">
+              Please wait...
+            </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </>
     );
   }
 
-  if (error) {
-    return (
-      <main
-        style={{
-          minHeight: "100vh",
-          background:
-            "linear-gradient(180deg,#eff6ff,#ffffff)",
-          padding: 24,
-          fontFamily:
-            "Arial, sans-serif",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 800,
-            margin: "0 auto",
-            paddingTop: 60,
-          }}
-        >
-          <div
-            style={{
-              background: "#ffffff",
-              borderRadius: 16,
-              padding: 24,
-              boxShadow:
-                "0 10px 30px rgba(15,23,42,0.08)",
-            }}
-          >
-            <h1
-              style={{
-                marginTop: 0,
-                color: "#991b1b",
-              }}
-            >
-              Could not load applicants
-            </h1>
+  // ==========================================================
+  // ERROR
+  // ==========================================================
 
-            <p
-              style={{
-                color: "#475569",
-              }}
-            >
-              {error}
-            </p>
+  if (errorMessage) {
+    return (
+      <>
+        <style jsx>{`
+          .error-page {
+            min-height: 100vh;
+            background: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            font-family:
+              Arial,
+              Helvetica,
+              sans-serif;
+          }
+
+          .error-box {
+            width: 100%;
+            max-width: 560px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 32px;
+            text-align: center;
+            box-shadow:
+              0 15px 40px rgba(
+                15,
+                23,
+                42,
+                0.08
+              );
+          }
+
+          .error-icon {
+            width: 58px;
+            height: 58px;
+            border-radius: 50%;
+            background: #fee2e2;
+            color: #dc2626;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 18px;
+            font-size: 25px;
+            font-weight: 900;
+          }
+
+          .error-title {
+            font-size: 22px;
+            font-weight: 800;
+            color: #0f172a;
+            margin-bottom: 10px;
+          }
+
+          .error-message {
+            color: #64748b;
+            line-height: 1.6;
+            margin-bottom: 24px;
+          }
+
+          .back-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 46px;
+            padding: 0 20px;
+            border-radius: 10px;
+            background: #2563eb;
+            color: white;
+            text-decoration: none;
+            font-weight: 800;
+          }
+        `}</style>
+
+        <main className="error-page">
+          <div className="error-box">
+            <div className="error-icon">
+              !
+            </div>
+
+            <div className="error-title">
+              Could not load applicants
+            </div>
+
+            <div className="error-message">
+              {errorMessage}
+            </div>
 
             <Link
               href="/company-dashboard"
-              style={{
-                ...actionButton(
-                  "#174ea6"
-                ),
-                maxWidth: 220,
-                textDecoration: "none",
-              }}
+              className="back-button"
             >
               Back to Dashboard
             </Link>
           </div>
-        </div>
-      </main>
+        </main>
+      </>
     );
   }
 
-  const filteredApplications =
-    applications.filter(
-      (application) => {
-        const graduate =
-          application.graduate ||
-          application.profile ||
-          application;
-
-        const searchText =
-          [
-            graduate.full_name,
-            graduate.email,
-            graduate.phone,
-            graduate.qualification,
-            graduate.field_of_study,
-            graduate.institution,
-            graduate.province,
-            graduate.skills,
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
-
-        const matchesSearch =
-          !search.trim() ||
-          searchText.includes(
-            search.trim().toLowerCase()
-          );
-
-        const matchesStatus =
-          statusFilter === "all" ||
-          normalise(
-            application.status
-          ) ===
-            normalise(statusFilter);
-
-        return (
-          matchesSearch &&
-          matchesStatus
-        );
-      }
-    );
+  // ==========================================================
+  // MAIN UI
+  // ==========================================================
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background:
-          "linear-gradient(180deg,#eff6ff 0%,#ffffff 45%)",
-        fontFamily:
-          "Arial, sans-serif",
-        color: "#0f172a",
-        paddingBottom: 50,
-      }}
-    >
-      {/* HEADER */}
+    <>
+      <style jsx global>{`
+        * {
+          box-sizing: border-box;
+        }
 
-      <header
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 50,
+        body {
+          margin: 0;
+          background: #f8fafc;
+          font-family:
+            Arial,
+            Helvetica,
+            sans-serif;
+          color: #0f172a;
+        }
+
+        button,
+        a {
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        .page {
+          min-height: 100vh;
           background:
-            "rgba(255,255,255,0.96)",
-          backdropFilter:
-            "blur(12px)",
-          borderBottom:
-            "1px solid #e2e8f0",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 1150,
-            margin: "0 auto",
-            padding:
-              "14px 18px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent:
-              "space-between",
-            gap: 14,
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontSize: 12,
-                color: "#64748b",
-                fontWeight: 700,
-                textTransform:
-                  "uppercase",
-                letterSpacing: 0.7,
-              }}
-            >
-              GradLink SA
+            linear-gradient(
+              180deg,
+              #eff6ff 0,
+              #f8fafc 260px
+            );
+        }
+
+        .topbar {
+          position: sticky;
+          top: 0;
+          z-index: 50;
+          background: rgba(
+            255,
+            255,
+            255,
+            0.96
+          );
+          backdrop-filter: blur(14px);
+          border-bottom: 1px solid #e2e8f0;
+        }
+
+        .topbar-inner {
+          width: 100%;
+          max-width: 1400px;
+          margin: 0 auto;
+          padding: 14px 24px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+        }
+
+        .brand-area {
+          min-width: 0;
+        }
+
+        .brand {
+          font-size: 20px;
+          font-weight: 900;
+          letter-spacing: -0.5px;
+          color: #0f3b82;
+        }
+
+        .brand-subtitle {
+          margin-top: 3px;
+          color: #64748b;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .top-actions {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+
+        .nav-button {
+          min-height: 42px;
+          padding: 0 15px;
+          border-radius: 9px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          text-decoration: none;
+          font-size: 13px;
+          font-weight: 800;
+          white-space: nowrap;
+        }
+
+        .nav-secondary {
+          color: #334155;
+          background: white;
+          border: 1px solid #cbd5e1;
+        }
+
+        .nav-primary {
+          color: white;
+          background: #2563eb;
+          border: 1px solid #2563eb;
+        }
+
+        .container {
+          width: 100%;
+          max-width: 1400px;
+          margin: 0 auto;
+          padding: 30px 24px 60px;
+        }
+
+        .back-link {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          color: #2563eb;
+          text-decoration: none;
+          font-size: 14px;
+          font-weight: 800;
+          margin-bottom: 18px;
+        }
+
+        .hero {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 24px;
+          margin-bottom: 24px;
+        }
+
+        .hero-copy {
+          min-width: 0;
+        }
+
+        .eyebrow {
+          display: inline-flex;
+          align-items: center;
+          min-height: 28px;
+          padding: 0 10px;
+          border-radius: 999px;
+          background: #dbeafe;
+          color: #1d4ed8;
+          font-size: 11px;
+          font-weight: 900;
+          text-transform: uppercase;
+          letter-spacing: 0.6px;
+          margin-bottom: 10px;
+        }
+
+        .title {
+          margin: 0;
+          font-size: clamp(
+            28px,
+            4vw,
+            42px
+          );
+          line-height: 1.08;
+          letter-spacing: -1.2px;
+          color: #0f172a;
+        }
+
+        .subtitle {
+          margin: 10px 0 0;
+          color: #64748b;
+          font-size: 15px;
+          line-height: 1.6;
+          max-width: 760px;
+        }
+
+        .subscription-badge {
+          flex-shrink: 0;
+          border: 1px solid #bfdbfe;
+          background: #eff6ff;
+          border-radius: 14px;
+          padding: 13px 15px;
+          min-width: 190px;
+        }
+
+        .subscription-label {
+          font-size: 10px;
+          font-weight: 900;
+          color: #64748b;
+          text-transform: uppercase;
+          letter-spacing: 0.6px;
+        }
+
+        .subscription-value {
+          margin-top: 4px;
+          font-size: 16px;
+          font-weight: 900;
+          color: #1d4ed8;
+        }
+
+        .stats {
+          display: grid;
+          grid-template-columns:
+            repeat(4, minmax(0, 1fr));
+          gap: 14px;
+          margin-bottom: 24px;
+        }
+
+        .stat {
+          background: white;
+          border: 1px solid #e2e8f0;
+          border-radius: 15px;
+          padding: 18px;
+        }
+
+        .stat-label {
+          color: #64748b;
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        .stat-value {
+          margin-top: 7px;
+          font-size: 27px;
+          font-weight: 900;
+          color: #0f172a;
+        }
+
+        .stat-blue {
+          color: #2563eb;
+        }
+
+        .stat-green {
+          color: #059669;
+        }
+
+        .stat-red {
+          color: #dc2626;
+        }
+
+        .stat-purple {
+          color: #7c3aed;
+        }
+
+        .premium-banner {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 18px;
+          background: linear-gradient(
+            135deg,
+            #0f3b82,
+            #2563eb
+          );
+          color: white;
+          border-radius: 17px;
+          padding: 20px 22px;
+          margin-bottom: 24px;
+          box-shadow:
+            0 12px 30px rgba(
+              37,
+              99,
+              235,
+              0.16
+            );
+        }
+
+        .premium-copy {
+          min-width: 0;
+        }
+
+        .premium-title {
+          font-size: 16px;
+          font-weight: 900;
+          margin-bottom: 5px;
+        }
+
+        .premium-text {
+          font-size: 13px;
+          line-height: 1.5;
+          color: #dbeafe;
+        }
+
+        .premium-button {
+          flex-shrink: 0;
+          min-height: 42px;
+          padding: 0 16px;
+          border-radius: 9px;
+          background: white;
+          color: #1d4ed8;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          font-weight: 900;
+        }
+
+        .table-section {
+          background: white;
+          border: 1px solid #e2e8f0;
+          border-radius: 18px;
+          overflow: hidden;
+        }
+
+        .section-header {
+          padding: 20px 22px;
+          border-bottom: 1px solid #e2e8f0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 15px;
+        }
+
+        .section-title {
+          margin: 0;
+          font-size: 18px;
+          font-weight: 900;
+          color: #0f172a;
+        }
+
+        .section-count {
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .empty {
+          padding: 60px 24px;
+          text-align: center;
+        }
+
+        .empty-icon {
+          width: 60px;
+          height: 60px;
+          margin: 0 auto 16px;
+          border-radius: 50%;
+          background: #eff6ff;
+          color: #2563eb;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 25px;
+          font-weight: 900;
+        }
+
+        .empty-title {
+          font-size: 18px;
+          font-weight: 900;
+          margin-bottom: 7px;
+        }
+
+        .empty-text {
+          color: #64748b;
+          font-size: 14px;
+        }
+
+        .applicant-list {
+          width: 100%;
+        }
+
+        .applicant {
+          padding: 22px;
+          border-bottom: 1px solid #e2e8f0;
+        }
+
+        .applicant:last-child {
+          border-bottom: 0;
+        }
+
+        .applicant-main {
+          display: grid;
+          grid-template-columns:
+            minmax(240px, 1.25fr)
+            minmax(190px, 1fr)
+            minmax(180px, 0.8fr)
+            minmax(300px, 1.5fr);
+          gap: 20px;
+          align-items: start;
+        }
+
+        .candidate-name {
+          font-size: 17px;
+          font-weight: 900;
+          color: #0f172a;
+          margin-bottom: 5px;
+        }
+
+        .candidate-email {
+          color: #64748b;
+          font-size: 13px;
+          line-height: 1.5;
+          word-break: break-word;
+        }
+
+        .candidate-meta {
+          margin-top: 12px;
+          display: grid;
+          gap: 6px;
+        }
+
+        .meta-row {
+          font-size: 12px;
+          color: #475569;
+          line-height: 1.45;
+        }
+
+        .meta-label {
+          color: #94a3b8;
+          font-weight: 800;
+        }
+
+        .match-box {
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 13px;
+          padding: 14px;
+        }
+
+        .match-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+        }
+
+        .match-score {
+          font-size: 25px;
+          font-weight: 900;
+          color: #2563eb;
+        }
+
+        .match-label {
+          font-size: 11px;
+          font-weight: 900;
+          padding: 5px 8px;
+          border-radius: 999px;
+          background: #dbeafe;
+          color: #1d4ed8;
+        }
+
+        .match-details {
+          margin-top: 10px;
+          display: grid;
+          gap: 6px;
+        }
+
+        .match-detail {
+          font-size: 11px;
+          color: #64748b;
+          line-height: 1.4;
+        }
+
+        .skills {
+          margin-top: 9px;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 5px;
+        }
+
+        .skill {
+          font-size: 10px;
+          font-weight: 800;
+          padding: 4px 7px;
+          border-radius: 999px;
+          background: #ecfdf5;
+          color: #047857;
+        }
+
+        .actions-column {
+          min-width: 0;
+        }
+
+        .status-line {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 10px;
+        }
+
+        .status-title {
+          font-size: 11px;
+          font-weight: 900;
+          color: #94a3b8;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .status {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 27px;
+          padding: 0 9px;
+          border-radius: 999px;
+          font-size: 11px;
+          font-weight: 900;
+        }
+
+        .status-pending {
+          background: #fef3c7;
+          color: #92400e;
+        }
+
+        .status-shortlisted {
+          background: #dcfce7;
+          color: #166534;
+        }
+
+        .status-rejected {
+          background: #fee2e2;
+          color: #991b1b;
+        }
+
+        .status-accepted {
+          background: #dbeafe;
+          color: #1d4ed8;
+        }
+
+        .button-grid {
+          display: grid;
+          grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+          gap: 8px;
+        }
+
+        .action-button {
+          min-height: 40px;
+          border-radius: 9px;
+          padding: 7px 10px;
+          border: 1px solid #cbd5e1;
+          background: white;
+          color: #334155;
+          font-size: 11px;
+          font-weight: 900;
+          cursor: pointer;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+        }
+
+        .action-button:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+        }
+
+        .button-blue {
+          color: #1d4ed8;
+          background: #eff6ff;
+          border-color: #bfdbfe;
+        }
+
+        .button-green {
+          color: #047857;
+          background: #ecfdf5;
+          border-color: #a7f3d0;
+        }
+
+        .button-red {
+          color: #b91c1c;
+          background: #fef2f2;
+          border-color: #fecaca;
+        }
+
+        .button-gray {
+          color: #475569;
+          background: #f8fafc;
+          border-color: #cbd5e1;
+        }
+
+        .button-full {
+          grid-column: 1 / -1;
+        }
+
+        .document-note {
+          margin-top: 9px;
+          color: #94a3b8;
+          font-size: 10px;
+          line-height: 1.4;
+        }
+
+        @media (max-width: 1150px) {
+          .applicant-main {
+            grid-template-columns:
+              minmax(220px, 1fr)
+              minmax(220px, 1fr);
+          }
+
+          .actions-column {
+            grid-column: 1 / -1;
+          }
+        }
+
+        @media (max-width: 760px) {
+          .topbar-inner {
+            padding: 12px 15px;
+            align-items: flex-start;
+          }
+
+          .brand {
+            font-size: 18px;
+          }
+
+          .brand-subtitle {
+            display: none;
+          }
+
+          .top-actions {
+            gap: 6px;
+          }
+
+          .nav-button {
+            min-height: 38px;
+            padding: 0 10px;
+            font-size: 11px;
+          }
+
+          .container {
+            padding: 22px 15px 45px;
+          }
+
+          .hero {
+            display: block;
+          }
+
+          .subscription-badge {
+            margin-top: 15px;
+            min-width: 0;
+          }
+
+          .stats {
+            grid-template-columns:
+              repeat(2, minmax(0, 1fr));
+          }
+
+          .premium-banner {
+            display: block;
+          }
+
+          .premium-button {
+            margin-top: 14px;
+          }
+
+          .section-header {
+            padding: 17px 15px;
+          }
+
+          .applicant {
+            padding: 17px 15px;
+          }
+
+          .applicant-main {
+            display: block;
+          }
+
+          .match-box {
+            margin-top: 15px;
+          }
+
+          .actions-column {
+            margin-top: 15px;
+          }
+
+          .button-grid {
+            grid-template-columns:
+              repeat(2, minmax(0, 1fr));
+          }
+        }
+
+        @media (max-width: 430px) {
+          .top-actions .dashboard-link {
+            display: none;
+          }
+
+          .title {
+            font-size: 28px;
+          }
+
+          .stats {
+            gap: 9px;
+          }
+
+          .stat {
+            padding: 14px;
+          }
+
+          .stat-value {
+            font-size: 23px;
+          }
+
+          .button-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .button-full {
+            grid-column: auto;
+          }
+        }
+      `}</style>
+
+      <div className="page">
+        <header className="topbar">
+          <div className="topbar-inner">
+            <div className="brand-area">
+              <div className="brand">
+                GradLink SA
+              </div>
+
+              <div className="brand-subtitle">
+                Applicant Management
+              </div>
             </div>
 
-            <h1
-              style={{
-                margin:
-                  "3px 0 0",
-                fontSize:
-                  "clamp(20px,5vw,28px)",
-              }}
-            >
-              Applicants
-            </h1>
-          </div>
+            <div className="top-actions">
+              <Link
+                href="/company-dashboard"
+                className="nav-button nav-secondary dashboard-link"
+              >
+                Dashboard
+              </Link>
 
+              <Link
+                href="/company-pricing"
+                className="nav-button nav-primary"
+              >
+                View Plans
+              </Link>
+            </div>
+          </div>
+        </header>
+
+        <main className="container">
           <Link
             href="/company-dashboard"
-            style={{
-              ...actionButton(
-                "#174ea6"
-              ),
-              width: "auto",
-              minWidth: 130,
-              textDecoration:
-                "none",
-            }}
+            className="back-link"
           >
-            Dashboard
+            ← Back to Dashboard
           </Link>
-        </div>
-      </header>
 
-      <div
-        style={{
-          maxWidth: 1150,
-          margin: "0 auto",
-          padding:
-            "24px 16px",
-        }}
-      >
-        {/* INTERNSHIP INFO */}
-
-        <section
-          style={{
-            background:
-              "#ffffff",
-            border:
-              "1px solid #e2e8f0",
-            borderRadius: 18,
-            padding: 22,
-            marginBottom: 18,
-            boxShadow:
-              "0 10px 30px rgba(15,23,42,0.06)",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              justifyContent:
-                "space-between",
-              gap: 16,
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  color: "#174ea6",
-                  fontWeight: 800,
-                  fontSize: 13,
-                  marginBottom: 5,
-                }}
-              >
-                {company?.company_name ||
-                  "Company"}
+          <section className="hero">
+            <div className="hero-copy">
+              <div className="eyebrow">
+                Applicant Management
               </div>
 
-              <h2
-                style={{
-                  margin:
-                    "0 0 8px",
-                  fontSize:
-                    "clamp(22px,5vw,32px)",
-                }}
-              >
+              <h1 className="title">
                 {internship?.job_title ||
-                  "Internship"}
-              </h2>
+                  "Internship Applicants"}
+              </h1>
 
-              <div
-                style={{
-                  color: "#64748b",
-                  fontSize: 14,
-                }}
-              >
-                {internship?.province ||
-                  ""}
-                {internship?.location
-                  ? ` • ${internship.location}`
-                  : ""}
+              <p className="subtitle">
+                Review applicants, compare their
+                qualifications and skills, and
+                manage application status from one
+                place.
+              </p>
+            </div>
+
+            <div className="subscription-badge">
+              <div className="subscription-label">
+                Company Plan
+              </div>
+
+              <div className="subscription-value">
+                {premiumLoading
+                  ? "Checking..."
+                  : subscription
+                    ? `${
+                        subscription.plan
+                          ? String(
+                              subscription.plan
+                            )
+                              .charAt(0)
+                              .toUpperCase() +
+                            String(
+                              subscription.plan
+                            ).slice(1)
+                          : "Plan"
+                      } • ${
+                        subscriptionStatus ||
+                        "inactive"
+                      }`
+                    : "No active plan"}
+              </div>
+            </div>
+          </section>
+
+          <section className="stats">
+            <div className="stat">
+              <div className="stat-label">
+                Total Applicants
+              </div>
+
+              <div className="stat-value stat-blue">
+                {stats.total}
               </div>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                alignItems:
-                  "center",
-                justifyContent:
-                  "center",
-                minWidth: 100,
-                minHeight: 76,
-                padding: 12,
-                borderRadius: 14,
-                background:
-                  "#eff6ff",
-                color: "#174ea6",
-              }}
-            >
-              <div
-                style={{
-                  textAlign:
-                    "center",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: 26,
-                    fontWeight: 800,
-                  }}
-                >
-                  {applications.length}
-                </div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 700,
-                  }}
-                >
-                  Applications
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* FILTERS */}
-
-        <section
-          style={{
-            background:
-              "#ffffff",
-            border:
-              "1px solid #e2e8f0",
-            borderRadius: 16,
-            padding: 16,
-            marginBottom: 18,
-            boxShadow:
-              "0 8px 25px rgba(15,23,42,0.05)",
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "minmax(0,1fr) minmax(150px,200px)",
-              gap: 12,
-            }}
-          >
-            <input
-              value={search}
-              onChange={(event) =>
-                setSearch(
-                  event.target.value
-                )
-              }
-              placeholder="Search applicants..."
-              style={{
-                width: "100%",
-                minHeight: 46,
-                boxSizing:
-                  "border-box",
-                border:
-                  "1px solid #cbd5e1",
-                borderRadius: 10,
-                padding:
-                  "0 14px",
-                fontSize: 14,
-                outline: "none",
-              }}
-            />
-
-            <select
-              value={statusFilter}
-              onChange={(event) =>
-                setStatusFilter(
-                  event.target.value
-                )
-              }
-              style={{
-                width: "100%",
-                minHeight: 46,
-                boxSizing:
-                  "border-box",
-                border:
-                  "1px solid #cbd5e1",
-                borderRadius: 10,
-                padding:
-                  "0 12px",
-                fontSize: 14,
-                background:
-                  "#ffffff",
-              }}
-            >
-              <option value="all">
-                All statuses
-              </option>
-              <option value="pending">
-                Pending
-              </option>
-              <option value="shortlisted">
+            <div className="stat">
+              <div className="stat-label">
                 Shortlisted
-              </option>
-              <option value="rejected">
+              </div>
+
+              <div className="stat-value stat-green">
+                {stats.shortlisted}
+              </div>
+            </div>
+
+            <div className="stat">
+              <div className="stat-label">
                 Rejected
-              </option>
-              <option value="accepted">
-                Accepted
-              </option>
-            </select>
-          </div>
-        </section>
+              </div>
 
-        {/* APPLICANTS */}
-
-        <section>
-          {filteredApplications.length ===
-          0 ? (
-            <div
-              style={{
-                background:
-                  "#ffffff",
-                border:
-                  "1px solid #e2e8f0",
-                borderRadius: 16,
-                padding: 35,
-                textAlign: "center",
-                color: "#64748b",
-              }}
-            >
-              No applicants found.
+              <div className="stat-value stat-red">
+                {stats.rejected}
+              </div>
             </div>
-          ) : (
-            <div
-              style={{
-                display: "grid",
-                gap: 16,
-              }}
-            >
-              {filteredApplications.map(
-                (application) => (
-                  <ApplicantCard
-                    key={
-                      application.id
-                    }
-                    application={
-                      application
-                    }
-                    internshipId={
-                      internshipId
-                    }
-                    onReviewCV={
-                      reviewCV
-                    }
-                    onViewQualification={
-                      viewQualification
-                    }
-                  />
-                )
-              )}
+
+            <div className="stat">
+              <div className="stat-label">
+                Strong Matches
+              </div>
+
+              <div className="stat-value stat-purple">
+                {stats.strongMatches}
+              </div>
             </div>
-          )}
-        </section>
-      </div>
-    </main>
-  );
-}
+          </section>
 
-function ApplicantCard({
-  application,
-  internshipId,
-  onReviewCV,
-  onViewQualification,
-}) {
-  const graduate =
-    application.graduate ||
-    application.profile ||
-    application;
+          {!isPremium && (
+            <section className="premium-banner">
+              <div className="premium-copy">
+                <div className="premium-title">
+                  Unlock advanced applicant tools
+                </div>
 
-  const score =
-    Number(application.matchScore) || 0;
+                <div className="premium-text">
+                  Professional and Enterprise
+                  plans can support advanced
+                  applicant screening and document
+                  verification features.
+                </div>
+              </div>
 
-  const label =
-    getMatchLabel(score);
-
-  const cv =
-    findCV(application);
-
-  const qualification =
-    findQualificationDocument(
-      application
-    );
-
-  const status =
-    application.status ||
-    "pending";
-
-  const statusText =
-    String(status)
-      .replace(/_/g, " ")
-      .replace(/\b\w/g, (letter) =>
-        letter.toUpperCase()
-      );
-
-  return (
-    <article
-      style={{
-        background: "#ffffff",
-        border: "1px solid #e2e8f0",
-        borderRadius: 18,
-        padding: 18,
-        boxShadow:
-          "0 8px 25px rgba(15,23,42,0.06)",
-        overflow: "hidden",
-      }}
-    >
-      {/* ==================================================
-          APPLICANT HEADER
-      ================================================== */}
-
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          gap: 14,
-          marginBottom: 16,
-        }}
-      >
-        <div
-          style={{
-            minWidth: 0,
-            flex: "1 1 250px",
-          }}
-        >
-          <div
-            style={{
-              fontSize: 20,
-              fontWeight: 800,
-              color: "#0f172a",
-              wordBreak: "break-word",
-            }}
-          >
-            {graduate.full_name ||
-              "Applicant"}
-          </div>
-
-          {graduate.email && (
-            <div
-              style={{
-                marginTop: 5,
-                color: "#64748b",
-                fontSize: 14,
-                wordBreak: "break-word",
-              }}
-            >
-              {graduate.email}
-            </div>
+              <Link
+                href="/company-pricing"
+                className="premium-button"
+              >
+                View Plans
+              </Link>
+            </section>
           )}
 
-          {graduate.phone && (
-            <div
-              style={{
-                marginTop: 3,
-                color: "#64748b",
-                fontSize: 14,
-              }}
-            >
-              {graduate.phone}
+          <section className="table-section">
+            <div className="section-header">
+              <div>
+                <h2 className="section-title">
+                  Applicants
+                </h2>
+
+                <div className="section-count">
+                  {stats.total}{" "}
+                  {stats.total === 1
+                    ? "application"
+                    : "applications"}
+                </div>
+              </div>
             </div>
-          )}
-        </div>
 
-        {/* MATCH SCORE */}
+            {applications.length === 0 ? (
+              <div className="empty">
+                <div className="empty-icon">
+                  ✓
+                </div>
 
-        <div
-          style={{
-            flexShrink: 0,
-            minWidth: 92,
-            padding: "10px 12px",
-            borderRadius: 12,
-            background: "#eff6ff",
-            border: "1px solid #dbeafe",
-            textAlign: "center",
-          }}
-        >
-          <div
-            style={{
-              fontSize: 24,
-              fontWeight: 900,
-              color: "#174ea6",
-              lineHeight: 1,
-            }}
-          >
-            {score}%
-          </div>
+                <div className="empty-title">
+                  No applicants yet
+                </div>
 
-          <div
-            style={{
-              marginTop: 5,
-              fontSize: 12,
-              fontWeight: 800,
-              color: "#475569",
-            }}
-          >
-            {label} Match
-          </div>
-        </div>
-      </div>
+                <div className="empty-text">
+                  Applications for this internship
+                  will appear here when graduates
+                  apply.
+                </div>
+              </div>
+            ) : (
+              <div className="applicant-list">
+                {applications.map(
+                  (application, index) => {
+                    const applicant =
+                      application.applicant ||
+                      application.graduate ||
+                      {};
 
-      {/* ==================================================
-          STATUS
-      ================================================== */}
+                    const graduate =
+                      application.graduate ||
+                      {};
 
-      <div
-        style={{
-          marginBottom: 16,
-        }}
-      >
-        <span
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            minHeight: 30,
-            padding: "5px 11px",
-            borderRadius: 999,
-            background:
-              normalise(status) ===
-              "shortlisted"
-                ? "#ecfdf5"
-                : normalise(status) ===
-                  "rejected"
-                ? "#fef2f2"
-                : "#f1f5f9",
-            color:
-              normalise(status) ===
-              "shortlisted"
-                ? "#047857"
-                : normalise(status) ===
-                  "rejected"
-                ? "#b91c1c"
-                : "#475569",
-            fontSize: 12,
-            fontWeight: 800,
-          }}
-        >
-          {statusText}
-        </span>
-      </div>
+                    const match =
+                      application.match || {
+                        score: 0,
+                        label: "Weak",
+                        qualificationMatch: false,
+                        fieldMatch: false,
+                        matchingSkills: [],
+                      };
 
-      {/* ==================================================
-          PROFILE INFORMATION
-      ================================================== */}
+                    const status =
+                      application.status ||
+                      "pending";
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            "repeat(auto-fit, minmax(190px, 1fr))",
-          gap: 10,
-          marginBottom: 18,
-        }}
-      >
-        <InfoBox
-          label="Qualification"
-          value={
-            graduate.qualification
-          }
-        />
+                    const candidateName =
+                      graduate.full_name ||
+                      applicant.full_name ||
+                      `Applicant ${
+                        index + 1
+                      }`;
 
-        <InfoBox
-          label="Field of Study"
-          value={
-            graduate.field_of_study
-          }
-        />
+                    const email =
+                      graduate.email ||
+                      applicant.email ||
+                      "Email not available";
 
-        <InfoBox
-          label="Institution"
-          value={
-            graduate.institution
-          }
-        />
+                    const qualification =
+                      graduate.qualification ||
+                      applicant.qualification ||
+                      "Not provided";
 
-        <InfoBox
-          label="Province"
-          value={
-            graduate.province
-          }
-        />
-      </div>
+                    const field =
+                      graduate.field_of_study ||
+                      applicant.field_of_study ||
+                      "Not provided";
 
-      {/* ==================================================
-          SKILLS
-      ================================================== */}
+                    const institution =
+                      graduate.institution ||
+                      applicant.institution ||
+                      "Not provided";
 
-      {graduate.skills && (
-        <div
-          style={{
-            marginBottom: 18,
-            padding: 14,
-            borderRadius: 12,
-            background: "#f8fafc",
-            border:
-              "1px solid #e2e8f0",
-          }}
-        >
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 800,
-              color: "#64748b",
-              marginBottom: 6,
-              textTransform:
-                "uppercase",
-              letterSpacing: 0.5,
-            }}
-          >
-            Skills
-          </div>
+                    const province =
+                      graduate.province ||
+                      applicant.province ||
+                      "";
 
-          <div
-            style={{
-              fontSize: 14,
-              lineHeight: 1.6,
-              color: "#334155",
-              wordBreak: "break-word",
-            }}
-          >
-            {graduate.skills}
-          </div>
-        </div>
-      )}
+                    const skills =
+                      parseSkills(
+                        graduate.skills ||
+                          applicant.skills
+                      );
 
-      {/* ==================================================
-          DOCUMENTS
-      ================================================== */}
+                    return (
+                      <article
+                        className="applicant"
+                        key={
+                          application.id ||
+                          `${candidateName}-${index}`
+                        }
+                      >
+                        <div className="applicant-main">
+                          <div>
+                            <div className="candidate-name">
+                              {candidateName}
+                            </div>
 
-      <div
-        style={{
-          borderTop:
-            "1px solid #e2e8f0",
-          paddingTop: 16,
-        }}
-      >
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 800,
-            color: "#334155",
-            marginBottom: 10,
-          }}
-        >
-          Applicant Documents
-        </div>
+                            <div className="candidate-email">
+                              {email}
+                            </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(210px, 1fr))",
-            gap: 10,
-          }}
-        >
-          {/* ==================================================
-              REVIEW CV
-          ================================================== */}
+                            <div className="candidate-meta">
+                              <div className="meta-row">
+                                <span className="meta-label">
+                                  Qualification:
+                                </span>{" "}
+                                {qualification}
+                              </div>
 
-          <button
-            type="button"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
+                              <div className="meta-row">
+                                <span className="meta-label">
+                                  Field:
+                                </span>{" "}
+                                {field}
+                              </div>
 
-              console.log(
-                "================================"
-              );
-              console.log(
-                "REVIEW CV BUTTON PRESSED"
-              );
-              console.log(
-                "Application:",
-                application
-              );
-              console.log(
-                "CV:",
-                cv
-              );
-              console.log(
-                "================================"
-              );
+                              <div className="meta-row">
+                                <span className="meta-label">
+                                  Institution:
+                                </span>{" "}
+                                {institution}
+                              </div>
 
-              onReviewCV(
-                application
-              );
-            }}
-            style={{
-              ...actionButton(
-                "#174ea6"
-              ),
-              cursor: "pointer",
-              pointerEvents: "auto",
-              WebkitTapHighlightColor:
-                "transparent",
-              touchAction:
-                "manipulation",
-              userSelect: "none",
-              WebkitUserSelect:
-                "none",
-              position: "relative",
-              zIndex: 5,
-            }}
-          >
-            📄 Review CV
-          </button>
+                              {province && (
+                                <div className="meta-row">
+                                  <span className="meta-label">
+                                    Province:
+                                  </span>{" "}
+                                  {province}
+                                </div>
+                              )}
+                            </div>
+                          </div>
 
-          {/* ==================================================
-              VIEW QUALIFICATION
-          ================================================== */}
+                          <div className="match-box">
+                            <div className="match-top">
+                              <div className="match-score">
+                                {match.score}%
+                              </div>
 
-          <button
-            type="button"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
+                              <div className="match-label">
+                                {match.label}
+                              </div>
+                            </div>
 
-              console.log(
-                "================================"
-              );
-              console.log(
-                "QUALIFICATION BUTTON PRESSED"
-              );
-              console.log(
-                "Application:",
-                application
-              );
-              console.log(
-                "Qualification:",
-                qualification
-              );
-              console.log(
-                "================================"
-              );
+                            <div className="match-details">
+                              <div className="match-detail">
+                                Qualification:{" "}
+                                {match.qualificationMatch
+                                  ? "Matched"
+                                  : "Not matched"}
+                              </div>
 
-              onViewQualification(
-                application
-              );
-            }}
-            style={{
-              ...actionButton(
-                "#6b46c1"
-              ),
-              cursor: "pointer",
-              pointerEvents: "auto",
-              WebkitTapHighlightColor:
-                "transparent",
-              touchAction:
-                "manipulation",
-              userSelect: "none",
-              WebkitUserSelect:
-                "none",
-              position: "relative",
-              zIndex: 5,
-            }}
-          >
-            🎓 View Qualification
-          </button>
+                              <div className="match-detail">
+                                Field:{" "}
+                                {match.fieldMatch
+                                  ? "Matched"
+                                  : "Not matched"}
+                              </div>
 
-          {/* ==================================================
-              FULL APPLICATION
-          ================================================== */}
+                              <div className="match-detail">
+                                Skills:{" "}
+                                {match.matchingSkills
+                                  ?.length ||
+                                  0}{" "}
+                                matched
+                              </div>
+                            </div>
 
-          <Link
-            href={`/company/internships/${internshipId}/applicants/${application.id}`}
-            onClick={(event) => {
-              event.stopPropagation();
-            }}
-            style={{
-              ...actionButton(
-                "#0f766e"
-              ),
-              cursor: "pointer",
-              pointerEvents: "auto",
-              textDecoration:
-                "none",
-              position: "relative",
-              zIndex: 5,
-            }}
-          >
-            👤 Full Application
-          </Link>
-        </div>
+                            {match.matchingSkills
+                              ?.length > 0 && (
+                              <div className="skills">
+                                {match.matchingSkills
+                                  .slice(0, 6)
+                                  .map(
+                                    (
+                                      skill,
+                                      skillIndex
+                                    ) => (
+                                      <span
+                                        className="skill"
+                                        key={`${skill}-${skillIndex}`}
+                                      >
+                                        {skill}
+                                      </span>
+                                    )
+                                  )}
+                              </div>
+                            )}
+                          </div>
 
-        {/* DOCUMENT STATUS */}
+                          <div>
+                            <div className="candidate-meta">
+                              <div className="meta-row">
+                                <span className="meta-label">
+                                  Application:
+                                </span>{" "}
+                                {getStatusLabel(
+                                  status
+                                )}
+                              </div>
 
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 8,
-            marginTop: 10,
-          }}
-        >
-          <DocumentStatus
-            label="CV"
-            available={Boolean(cv)}
-          />
+                              {application.created_at && (
+                                <div className="meta-row">
+                                  <span className="meta-label">
+                                    Applied:
+                                  </span>{" "}
+                                  {new Date(
+                                    application.created_at
+                                  ).toLocaleDateString(
+                                    "en-ZA",
+                                    {
+                                      year: "numeric",
+                                      month: "short",
+                                      day: "numeric",
+                                    }
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
 
-          <DocumentStatus
-            label="Qualification"
-            available={Boolean(
-              qualification
+                          <div className="actions-column">
+                            <div className="status-line">
+                              <span className="status-title">
+                                Status
+                              </span>
+
+                              <span
+                                className={`status ${getStatusClass(
+                                  status
+                                )}`}
+                              >
+                                {getStatusLabel(
+                                  status
+                                )}
+                              </span>
+                            </div>
+
+                            <div className="button-grid">
+                              <button
+                                type="button"
+                                className="action-button button-blue"
+                                onClick={() =>
+                                  handleCV(
+                                    application
+                                  )
+                                }
+                              >
+                                Review CV
+                              </button>
+
+                              <button
+                                type="button"
+                                className="action-button button-blue"
+                                onClick={() =>
+                                  handleQualification(
+                                    application
+                                  )
+                                }
+                              >
+                                View Qualification
+                              </button>
+
+                              <Link
+                                href={`/company/internships/${internshipId}/applicants/${application.id}`}
+                                className="action-button button-gray button-full"
+                              >
+                                Full Application
+                              </Link>
+
+                              <button
+                                type="button"
+                                className="action-button button-green"
+                                disabled={
+                                  actionLoading !==
+                                  null
+                                }
+                                onClick={() =>
+                                  updateStatus(
+                                    application.id,
+                                    "shortlisted"
+                                  )
+                                }
+                              >
+                                {actionLoading ===
+                                `${application.id}-shortlisted`
+                                  ? "Saving..."
+                                  : "Shortlist"}
+                              </button>
+
+                              <button
+                                type="button"
+                                className="action-button button-red"
+                                disabled={
+                                  actionLoading !==
+                                  null
+                                }
+                                onClick={() =>
+                                  updateStatus(
+                                    application.id,
+                                    "rejected"
+                                  )
+                                }
+                              >
+                                {actionLoading ===
+                                `${application.id}-rejected`
+                                  ? "Saving..."
+                                  : "Reject"}
+                              </button>
+
+                              <button
+                                type="button"
+                                className="action-button button-gray button-full"
+                                disabled={
+                                  actionLoading !==
+                                  null
+                                }
+                                onClick={() =>
+                                  updateStatus(
+                                    application.id,
+                                    "pending"
+                                  )
+                                }
+                              >
+                                {actionLoading ===
+                                `${application.id}-pending`
+                                  ? "Saving..."
+                                  : "Reset to Pending"}
+                              </button>
+                            </div>
+
+                            <div className="document-note">
+                              Documents open through
+                              secure signed Supabase
+                              storage links.
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  }
+                )}
+              </div>
             )}
-          />
-        </div>
+          </section>
+        </main>
       </div>
-    </article>
-  );
-}
-
-/* =========================================================
-   INFO BOX
-========================================================= */
-
-function InfoBox({
-  label,
-  value,
-}) {
-  return (
-    <div
-      style={{
-        minWidth: 0,
-        padding: 13,
-        borderRadius: 12,
-        background: "#f8fafc",
-        border:
-          "1px solid #e2e8f0",
-      }}
-    >
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 800,
-          color: "#64748b",
-          textTransform:
-            "uppercase",
-          letterSpacing: 0.45,
-          marginBottom: 5,
-        }}
-      >
-        {label}
-      </div>
-
-      <div
-        style={{
-          fontSize: 14,
-          fontWeight: 700,
-          color: "#1e293b",
-          wordBreak:
-            "break-word",
-        }}
-      >
-        {value || "Not provided"}
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================
-   DOCUMENT STATUS
-========================================================= */
-
-function DocumentStatus({
-  label,
-  available,
-}) {
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 5,
-        minHeight: 28,
-        padding: "4px 9px",
-        borderRadius: 999,
-        background: available
-          ? "#ecfdf5"
-          : "#fef2f2",
-        color: available
-          ? "#047857"
-          : "#b91c1c",
-        fontSize: 11,
-        fontWeight: 800,
-      }}
-    >
-      <span>
-        {available ? "✓" : "!"}
-      </span>
-
-      <span>
-        {label}:{" "}
-        {available
-          ? "Available"
-          : "Not found"}
-      </span>
-    </span>
+    </>
   );
 }
