@@ -22,6 +22,7 @@ const PLANS = {
     listings: 5,
     description:
       "A simple way for growing companies to start recruiting graduates.",
+    icon: "rocket",
     features: [
       "5 active internship listings",
       "Graduate applications",
@@ -39,6 +40,7 @@ const PLANS = {
     description:
       "Built for companies actively recruiting and managing more graduates.",
     popular: true,
+    icon: "bolt",
     features: [
       "15 active internship listings",
       "Graduate applications",
@@ -57,6 +59,7 @@ const PLANS = {
     listings: 30,
     description:
       "Designed for companies with larger graduate recruitment needs.",
+    icon: "building",
     features: [
       "30 active internship listings",
       "Graduate applications",
@@ -75,6 +78,7 @@ const PLANS = {
     description:
       "A flexible option when you only need to publish one listing.",
     payPerListing: true,
+    icon: "target",
     features: [
       "1 internship listing",
       "Receive graduate applications",
@@ -89,6 +93,227 @@ function formatMoney(amount) {
 }
 
 // ============================================================
+// SIMPLE PROFESSIONAL ICONS
+// ============================================================
+
+function PlanIcon({ type }) {
+  if (type === "rocket") {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className="plan-svg"
+      >
+        <path
+          d="M14.5 5.5c1.7-1.7 3.8-2.7 6-3 .3 2.2-.6 4.3-2.3 6l-2.7 2.7-3.2-3.2 2.2-2.5Z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="m12.3 8-4.6 1.1-2.2 2.2 4.3.9"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="m15.8 11.5-1.1 4.6-2.2 2.2-.9-4.3"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle
+          cx="16.9"
+          cy="7.1"
+          r="1.4"
+          fill="currentColor"
+        />
+        <path
+          d="M8.2 15.8c-1.4.2-2.6.8-3.6 1.8-.6.6-.9 1.4-1 2.2 1-.1 1.7-.4 2.3-1 1-.9 1.6-2.1 1.8-3.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
+  }
+
+  if (type === "bolt") {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className="plan-svg"
+      >
+        <path
+          d="M13.1 2.8 5.8 13h5.6l-.5 8.2L18.2 11h-5.5l.4-8.2Z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.9"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
+  if (type === "building") {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className="plan-svg"
+      >
+        <path
+          d="M4 21V6.5L12 3l8 3.5V21"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M8 9h1M8 13h1M8 17h1M15 9h1M15 13h1M15 17h1"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+        <path
+          d="M10.5 21v-4h3v4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="plan-svg"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="8.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path
+        d="m14.8 9.2-1.7 3.9-3.9 1.7 1.7-3.9 3.9-1.7Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle
+        cx="12"
+        cy="12"
+        r="1"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+// ============================================================
+// CHECK ICON
+// ============================================================
+
+function CheckIcon() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      className="check-svg"
+    >
+      <path
+        d="m5 10.2 3.1 3.1L15.2 6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+// ============================================================
+// ARROW ICON
+// ============================================================
+
+function ArrowIcon() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      className="arrow-svg"
+    >
+      <path
+        d="M4 10h11M11 5l5 5-5 5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+// ============================================================
+// LOCK ICON
+// ============================================================
+
+function LockIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="lock-svg"
+    >
+      <rect
+        x="5"
+        y="10"
+        width="14"
+        height="11"
+        rx="2.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M8 10V7.5a4 4 0 0 1 8 0V10"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <circle
+        cx="12"
+        cy="15.5"
+        r="1"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+// ============================================================
 // PLAN CARD
 // ============================================================
 
@@ -98,7 +323,8 @@ function PlanCard({
   onSelect,
   loading,
 }) {
-  const isPayPerListing = plan.payPerListing === true;
+  const isPayPerListing =
+    plan.payPerListing === true;
 
   const price = isPayPerListing
     ? plan.price
@@ -113,107 +339,158 @@ function PlanCard({
       : "per month";
 
   return (
-    <div
+    <article
       className={`plan-card ${
-        plan.popular ? "plan-card-popular" : ""
+        plan.popular
+          ? "plan-card-popular"
+          : ""
+      } ${
+        isPayPerListing
+          ? "plan-card-flexible"
+          : ""
       }`}
     >
       {plan.popular && (
         <div className="popular-badge">
-          <span>★</span>
+          <span className="popular-star">
+            ★
+          </span>
           MOST POPULAR
         </div>
       )}
 
-      <div className="plan-top">
-        <div className="plan-icon">
-          {plan.key === "starter"
-            ? "🚀"
-            : plan.key === "professional"
-              ? "⚡"
-              : plan.key === "enterprise"
-                ? "🏢"
-                : "🎯"}
+      <div className="plan-content">
+
+        {/* PLAN HEADER */}
+
+        <div className="plan-heading">
+
+          <div className="plan-icon">
+            <PlanIcon type={plan.icon} />
+          </div>
+
+          <div className="plan-title-row">
+            <h2>{plan.name}</h2>
+
+            {isPayPerListing && (
+              <span className="flexible-label">
+                FLEXIBLE
+              </span>
+            )}
+          </div>
+
+          <p className="plan-description">
+            {plan.description}
+          </p>
+
         </div>
 
-        <h2>{plan.name}</h2>
+        {/* PRICE */}
 
-        <p className="plan-description">
-          {plan.description}
-        </p>
-      </div>
+        <div className="price-area">
 
-      <div className="price-area">
-        <div className="price-line">
-          <span className="price">
-            {formatMoney(price)}
-          </span>
+          <div className="price-line">
 
-          <span className="price-period">
-            {billingLabel}
-          </span>
-        </div>
-
-        {!isPayPerListing &&
-          billing === "annual" && (
-            <div className="saving-badge">
-              SAVE 2 MONTHS
-            </div>
-          )}
-      </div>
-
-      <div className="listing-limit">
-        <span className="listing-icon">✓</span>
-
-        <span>
-          <strong>{plan.listings}</strong>{" "}
-          active{" "}
-          {plan.listings === 1
-            ? "listing"
-            : "listings"}
-        </span>
-      </div>
-
-      <div className="features">
-        {plan.features.map((feature, index) => (
-          <div
-            key={index}
-            className="feature-row"
-          >
-            <span className="feature-check">
-              ✓
+            <span className="price">
+              {formatMoney(price)}
             </span>
 
-            <span>{feature}</span>
+            <span className="price-period">
+              {billingLabel}
+            </span>
+
           </div>
-        ))}
+
+          {!isPayPerListing &&
+            billing === "annual" && (
+              <div className="saving-badge">
+                SAVE 2 MONTHS
+              </div>
+            )}
+
+        </div>
+
+        {/* LISTING CAPACITY */}
+
+        <div className="listing-limit">
+
+          <span className="listing-icon">
+            <CheckIcon />
+          </span>
+
+          <div>
+            <strong>
+              {plan.listings}
+            </strong>{" "}
+            active{" "}
+            {plan.listings === 1
+              ? "listing"
+              : "listings"}
+          </div>
+
+        </div>
+
+        {/* FEATURES */}
+
+        <div className="features">
+
+          <div className="features-label">
+            INCLUDED
+          </div>
+
+          {plan.features.map(
+            (feature, index) => (
+              <div
+                key={index}
+                className="feature-row"
+              >
+                <span className="feature-check">
+                  <CheckIcon />
+                </span>
+
+                <span>{feature}</span>
+              </div>
+            )
+          )}
+
+        </div>
+
       </div>
 
-      <div className="plan-spacer" />
+      {/* BUTTON */}
 
-      <button
-        type="button"
-        onClick={() => onSelect(plan.key)}
-        disabled={loading}
-        className={`plan-button ${
-          plan.popular
-            ? "plan-button-primary"
-            : "plan-button-secondary"
-        }`}
-      >
-        {loading
-          ? "Please wait..."
-          : isPayPerListing
-            ? "Publish a Listing"
-            : "Choose Plan"}
+      <div className="plan-action">
 
-        {!loading && (
-          <span className="button-arrow">
-            →
+        <button
+          type="button"
+          onClick={() =>
+            onSelect(plan.key)
+          }
+          disabled={loading}
+          className={`plan-button ${
+            plan.popular
+              ? "plan-button-primary"
+              : "plan-button-secondary"
+          }`}
+        >
+
+          <span>
+            {loading
+              ? "Please wait..."
+              : isPayPerListing
+                ? "Publish a Listing"
+                : "Choose Plan"}
           </span>
-        )}
-      </button>
-    </div>
+
+          {!loading && (
+            <ArrowIcon />
+          )}
+
+        </button>
+
+      </div>
+
+    </article>
   );
 }
 
@@ -227,10 +504,13 @@ export default function CompanyPricingPage() {
   const [billing, setBilling] =
     useState("monthly");
 
-  const [user, setUser] = useState(null);
-
-  const [currentSubscription, setCurrentSubscription] =
+  const [user, setUser] =
     useState(null);
+
+  const [
+    currentSubscription,
+    setCurrentSubscription,
+  ] = useState(null);
 
   const [loadingPlan, setLoadingPlan] =
     useState(null);
@@ -238,42 +518,69 @@ export default function CompanyPricingPage() {
   const [message, setMessage] =
     useState("");
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // LOAD USER
-  // ----------------------------------------------------------
+  // ==========================================================
 
   useEffect(() => {
+    let mounted = true;
+
     async function loadUser() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (user) {
-        setUser(user);
+        if (!mounted) return;
 
-        const { data } = await supabase
-          .from("company_subscriptions")
-          .select("*")
-          .eq("company_id", user.id)
-          .order("created_at", {
-            ascending: false,
-          })
-          .limit(1);
+        if (user) {
+          setUser(user);
 
-        if (data && data.length > 0) {
-          setCurrentSubscription(data[0]);
+          const { data } =
+            await supabase
+              .from("company_subscriptions")
+              .select("*")
+              .eq(
+                "company_id",
+                user.id
+              )
+              .order("created_at", {
+                ascending: false,
+              })
+              .limit(1);
+
+          if (
+            mounted &&
+            data &&
+            data.length > 0
+          ) {
+            setCurrentSubscription(
+              data[0]
+            );
+          }
         }
+      } catch (error) {
+        console.error(
+          "Unable to load company:",
+          error
+        );
       }
     }
 
     loadUser();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // SELECT PLAN
-  // ----------------------------------------------------------
+  // ==========================================================
 
-  async function continueToPayment(planKey) {
+  async function continueToPayment(
+    planKey
+  ) {
     try {
       setMessage("");
       setLoadingPlan(planKey);
@@ -285,14 +592,20 @@ export default function CompanyPricingPage() {
           data: {
             user: loggedInUser,
           },
-        } = await supabase.auth.getUser();
+        } =
+          await supabase.auth.getUser();
 
-        currentUser = loggedInUser;
+        currentUser =
+          loggedInUser;
 
         if (currentUser) {
           setUser(currentUser);
         }
       }
+
+      // ------------------------------------------------------
+      // NOT LOGGED IN
+      // ------------------------------------------------------
 
       if (!currentUser) {
         router.push(
@@ -302,7 +615,8 @@ export default function CompanyPricingPage() {
         return;
       }
 
-      const selectedPlan = PLANS[planKey];
+      const selectedPlan =
+        PLANS[planKey];
 
       if (!selectedPlan) {
         setMessage(
@@ -323,15 +637,26 @@ export default function CompanyPricingPage() {
 
       const {
         data: activeSubscription,
+        error: activeError,
       } = await supabase
         .from("company_subscriptions")
         .select("*")
-        .eq("company_id", currentUser.id)
+        .eq(
+          "company_id",
+          currentUser.id
+        )
         .eq("status", "active")
         .order("created_at", {
           ascending: false,
         })
         .limit(1);
+
+      if (activeError) {
+        console.error(
+          "Active subscription check:",
+          activeError
+        );
+      }
 
       if (
         activeSubscription &&
@@ -354,22 +679,37 @@ export default function CompanyPricingPage() {
             : selectedPlan.monthly;
 
       // ------------------------------------------------------
-      // CREATE / UPDATE PENDING SUBSCRIPTION
+      // FIND EXISTING INACTIVE SUBSCRIPTION
       // ------------------------------------------------------
 
       const {
         data: existingPending,
+        error: pendingError,
       } = await supabase
         .from("company_subscriptions")
         .select("*")
-        .eq("company_id", currentUser.id)
+        .eq(
+          "company_id",
+          currentUser.id
+        )
         .eq("status", "inactive")
         .order("created_at", {
           ascending: false,
         })
         .limit(1);
 
+      if (pendingError) {
+        console.error(
+          "Pending subscription check:",
+          pendingError
+        );
+      }
+
       let subscriptionId = null;
+
+      // ------------------------------------------------------
+      // UPDATE EXISTING PENDING SUBSCRIPTION
+      // ------------------------------------------------------
 
       if (
         existingPending &&
@@ -386,7 +726,8 @@ export default function CompanyPricingPage() {
           .update({
             plan: planKey,
             monthly_price: amount,
-            payment_provider: "payfast",
+            payment_provider:
+              "payfast",
             payment_reference: null,
             updated_at:
               new Date().toISOString(),
@@ -401,18 +742,26 @@ export default function CompanyPricingPage() {
 
         subscriptionId =
           updatedSubscription.id;
-      } else {
+      }
+
+      // ------------------------------------------------------
+      // CREATE NEW PENDING SUBSCRIPTION
+      // ------------------------------------------------------
+
+      else {
         const {
           data: newSubscription,
           error: insertError,
         } = await supabase
           .from("company_subscriptions")
           .insert({
-            company_id: currentUser.id,
+            company_id:
+              currentUser.id,
             plan: planKey,
             status: "inactive",
             monthly_price: amount,
-            payment_provider: "payfast",
+            payment_provider:
+              "payfast",
             payment_reference: null,
           })
           .select()
@@ -427,15 +776,17 @@ export default function CompanyPricingPage() {
       }
 
       // ------------------------------------------------------
-      // SEND TO PAYMENT
+      // SEND TO PAYMENT PAGE
       // ------------------------------------------------------
 
-      const params = new URLSearchParams({
-        plan: planKey,
-        billing: selectedBilling,
-        subscription:
-          String(subscriptionId),
-      });
+      const params =
+        new URLSearchParams({
+          plan: planKey,
+          billing:
+            selectedBilling,
+          subscription:
+            String(subscriptionId),
+        });
 
       router.push(
         `/company/payment?${params.toString()}`
@@ -455,9 +806,9 @@ export default function CompanyPricingPage() {
     }
   }
 
-  // ----------------------------------------------------------
+  // ==========================================================
   // ACTIVE SUBSCRIPTION
-  // ----------------------------------------------------------
+  // ==========================================================
 
   const active =
     currentSubscription &&
@@ -465,8 +816,16 @@ export default function CompanyPricingPage() {
       currentSubscription.status
     ).toLowerCase() === "active";
 
+  // ==========================================================
+  // RENDER
+  // ==========================================================
+
   return (
     <main className="pricing-page">
+
+      <div className="pricing-background-shape shape-one" />
+      <div className="pricing-background-shape shape-two" />
+
       <div className="pricing-shell">
 
         {/* ==================================================
@@ -474,28 +833,48 @@ export default function CompanyPricingPage() {
         ================================================== */}
 
         <header className="pricing-nav">
+
           <button
             type="button"
             className="brand"
-            onClick={() => router.push("/")}
+            onClick={() =>
+              router.push("/")
+            }
+            aria-label="Go to GradLink SA home"
           >
+
             <span className="brand-mark">
               G
             </span>
 
-            <span>
-              <strong>GradLink</strong>
-              <small>SA</small>
+            <span className="brand-name">
+              <strong>
+                GradLink
+              </strong>
+
+              <small>
+                SA
+              </small>
             </span>
+
           </button>
 
           <button
             type="button"
             className="back-button"
-            onClick={() => router.back()}
+            onClick={() =>
+              router.back()
+            }
           >
-            ← Back
+            <span className="back-arrow">
+              ←
+            </span>
+
+            <span>
+              Back
+            </span>
           </button>
+
         </header>
 
         {/* ==================================================
@@ -506,7 +885,10 @@ export default function CompanyPricingPage() {
 
           <div className="hero-badge">
             <span className="hero-badge-dot" />
-            GRADLINK SA FOR COMPANIES
+
+            <span>
+              GRADLINK SA FOR COMPANIES
+            </span>
           </div>
 
           <h1>
@@ -517,27 +899,34 @@ export default function CompanyPricingPage() {
           </h1>
 
           <p className="hero-description">
-            Choose a recruitment plan that gives
-            your company the tools and capacity
-            to connect with qualified South African
-            graduates.
+            Give your company the tools to
+            discover, connect with and recruit
+            qualified South African graduates.
           </p>
 
           <div className="hero-points">
+
             <div>
-              <span>✓</span>
+              <span>
+                <CheckIcon />
+              </span>
               Publish internships
             </div>
 
             <div>
-              <span>✓</span>
+              <span>
+                <CheckIcon />
+              </span>
               Receive applications
             </div>
 
             <div>
-              <span>✓</span>
+              <span>
+                <CheckIcon />
+              </span>
               Discover graduate talent
             </div>
+
           </div>
 
         </section>
@@ -548,11 +937,13 @@ export default function CompanyPricingPage() {
 
         {active && (
           <div className="active-banner">
+
             <div className="active-icon">
-              ✓
+              <CheckIcon />
             </div>
 
-            <div>
+            <div className="active-copy">
+
               <strong>
                 Your plan is active
               </strong>
@@ -563,6 +954,7 @@ export default function CompanyPricingPage() {
                 ).toUpperCase()}{" "}
                 subscription
               </span>
+
             </div>
 
             <button
@@ -571,8 +963,13 @@ export default function CompanyPricingPage() {
                 router.push("/company")
               }
             >
-              Go to Dashboard →
+              <span>
+                Go to Dashboard
+              </span>
+
+              <ArrowIcon />
             </button>
+
           </div>
         )}
 
@@ -582,8 +979,15 @@ export default function CompanyPricingPage() {
 
         {message && (
           <div className="error-message">
-            <span>!</span>
-            {message}
+
+            <span className="error-icon">
+              !
+            </span>
+
+            <span>
+              {message}
+            </span>
+
           </div>
         )}
 
@@ -593,15 +997,21 @@ export default function CompanyPricingPage() {
 
         <section className="billing-section">
 
-          <div>
+          <div className="billing-copy">
+
+            <div className="section-eyebrow">
+              PLANS & PRICING
+            </div>
+
             <h2>
               Choose your billing
             </h2>
 
             <p>
-              Save 2 months when you
-              choose annual billing.
+              Save 2 months with annual
+              billing.
             </p>
+
           </div>
 
           <div className="billing-toggle">
@@ -631,10 +1041,13 @@ export default function CompanyPricingPage() {
                 setBilling("annual")
               }
             >
-              Annual
               <span>
-                SAVE 2 MONTHS
+                Annual
               </span>
+
+              <small>
+                SAVE 2 MONTHS
+              </small>
             </button>
 
           </div>
@@ -650,16 +1063,21 @@ export default function CompanyPricingPage() {
           <PlanCard
             plan={PLANS.starter}
             billing={billing}
-            onSelect={continueToPayment}
+            onSelect={
+              continueToPayment
+            }
             loading={
-              loadingPlan === "starter"
+              loadingPlan ===
+              "starter"
             }
           />
 
           <PlanCard
             plan={PLANS.professional}
             billing={billing}
-            onSelect={continueToPayment}
+            onSelect={
+              continueToPayment
+            }
             loading={
               loadingPlan ===
               "professional"
@@ -669,16 +1087,23 @@ export default function CompanyPricingPage() {
           <PlanCard
             plan={PLANS.enterprise}
             billing={billing}
-            onSelect={continueToPayment}
+            onSelect={
+              continueToPayment
+            }
             loading={
-              loadingPlan === "enterprise"
+              loadingPlan ===
+              "enterprise"
             }
           />
 
           <PlanCard
-            plan={PLANS.pay_per_listing}
+            plan={
+              PLANS.pay_per_listing
+            }
             billing={billing}
-            onSelect={continueToPayment}
+            onSelect={
+              continueToPayment
+            }
             loading={
               loadingPlan ===
               "pay_per_listing"
@@ -687,10 +1112,8 @@ export default function CompanyPricingPage() {
 
         </section>
 
-        {/* Part 2 continues here */}
-        
-                {/* ==================================================
-            TRUST / PAYMENT SECTION
+        {/* ==================================================
+            TRUST / PAYMENT
         ================================================== */}
 
         <section className="trust-section">
@@ -698,20 +1121,32 @@ export default function CompanyPricingPage() {
           <div className="trust-card">
 
             <div className="trust-icon">
-              🔒
+              <LockIcon />
             </div>
 
-            <div>
-              <strong>
-                Secure payments with PayFast
-              </strong>
+            <div className="trust-copy">
+
+              <div className="trust-title-row">
+
+                <strong>
+                  Secure payments with PayFast
+                </strong>
+
+                <span className="secure-label">
+                  SECURE
+                </span>
+
+              </div>
 
               <p>
-                Your payment is processed securely
-                through PayFast. Your GradLink SA
-                company plan becomes active only
-                after successful payment verification.
+                Your payment is processed
+                securely through PayFast.
+                Your GradLink SA company
+                plan becomes active only
+                after successful payment
+                verification.
               </p>
+
             </div>
 
           </div>
@@ -719,18 +1154,24 @@ export default function CompanyPricingPage() {
           <div className="trust-items">
 
             <div>
-              <span>✓</span>
+              <span>
+                <CheckIcon />
+              </span>
               Secure payment processing
             </div>
 
             <div>
-              <span>✓</span>
-              No free company plan
+              <span>
+                <CheckIcon />
+              </span>
+              Paid company plans
             </div>
 
             <div>
-              <span>✓</span>
-              Upgrade when your business grows
+              <span>
+                <CheckIcon />
+              </span>
+              Upgrade as you grow
             </div>
 
           </div>
@@ -738,82 +1179,100 @@ export default function CompanyPricingPage() {
         </section>
 
         {/* ==================================================
-            FAQ / INFORMATION
+            INFORMATION
         ================================================== */}
 
         <section className="info-section">
 
           <div className="info-heading">
-            <span>GRADLINK SA</span>
+
+            <div className="section-eyebrow">
+              HOW IT WORKS
+            </div>
 
             <h2>
-              Built for graduate recruitment
+              Start recruiting in three
+              simple steps.
             </h2>
 
             <p>
-              Whether you are hiring for your first
-              internship or managing a larger
-              graduate recruitment programme,
-              choose the capacity that fits your
-              organisation.
+              Choose your recruitment capacity,
+              complete your payment and start
+              connecting with graduate talent
+              after payment verification.
             </p>
+
           </div>
 
           <div className="info-grid">
 
             <div className="info-item">
+
               <div className="info-number">
                 01
               </div>
 
-              <div>
+              <div className="info-content">
+
                 <h3>
                   Choose your plan
                 </h3>
 
                 <p>
-                  Select the plan that matches the
-                  number of active internship
-                  listings your company needs.
+                  Select the plan that matches
+                  the number of active
+                  internship listings your
+                  company needs.
                 </p>
+
               </div>
+
             </div>
 
             <div className="info-item">
+
               <div className="info-number">
                 02
               </div>
 
-              <div>
+              <div className="info-content">
+
                 <h3>
                   Complete payment
                 </h3>
 
                 <p>
-                  Continue to PayFast and complete
-                  the payment for your selected
-                  plan.
+                  Continue to PayFast and
+                  securely complete payment
+                  for your selected plan.
                 </p>
+
               </div>
+
             </div>
 
             <div className="info-item">
+
               <div className="info-number">
                 03
               </div>
 
-              <div>
+              <div className="info-content">
+
                 <h3>
                   Start recruiting
                 </h3>
 
                 <p>
-                  After payment verification, your
-                  company subscription becomes
-                  active and your recruitment tools
-                  become available.
+                  Once payment is verified,
+                  your company subscription
+                  becomes active and your
+                  recruitment tools become
+                  available.
                 </p>
+
               </div>
+
             </div>
 
           </div>
@@ -827,69 +1286,108 @@ export default function CompanyPricingPage() {
         <footer className="pricing-footer">
 
           <div className="footer-brand">
+
             <span className="footer-mark">
               G
             </span>
 
             <div>
+
               <strong>
                 GradLink SA
               </strong>
 
               <span>
-                Connecting South African graduates
-                with opportunity.
+                Connecting South African
+                graduates with opportunity.
               </span>
+
             </div>
+
           </div>
 
           <div className="footer-note">
+
             <span>
-              © {new Date().getFullYear()} GradLink SA
+              ©{" "}
+              {new Date().getFullYear()}{" "}
+              GradLink SA
             </span>
 
             <span>
               Companies require a paid plan.
             </span>
+
           </div>
 
         </footer>
 
       </div>
 
-      {/* ====================================================
-          COMPLETE PAGE STYLING
-      ==================================================== */}
+            <style jsx>{`
 
-      <style jsx>{`
+        /* ==================================================
+           GLOBAL
+        ================================================== */
 
         * {
           box-sizing: border-box;
         }
 
         .pricing-page {
+          position: relative;
           min-height: 100vh;
+          overflow: hidden;
           background:
             radial-gradient(
-              circle at 50% -10%,
-              rgba(37, 99, 235, 0.15),
-              transparent 35%
+              circle at 50% -15%,
+              rgba(37, 99, 235, 0.14),
+              transparent 38%
             ),
             linear-gradient(
               180deg,
               #f8fbff 0%,
-              #f8fafc 42%,
+              #f8fafc 45%,
               #ffffff 100%
             );
-
           color: #0f172a;
           padding: 0 18px 70px;
         }
 
         .pricing-shell {
+          position: relative;
+          z-index: 2;
           width: 100%;
           max-width: 1240px;
           margin: 0 auto;
+        }
+
+        .pricing-background-shape {
+          position: absolute;
+          pointer-events: none;
+          border-radius: 999px;
+          filter: blur(2px);
+          opacity: 0.55;
+        }
+
+        .shape-one {
+          width: 320px;
+          height: 320px;
+          top: 220px;
+          left: -220px;
+          background: rgba(59, 130, 246, 0.08);
+        }
+
+        .shape-two {
+          width: 280px;
+          height: 280px;
+          top: 720px;
+          right: -180px;
+          background: rgba(14, 165, 233, 0.07);
+        }
+
+        button {
+          font-family: inherit;
         }
 
         /* ==================================================
@@ -901,13 +1399,14 @@ export default function CompanyPricingPage() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+          border-bottom: 1px solid
+            rgba(148, 163, 184, 0.18);
         }
 
         .brand {
           display: inline-flex;
           align-items: center;
-          gap: 10px;
+          gap: 11px;
           border: none;
           background: transparent;
           cursor: pointer;
@@ -916,56 +1415,75 @@ export default function CompanyPricingPage() {
         }
 
         .brand-mark {
-          width: 39px;
-          height: 39px;
+          width: 40px;
+          height: 40px;
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: 11px;
-          background: linear-gradient(
-            135deg,
-            #2563eb,
-            #1d4ed8
-          );
+          border-radius: 12px;
+          background:
+            linear-gradient(
+              145deg,
+              #3b82f6,
+              #1d4ed8
+            );
           color: white;
           font-size: 20px;
-          font-weight: 900;
+          font-weight: 950;
           box-shadow:
-            0 8px 18px rgba(37, 99, 235, 0.25);
+            0 9px 22px
+              rgba(37, 99, 235, 0.25);
         }
 
-        .brand > span:last-child {
+        .brand-name {
           display: flex;
           align-items: baseline;
           gap: 4px;
           font-size: 18px;
+          letter-spacing: -0.02em;
         }
 
-        .brand strong {
-          font-weight: 900;
+        .brand-name strong {
+          font-weight: 950;
         }
 
-        .brand small {
+        .brand-name small {
           color: #2563eb;
-          font-size: 12px;
-          font-weight: 900;
+          font-size: 11px;
+          font-weight: 950;
         }
 
         .back-button {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
           border: 1px solid #dbe3ef;
-          background: rgba(255, 255, 255, 0.9);
+          background: rgba(255, 255, 255, 0.92);
           color: #334155;
-          padding: 10px 16px;
+          padding: 10px 15px;
           border-radius: 10px;
-          font-weight: 800;
+          font-size: 13px;
+          font-weight: 850;
           cursor: pointer;
-          transition: 0.2s ease;
+          transition:
+            border-color 0.2s ease,
+            color 0.2s ease,
+            transform 0.2s ease,
+            box-shadow 0.2s ease;
         }
 
         .back-button:hover {
           border-color: #93c5fd;
           color: #1d4ed8;
           transform: translateY(-1px);
+          box-shadow:
+            0 6px 15px
+              rgba(15, 23, 42, 0.05);
+        }
+
+        .back-arrow {
+          font-size: 17px;
+          line-height: 1;
         }
 
         /* ==================================================
@@ -973,46 +1491,49 @@ export default function CompanyPricingPage() {
         ================================================== */
 
         .hero {
-          text-align: center;
           max-width: 850px;
           margin: 0 auto;
-          padding: 72px 0 50px;
+          padding: 72px 0 52px;
+          text-align: center;
         }
 
         .hero-badge {
           display: inline-flex;
           align-items: center;
-          gap: 8px;
+          gap: 9px;
           padding: 8px 14px;
-          border-radius: 999px;
-          background: #eff6ff;
           border: 1px solid #dbeafe;
+          border-radius: 999px;
+          background:
+            rgba(239, 246, 255, 0.82);
           color: #1d4ed8;
-          font-size: 12px;
-          font-weight: 900;
-          letter-spacing: 0.04em;
+          font-size: 10px;
+          font-weight: 950;
+          letter-spacing: 0.08em;
         }
 
         .hero-badge-dot {
           width: 7px;
           height: 7px;
+          flex: 0 0 auto;
           border-radius: 50%;
           background: #2563eb;
           box-shadow:
-            0 0 0 4px rgba(37, 99, 235, 0.1);
+            0 0 0 4px
+              rgba(37, 99, 235, 0.10);
         }
 
         .hero h1 {
-          margin: 22px 0 0;
-          font-size: clamp(
-            38px,
-            7vw,
-            68px
-          );
-          line-height: 1.02;
-          letter-spacing: -0.045em;
-          font-weight: 950;
+          margin: 23px 0 0;
           color: #0f172a;
+          font-size: clamp(
+            42px,
+            7vw,
+            70px
+          );
+          line-height: 1.01;
+          letter-spacing: -0.055em;
+          font-weight: 950;
         }
 
         .hero h1 span {
@@ -1021,22 +1542,23 @@ export default function CompanyPricingPage() {
         }
 
         .hero-description {
-          max-width: 690px;
-          margin: 22px auto 0;
+          max-width: 680px;
+          margin: 23px auto 0;
           color: #64748b;
-          font-size: 17px;
-          line-height: 1.7;
+          font-size: 16px;
+          line-height: 1.75;
         }
 
         .hero-points {
           display: flex;
+          align-items: center;
           justify-content: center;
           flex-wrap: wrap;
-          gap: 12px 25px;
-          margin-top: 28px;
+          gap: 10px 25px;
+          margin-top: 29px;
           color: #334155;
-          font-size: 14px;
-          font-weight: 750;
+          font-size: 13px;
+          font-weight: 800;
         }
 
         .hero-points div {
@@ -1046,20 +1568,23 @@ export default function CompanyPricingPage() {
         }
 
         .hero-points span {
-          width: 20px;
-          height: 20px;
+          width: 21px;
+          height: 21px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           border-radius: 50%;
           background: #dcfce7;
           color: #15803d;
-          font-size: 12px;
-          font-weight: 900;
+        }
+
+        .hero-points .check-svg {
+          width: 13px;
+          height: 13px;
         }
 
         /* ==================================================
-           ACTIVE BANNER
+           ACTIVE PLAN
         ================================================== */
 
         .active-banner {
@@ -1068,10 +1593,18 @@ export default function CompanyPricingPage() {
           display: flex;
           align-items: center;
           gap: 14px;
-          padding: 16px 18px;
+          padding: 15px 17px;
           border: 1px solid #86efac;
-          background: #f0fdf4;
-          border-radius: 15px;
+          border-radius: 16px;
+          background:
+            linear-gradient(
+              135deg,
+              #f0fdf4,
+              #f7fff9
+            );
+          box-shadow:
+            0 8px 25px
+              rgba(22, 163, 74, 0.06);
         }
 
         .active-icon {
@@ -1084,38 +1617,58 @@ export default function CompanyPricingPage() {
           border-radius: 12px;
           background: #16a34a;
           color: white;
-          font-weight: 900;
         }
 
-        .active-banner > div:nth-child(2) {
+        .active-icon .check-svg {
+          width: 21px;
+          height: 21px;
+        }
+
+        .active-copy {
+          min-width: 0;
+          flex: 1;
           display: flex;
           flex-direction: column;
           gap: 3px;
-          flex: 1;
         }
 
-        .active-banner strong {
+        .active-copy strong {
           color: #166534;
           font-size: 14px;
+          font-weight: 900;
         }
 
-        .active-banner span {
+        .active-copy span {
           color: #15803d;
-          font-size: 12px;
-          font-weight: 700;
+          font-size: 11px;
+          font-weight: 750;
+          letter-spacing: 0.04em;
         }
 
         .active-banner button {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          flex: 0 0 auto;
           border: none;
           background: transparent;
           color: #15803d;
+          font-size: 12px;
           font-weight: 900;
           cursor: pointer;
-          white-space: nowrap;
+        }
+
+        .active-banner button:hover {
+          color: #166534;
+        }
+
+        .active-banner button .arrow-svg {
+          width: 16px;
+          height: 16px;
         }
 
         /* ==================================================
-           ERROR
+           ERROR MESSAGE
         ================================================== */
 
         .error-message {
@@ -1125,19 +1678,20 @@ export default function CompanyPricingPage() {
           align-items: center;
           justify-content: center;
           gap: 9px;
-          padding: 14px 18px;
+          padding: 13px 17px;
+          border: 1px solid #fecaca;
           border-radius: 12px;
           background: #fef2f2;
-          border: 1px solid #fecaca;
           color: #b91c1c;
-          font-size: 14px;
+          font-size: 13px;
           font-weight: 750;
           text-align: center;
         }
 
-        .error-message span {
+        .error-icon {
           width: 21px;
           height: 21px;
+          flex: 0 0 auto;
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -1145,11 +1699,11 @@ export default function CompanyPricingPage() {
           background: #dc2626;
           color: white;
           font-size: 12px;
-          font-weight: 900;
+          font-weight: 950;
         }
 
         /* ==================================================
-           BILLING
+           BILLING SECTION
         ================================================== */
 
         .billing-section {
@@ -1157,73 +1711,90 @@ export default function CompanyPricingPage() {
           align-items: center;
           justify-content: space-between;
           gap: 25px;
-          margin: 10px 0 30px;
+          margin: 8px 0 30px;
           padding: 22px 24px;
-          background: rgba(255, 255, 255, 0.8);
           border: 1px solid #e2e8f0;
           border-radius: 18px;
+          background:
+            rgba(255, 255, 255, 0.86);
           box-shadow:
-            0 10px 35px rgba(
-              15,
-              23,
-              42,
-              0.04
-            );
+            0 12px 35px
+              rgba(15, 23, 42, 0.045);
+        }
+
+        .billing-copy {
+          min-width: 0;
+        }
+
+        .section-eyebrow {
+          color: #2563eb;
+          font-size: 10px;
+          font-weight: 950;
+          letter-spacing: 0.13em;
         }
 
         .billing-section h2 {
-          margin: 0;
-          font-size: 17px;
-          font-weight: 900;
+          margin: 5px 0 0;
+          color: #0f172a;
+          font-size: 18px;
+          font-weight: 950;
+          letter-spacing: -0.02em;
         }
 
         .billing-section p {
           margin: 5px 0 0;
           color: #64748b;
-          font-size: 13px;
+          font-size: 12px;
         }
 
         .billing-toggle {
+          flex: 0 0 auto;
           display: flex;
           gap: 4px;
           padding: 4px;
-          border-radius: 12px;
-          background: #f1f5f9;
           border: 1px solid #e2e8f0;
+          border-radius: 13px;
+          background: #f1f5f9;
         }
 
         .billing-toggle button {
+          min-width: 105px;
+          min-height: 43px;
           border: none;
+          border-radius: 9px;
           background: transparent;
           color: #64748b;
-          min-width: 105px;
-          padding: 10px 14px;
-          border-radius: 9px;
-          font-weight: 850;
+          font-size: 12px;
+          font-weight: 900;
           cursor: pointer;
-          transition: 0.2s ease;
+          transition:
+            background 0.2s ease,
+            color 0.2s ease,
+            box-shadow 0.2s ease;
         }
 
         .billing-toggle button.billing-active {
           background: #2563eb;
           color: white;
           box-shadow:
-            0 5px 12px rgba(
-              37,
-              99,
-              235,
-              0.2
-            );
+            0 6px 15px
+              rgba(37, 99, 235, 0.19);
         }
 
         .billing-toggle button span {
           display: block;
-          margin-top: 2px;
-          font-size: 9px;
-          color: #16a34a;
         }
 
-        .billing-toggle button.billing-active span {
+        .billing-toggle button small {
+          display: block;
+          margin-top: 2px;
+          color: #16a34a;
+          font-size: 8px;
+          font-weight: 950;
+          letter-spacing: 0.04em;
+        }
+
+        .billing-toggle button.billing-active small {
           color: #dcfce7;
         }
 
@@ -1234,12 +1805,9 @@ export default function CompanyPricingPage() {
         .plans-section {
           display: grid;
           grid-template-columns:
-            repeat(
-              4,
-              minmax(0, 1fr)
-            );
+            repeat(4, minmax(0, 1fr));
           align-items: stretch;
-          gap: 18px;
+          gap: 17px;
         }
 
         /* ==================================================
@@ -1248,51 +1816,51 @@ export default function CompanyPricingPage() {
 
         .plan-card {
           position: relative;
+          min-width: 0;
           display: flex;
           flex-direction: column;
-          min-width: 0;
-          padding: 25px;
-          border-radius: 20px;
-          background: rgba(
-            255,
-            255,
-            255,
-            0.96
-          );
+          padding: 24px;
           border: 1px solid #e2e8f0;
+          border-radius: 20px;
+          background:
+            rgba(255, 255, 255, 0.97);
           box-shadow:
-            0 12px 35px rgba(
-              15,
-              23,
-              42,
-              0.055
-            );
+            0 12px 34px
+              rgba(15, 23, 42, 0.055);
           transition:
-            transform 0.2s ease,
-            box-shadow 0.2s ease,
-            border-color 0.2s ease;
+            transform 0.22s ease,
+            box-shadow 0.22s ease,
+            border-color 0.22s ease;
         }
 
         .plan-card:hover {
           transform: translateY(-4px);
           border-color: #bfdbfe;
           box-shadow:
-            0 20px 45px rgba(
-              15,
-              23,
-              42,
-              0.09
-            );
+            0 22px 48px
+              rgba(15, 23, 42, 0.09);
         }
 
         .plan-card-popular {
           border: 2px solid #2563eb;
           box-shadow:
-            0 18px 50px rgba(
-              37,
-              99,
-              235,
-              0.16
+            0 20px 52px
+              rgba(37, 99, 235, 0.14);
+        }
+
+        .plan-card-popular:hover {
+          border-color: #2563eb;
+          box-shadow:
+            0 25px 58px
+              rgba(37, 99, 235, 0.18);
+        }
+
+        .plan-card-flexible {
+          background:
+            linear-gradient(
+              180deg,
+              #ffffff,
+              #fbfdff
             );
         }
 
@@ -1300,124 +1868,189 @@ export default function CompanyPricingPage() {
           position: absolute;
           top: -13px;
           left: 50%;
+          z-index: 4;
           transform: translateX(-50%);
-          display: flex;
+          display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: 6px;
-          padding: 7px 15px;
+          min-height: 26px;
+          padding: 6px 13px;
           border-radius: 999px;
-          background: #2563eb;
+          background:
+            linear-gradient(
+              135deg,
+              #2563eb,
+              #1d4ed8
+            );
           color: white;
-          font-size: 10px;
+          font-size: 9px;
           font-weight: 950;
-          letter-spacing: 0.06em;
+          letter-spacing: 0.07em;
           white-space: nowrap;
           box-shadow:
-            0 7px 16px rgba(
-              37,
-              99,
-              235,
-              0.25
-            );
+            0 8px 18px
+              rgba(37, 99, 235, 0.25);
         }
 
-        .popular-badge span {
-          font-size: 11px;
+        .popular-star {
+          font-size: 10px;
         }
 
-        .plan-top {
-          min-height: 190px;
+        .plan-content {
+          flex: 1;
+          min-width: 0;
+        }
+
+        /* ==================================================
+           PLAN HEADER
+        ================================================== */
+
+        .plan-heading {
+          min-width: 0;
         }
 
         .plan-icon {
-          width: 42px;
-          height: 42px;
+          width: 43px;
+          height: 43px;
           display: flex;
           align-items: center;
           justify-content: center;
           margin-bottom: 17px;
-          border-radius: 12px;
-          background: #eff6ff;
-          font-size: 19px;
+          border: 1px solid #dbeafe;
+          border-radius: 13px;
+          background:
+            linear-gradient(
+              145deg,
+              #eff6ff,
+              #f8fbff
+            );
+          color: #2563eb;
+        }
+
+        .plan-svg {
+          width: 22px;
+          height: 22px;
+        }
+
+        .plan-title-row {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 8px;
         }
 
         .plan-card h2 {
           margin: 0;
-          font-size: 22px;
-          font-weight: 900;
-          letter-spacing: -0.02em;
+          color: #0f172a;
+          font-size: 21px;
+          font-weight: 950;
+          letter-spacing: -0.025em;
+        }
+
+        .flexible-label {
+          padding: 4px 7px;
+          border: 1px solid #e2e8f0;
+          border-radius: 6px;
+          background: #f8fafc;
+          color: #64748b;
+          font-size: 7px;
+          font-weight: 950;
+          letter-spacing: 0.07em;
         }
 
         .plan-description {
           min-height: 66px;
           margin: 9px 0 0;
           color: #64748b;
-          font-size: 13px;
-          line-height: 1.6;
+          font-size: 12px;
+          line-height: 1.65;
         }
 
+        /* ==================================================
+           PRICE
+        ================================================== */
+
         .price-area {
-          margin-top: 2px;
-          min-height: 78px;
+          min-height: 83px;
+          margin-top: 18px;
         }
 
         .price-line {
           display: flex;
           align-items: baseline;
-          gap: 6px;
           flex-wrap: wrap;
+          gap: 6px;
         }
 
         .price {
           color: #0f172a;
-          font-size: 35px;
+          font-size: 34px;
           line-height: 1;
           font-weight: 950;
-          letter-spacing: -0.035em;
+          letter-spacing: -0.045em;
         }
 
         .price-period {
           color: #64748b;
-          font-size: 12px;
-          font-weight: 700;
+          font-size: 11px;
+          font-weight: 750;
         }
 
         .saving-badge {
           display: inline-flex;
           margin-top: 9px;
           padding: 5px 8px;
+          border: 1px solid #bbf7d0;
           border-radius: 7px;
-          background: #dcfce7;
+          background: #f0fdf4;
           color: #15803d;
-          font-size: 9px;
+          font-size: 8px;
           font-weight: 950;
-          letter-spacing: 0.04em;
+          letter-spacing: 0.05em;
         }
+
+        /* ==================================================
+           LISTING CAPACITY
+        ================================================== */
 
         .listing-limit {
           display: flex;
           align-items: center;
           gap: 9px;
-          margin-top: 10px;
-          padding: 12px;
+          margin-top: 8px;
+          padding: 11px;
+          border: 1px solid #dbeafe;
           border-radius: 11px;
           background: #eff6ff;
           color: #1e40af;
-          font-size: 13px;
+          font-size: 12px;
+        }
+
+        .listing-limit strong {
+          font-weight: 950;
         }
 
         .listing-icon {
           width: 22px;
           height: 22px;
+          flex: 0 0 auto;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           border-radius: 50%;
           background: #2563eb;
           color: white;
-          font-size: 11px;
-          font-weight: 900;
         }
+
+        .listing-icon .check-svg {
+          width: 13px;
+          height: 13px;
+        }
+
+        /* ==================================================
+           FEATURES
+        ================================================== */
 
         .features {
           display: flex;
@@ -1426,77 +2059,117 @@ export default function CompanyPricingPage() {
           margin-top: 20px;
         }
 
+        .features-label {
+          margin-bottom: 1px;
+          color: #94a3b8;
+          font-size: 8px;
+          font-weight: 950;
+          letter-spacing: 0.12em;
+        }
+
         .feature-row {
           display: flex;
           align-items: flex-start;
           gap: 8px;
+          min-width: 0;
           color: #475569;
-          font-size: 12px;
-          line-height: 1.45;
+          font-size: 11px;
+          line-height: 1.5;
         }
 
         .feature-check {
           flex: 0 0 auto;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 17px;
+          height: 17px;
+          margin-top: -1px;
+          border-radius: 50%;
+          background: #f0fdf4;
           color: #16a34a;
-          font-weight: 950;
         }
 
-        .plan-spacer {
-          flex: 1;
-          min-height: 25px;
+        .check-svg {
+          width: 12px;
+          height: 12px;
+        }
+
+        /* ==================================================
+           PLAN BUTTON
+        ================================================== */
+
+        .plan-action {
+          margin-top: 25px;
         }
 
         .plan-button {
           width: 100%;
+          min-height: 47px;
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 8px;
-          border: none;
           border-radius: 11px;
-          padding: 14px 16px;
-          font-size: 13px;
-          font-weight: 900;
+          padding: 12px 15px;
+          font-size: 12px;
+          font-weight: 950;
           cursor: pointer;
-          transition: 0.2s ease;
+          transition:
+            transform 0.2s ease,
+            background 0.2s ease,
+            border-color 0.2s ease,
+            box-shadow 0.2s ease;
         }
 
         .plan-button:disabled {
-          opacity: 0.6;
+          opacity: 0.58;
           cursor: not-allowed;
+          transform: none;
         }
 
         .plan-button-primary {
-          background: #2563eb;
+          border: 1px solid #2563eb;
+          background:
+            linear-gradient(
+              135deg,
+              #2563eb,
+              #1d4ed8
+            );
           color: white;
           box-shadow:
-            0 8px 18px rgba(
-              37,
-              99,
-              235,
-              0.2
-            );
+            0 9px 20px
+              rgba(37, 99, 235, 0.19);
         }
 
         .plan-button-primary:hover:not(:disabled) {
-          background: #1d4ed8;
           transform: translateY(-1px);
+          background:
+            linear-gradient(
+              135deg,
+              #1d4ed8,
+              #1e40af
+            );
+          box-shadow:
+            0 12px 25px
+              rgba(37, 99, 235, 0.25);
         }
 
         .plan-button-secondary {
+          border: 1px solid #dbeafe;
           background: #f8fafc;
           color: #1e3a8a;
-          border: 1px solid #dbeafe;
         }
 
         .plan-button-secondary:hover:not(:disabled) {
-          background: #eff6ff;
+          transform: translateY(-1px);
           border-color: #93c5fd;
+          background: #eff6ff;
         }
 
-        .button-arrow {
-          font-size: 17px;
-          line-height: 1;
+        .arrow-svg {
+          width: 17px;
+          height: 17px;
         }
 
         /* ==================================================
@@ -1504,50 +2177,81 @@ export default function CompanyPricingPage() {
         ================================================== */
 
         .trust-section {
-          margin-top: 45px;
-          padding: 24px;
-          border-radius: 18px;
-          background: #f8fafc;
+          margin-top: 46px;
+          padding: 25px;
           border: 1px solid #e2e8f0;
+          border-radius: 19px;
+          background:
+            linear-gradient(
+              135deg,
+              #f8fafc,
+              #ffffff
+            );
         }
 
         .trust-card {
+          max-width: 820px;
+          margin: 0 auto;
           display: flex;
           align-items: center;
           gap: 15px;
-          max-width: 800px;
-          margin: 0 auto;
         }
 
         .trust-icon {
+          width: 47px;
+          height: 47px;
           flex: 0 0 auto;
-          width: 46px;
-          height: 46px;
           display: flex;
           align-items: center;
           justify-content: center;
+          border: 1px solid #bbf7d0;
           border-radius: 13px;
-          background: #dcfce7;
-          font-size: 19px;
+          background: #f0fdf4;
+          color: #15803d;
+        }
+
+        .lock-svg {
+          width: 22px;
+          height: 22px;
+        }
+
+        .trust-copy {
+          min-width: 0;
+        }
+
+        .trust-title-row {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 8px;
         }
 
         .trust-card strong {
-          display: block;
-          margin-bottom: 4px;
           color: #0f172a;
           font-size: 14px;
-          font-weight: 900;
+          font-weight: 950;
+        }
+
+        .secure-label {
+          padding: 3px 6px;
+          border-radius: 5px;
+          background: #dcfce7;
+          color: #15803d;
+          font-size: 7px;
+          font-weight: 950;
+          letter-spacing: 0.07em;
         }
 
         .trust-card p {
-          margin: 0;
+          margin: 5px 0 0;
           color: #64748b;
-          font-size: 12px;
-          line-height: 1.6;
+          font-size: 11px;
+          line-height: 1.65;
         }
 
         .trust-items {
           display: flex;
+          align-items: center;
           justify-content: center;
           flex-wrap: wrap;
           gap: 10px 28px;
@@ -1555,8 +2259,8 @@ export default function CompanyPricingPage() {
           padding-top: 18px;
           border-top: 1px solid #e2e8f0;
           color: #475569;
-          font-size: 12px;
-          font-weight: 750;
+          font-size: 11px;
+          font-weight: 800;
         }
 
         .trust-items div {
@@ -1566,8 +2270,19 @@ export default function CompanyPricingPage() {
         }
 
         .trust-items span {
-          color: #16a34a;
-          font-weight: 950;
+          width: 17px;
+          height: 17px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          background: #dcfce7;
+          color: #15803d;
+        }
+
+        .trust-items .check-svg {
+          width: 11px;
+          height: 11px;
         }
 
         /* ==================================================
@@ -1582,64 +2297,71 @@ export default function CompanyPricingPage() {
 
         .info-heading {
           max-width: 650px;
-          margin-bottom: 35px;
-        }
-
-        .info-heading > span {
-          color: #2563eb;
-          font-size: 11px;
-          font-weight: 950;
-          letter-spacing: 0.12em;
+          margin-bottom: 34px;
         }
 
         .info-heading h2 {
+          max-width: 620px;
           margin: 8px 0 10px;
-          font-size: 30px;
+          color: #0f172a;
+          font-size: 31px;
+          line-height: 1.12;
           font-weight: 950;
-          letter-spacing: -0.025em;
+          letter-spacing: -0.035em;
         }
 
         .info-heading p {
+          max-width: 600px;
           margin: 0;
           color: #64748b;
-          font-size: 14px;
+          font-size: 13px;
           line-height: 1.7;
         }
 
         .info-grid {
           display: grid;
           grid-template-columns:
-            repeat(3, 1fr);
-          gap: 20px;
+            repeat(3, minmax(0, 1fr));
+          gap: 18px;
         }
 
         .info-item {
+          min-width: 0;
           display: flex;
           gap: 15px;
           padding: 20px;
-          border-radius: 15px;
-          background: #ffffff;
           border: 1px solid #e2e8f0;
+          border-radius: 16px;
+          background: #ffffff;
+          box-shadow:
+            0 8px 25px
+              rgba(15, 23, 42, 0.035);
         }
 
         .info-number {
           flex: 0 0 auto;
           color: #2563eb;
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 950;
+          letter-spacing: 0.05em;
+        }
+
+        .info-content {
+          min-width: 0;
         }
 
         .info-item h3 {
           margin: 0 0 6px;
+          color: #0f172a;
           font-size: 14px;
-          font-weight: 900;
+          font-weight: 950;
         }
 
         .info-item p {
           margin: 0;
           color: #64748b;
-          font-size: 12px;
-          line-height: 1.6;
+          font-size: 11px;
+          line-height: 1.65;
         }
 
         /* ==================================================
@@ -1659,34 +2381,45 @@ export default function CompanyPricingPage() {
           display: flex;
           align-items: center;
           gap: 10px;
+          min-width: 0;
         }
 
         .footer-mark {
-          width: 34px;
-          height: 34px;
+          width: 35px;
+          height: 35px;
+          flex: 0 0 auto;
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: 9px;
-          background: #2563eb;
+          border-radius: 10px;
+          background:
+            linear-gradient(
+              145deg,
+              #2563eb,
+              #1d4ed8
+            );
           color: white;
+          font-size: 15px;
           font-weight: 950;
         }
 
         .footer-brand > div {
+          min-width: 0;
           display: flex;
           flex-direction: column;
           gap: 2px;
         }
 
         .footer-brand strong {
-          font-size: 13px;
-          font-weight: 900;
+          color: #0f172a;
+          font-size: 12px;
+          font-weight: 950;
         }
 
         .footer-brand span {
           color: #94a3b8;
-          font-size: 10px;
+          font-size: 9px;
+          line-height: 1.4;
         }
 
         .footer-note {
@@ -1695,22 +2428,23 @@ export default function CompanyPricingPage() {
           align-items: flex-end;
           gap: 3px;
           color: #94a3b8;
-          font-size: 10px;
+          font-size: 9px;
+          text-align: right;
         }
 
         /* ==================================================
            TABLET
         ================================================== */
 
-        @media (max-width: 1050px) {
+        @media (max-width: 1100px) {
 
           .plans-section {
             grid-template-columns:
               repeat(2, minmax(0, 1fr));
           }
 
-          .plan-top {
-            min-height: auto;
+          .plan-card {
+            min-height: 100%;
           }
 
           .plan-description {
@@ -1719,7 +2453,6 @@ export default function CompanyPricingPage() {
 
           .price-area {
             min-height: auto;
-            margin-top: 20px;
           }
 
         }
@@ -1731,71 +2464,155 @@ export default function CompanyPricingPage() {
         @media (max-width: 700px) {
 
           .pricing-page {
-            padding-left: 12px;
-            padding-right: 12px;
-            padding-bottom: 45px;
+            padding:
+              0 12px
+              45px;
           }
+
+          .pricing-shell {
+            max-width: 100%;
+          }
+
+          /* ----------------------------------------------
+             NAV
+          ---------------------------------------------- */
 
           .pricing-nav {
-            min-height: 68px;
+            min-height: 67px;
           }
 
-          .brand > span:last-child {
-            font-size: 16px;
+          .brand {
+            gap: 8px;
           }
 
           .brand-mark {
             width: 36px;
             height: 36px;
+            border-radius: 10px;
             font-size: 18px;
           }
 
-          .back-button {
-            padding: 9px 12px;
-            font-size: 12px;
+          .brand-name {
+            font-size: 16px;
           }
 
+          .brand-name small {
+            font-size: 10px;
+          }
+
+          .back-button {
+            min-height: 37px;
+            padding:
+              8px 11px;
+            font-size: 11px;
+          }
+
+          .back-arrow {
+            font-size: 15px;
+          }
+
+          /* ----------------------------------------------
+             HERO
+          ---------------------------------------------- */
+
           .hero {
-            padding: 48px 5px 35px;
+            padding:
+              48px 4px
+              36px;
+          }
+
+          .hero-badge {
+            max-width: 100%;
+            padding:
+              7px 11px;
+            font-size: 8px;
+            letter-spacing: 0.07em;
           }
 
           .hero h1 {
-            font-size: 42px;
-            letter-spacing: -0.045em;
+            margin-top: 20px;
+            font-size: 41px;
+            line-height: 1.03;
+            letter-spacing: -0.055em;
           }
 
           .hero-description {
-            font-size: 14px;
-            line-height: 1.65;
+            max-width: 500px;
+            margin-top: 18px;
+            font-size: 13px;
+            line-height: 1.7;
           }
 
           .hero-points {
             flex-direction: column;
             align-items: center;
-            gap: 9px;
-            font-size: 12px;
+            gap: 8px;
+            margin-top: 23px;
+            font-size: 11px;
           }
+
+          /* ----------------------------------------------
+             ACTIVE PLAN
+          ---------------------------------------------- */
 
           .active-banner {
             align-items: flex-start;
             flex-wrap: wrap;
+            gap: 11px;
+            margin-bottom: 26px;
+            padding: 14px;
+            border-radius: 14px;
+          }
+
+          .active-icon {
+            width: 37px;
+            height: 37px;
+            border-radius: 10px;
+          }
+
+          .active-copy strong {
+            font-size: 12px;
+          }
+
+          .active-copy span {
+            font-size: 9px;
           }
 
           .active-banner button {
             width: 100%;
-            padding-top: 8px;
-            text-align: left;
+            min-height: 38px;
+            justify-content: flex-start;
+            padding:
+              8px 0 0
+              48px;
+            border-top: 1px solid
+              rgba(22, 101, 52, 0.12);
+            font-size: 11px;
           }
+
+          /* ----------------------------------------------
+             BILLING
+          ---------------------------------------------- */
 
           .billing-section {
             flex-direction: column;
             align-items: stretch;
+            gap: 17px;
+            margin-bottom: 27px;
             padding: 18px;
+            border-radius: 16px;
           }
 
-          .billing-section h2,
-          .billing-section p {
+          .billing-copy {
             text-align: center;
+          }
+
+          .billing-section h2 {
+            font-size: 16px;
+          }
+
+          .billing-section p {
+            font-size: 11px;
           }
 
           .billing-toggle {
@@ -1805,61 +2622,207 @@ export default function CompanyPricingPage() {
           .billing-toggle button {
             flex: 1;
             min-width: 0;
+            min-height: 45px;
+            font-size: 11px;
           }
+
+          /* ----------------------------------------------
+             PLANS
+          ---------------------------------------------- */
 
           .plans-section {
             grid-template-columns: 1fr;
-            gap: 24px;
+            gap: 25px;
           }
 
           .plan-card {
-            padding: 23px;
+            width: 100%;
+            padding: 22px;
+            border-radius: 18px;
+          }
+
+          .plan-card:hover {
+            transform: none;
           }
 
           .plan-card-popular {
             margin-top: 6px;
           }
 
-          .price {
-            font-size: 37px;
+          .popular-badge {
+            top: -13px;
+            min-height: 25px;
+            padding:
+              6px 12px;
+            font-size: 8px;
           }
+
+          .plan-icon {
+            width: 42px;
+            height: 42px;
+            margin-bottom: 15px;
+          }
+
+          .plan-card h2 {
+            font-size: 20px;
+          }
+
+          .plan-description {
+            min-height: 0;
+            margin-top: 8px;
+            font-size: 12px;
+            line-height: 1.6;
+          }
+
+          .price-area {
+            min-height: 0;
+            margin-top: 19px;
+          }
+
+          .price {
+            font-size: 36px;
+          }
+
+          .price-period {
+            font-size: 10px;
+          }
+
+          .listing-limit {
+            margin-top: 15px;
+            padding: 11px;
+          }
+
+          .features {
+            margin-top: 19px;
+            gap: 9px;
+          }
+
+          .feature-row {
+            font-size: 11px;
+          }
+
+          .plan-action {
+            margin-top: 23px;
+          }
+
+          .plan-button {
+            min-height: 49px;
+            font-size: 12px;
+          }
+
+          /* ----------------------------------------------
+             TRUST
+          ---------------------------------------------- */
 
           .trust-section {
             margin-top: 35px;
-            padding: 20px;
+            padding: 19px;
+            border-radius: 16px;
           }
 
           .trust-card {
             align-items: flex-start;
+            gap: 11px;
+          }
+
+          .trust-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 11px;
+          }
+
+          .trust-copy {
+            flex: 1;
+          }
+
+          .trust-title-row {
+            gap: 6px;
+          }
+
+          .trust-card strong {
+            font-size: 12px;
+          }
+
+          .secure-label {
+            font-size: 6px;
+          }
+
+          .trust-card p {
+            font-size: 10px;
+            line-height: 1.6;
           }
 
           .trust-items {
             flex-direction: column;
             align-items: flex-start;
             gap: 9px;
+            margin-top: 17px;
+            padding-top: 16px;
+            font-size: 10px;
           }
+
+          /* ----------------------------------------------
+             INFORMATION
+          ---------------------------------------------- */
 
           .info-section {
             margin-top: 50px;
-            padding: 40px 0;
+            padding:
+              40px 0;
+          }
+
+          .info-heading {
+            margin-bottom: 25px;
           }
 
           .info-heading h2 {
-            font-size: 26px;
+            margin-top: 7px;
+            font-size: 27px;
+            line-height: 1.12;
+          }
+
+          .info-heading p {
+            font-size: 11px;
+            line-height: 1.65;
           }
 
           .info-grid {
             grid-template-columns: 1fr;
-            gap: 12px;
+            gap: 11px;
           }
+
+          .info-item {
+            gap: 12px;
+            padding: 17px;
+            border-radius: 14px;
+          }
+
+          .info-number {
+            font-size: 10px;
+          }
+
+          .info-item h3 {
+            margin-bottom: 5px;
+            font-size: 13px;
+          }
+
+          .info-item p {
+            font-size: 10px;
+          }
+
+          /* ----------------------------------------------
+             FOOTER
+          ---------------------------------------------- */
 
           .pricing-footer {
             flex-direction: column;
             align-items: flex-start;
+            gap: 18px;
           }
 
           .footer-note {
             align-items: flex-start;
+            text-align: left;
           }
 
         }
@@ -1870,26 +2833,93 @@ export default function CompanyPricingPage() {
 
         @media (max-width: 390px) {
 
+          .pricing-page {
+            padding-left: 10px;
+            padding-right: 10px;
+          }
+
+          .hero {
+            padding-top: 43px;
+          }
+
           .hero h1 {
             font-size: 36px;
           }
 
           .hero-badge {
-            font-size: 10px;
+            font-size: 7px;
+          }
+
+          .hero-description {
+            font-size: 12px;
           }
 
           .plan-card {
-            padding: 20px;
+            padding: 19px;
+          }
+
+          .plan-card h2 {
+            font-size: 19px;
           }
 
           .price {
-            font-size: 34px;
+            font-size: 33px;
           }
 
           .billing-toggle button {
-            font-size: 12px;
+            min-height: 43px;
+            font-size: 10px;
+          }
+
+          .billing-toggle button small {
+            font-size: 7px;
+          }
+
+          .trust-section {
+            padding: 16px;
+          }
+
+          .info-heading h2 {
+            font-size: 24px;
+          }
+
+        }
+
+        /* ==================================================
+           VERY SMALL PHONES
+        ================================================== */
+
+        @media (max-width: 340px) {
+
+          .brand-name {
+            font-size: 14px;
+          }
+
+          .back-button span:last-child {
+            display: none;
+          }
+
+          .back-button {
+            width: 36px;
+            justify-content: center;
+            padding: 8px;
+          }
+
+          .hero h1 {
+            font-size: 33px;
+          }
+
+          .hero-badge {
             padding-left: 8px;
             padding-right: 8px;
+          }
+
+          .plan-card {
+            padding: 17px;
+          }
+
+          .price {
+            font-size: 31px;
           }
 
         }
