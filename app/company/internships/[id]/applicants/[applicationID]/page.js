@@ -290,9 +290,7 @@ function calculateMatch(application, internship) {
   if (matchedSkills.length > 0) {
     strengths.push(
       `Matches ${matchedSkills.length} required skill${
-        matchedSkills.length === 1
-          ? ""
-          : "s"
+        matchedSkills.length === 1 ? "" : "s"
       }.`
     );
   }
@@ -300,9 +298,7 @@ function calculateMatch(application, internship) {
   if (missingSkills.length > 0) {
     improvements.push(
       `Missing ${missingSkills.length} required skill${
-        missingSkills.length === 1
-          ? ""
-          : "s"
+        missingSkills.length === 1 ? "" : "s"
       }.`
     );
   }
@@ -318,6 +314,125 @@ function calculateMatch(application, internship) {
 }
 
 // ============================================================
+// CLEAN SUPABASE STORAGE PATH
+// ============================================================
+
+function cleanStoragePath(value) {
+  if (!value) return "";
+
+  let path = String(value).trim();
+
+  if (!path) return "";
+
+  // ----------------------------------------------------------
+  // FULL EXTERNAL URL
+  // ----------------------------------------------------------
+
+  if (
+    path.startsWith("http://") ||
+    path.startsWith("https://")
+  ) {
+    try {
+      const parsed = new URL(path);
+
+      // Supabase storage URL
+      if (
+        parsed.pathname.includes("/storage/v1/object/")
+      ) {
+        const marker = "/documents/";
+
+        const markerIndex =
+          parsed.pathname.indexOf(marker);
+
+        if (markerIndex !== -1) {
+          return decodeURIComponent(
+            parsed.pathname.slice(
+              markerIndex + marker.length
+            )
+          );
+        }
+      }
+
+      // Other external URL
+      return path;
+    } catch {
+      return path;
+    }
+  }
+
+  // ----------------------------------------------------------
+  // REMOVE QUERY / HASH
+  // ----------------------------------------------------------
+
+  path = path.split("?")[0];
+  path = path.split("#")[0];
+
+  // ----------------------------------------------------------
+  // DECODE
+  // ----------------------------------------------------------
+
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // Keep original path if decoding fails.
+  }
+
+  // ----------------------------------------------------------
+  // REMOVE LEADING SLASHES
+  // ----------------------------------------------------------
+
+  path = path.replace(/^\/+/, "");
+
+  // ----------------------------------------------------------
+  // REMOVE STORAGE PREFIXES
+  // ----------------------------------------------------------
+
+  path = path.replace(
+    /^storage\/v1\/object\/(?:public|sign)\/documents\//,
+    ""
+  );
+
+  path = path.replace(
+    /^storage\/v1\/object\/documents\//,
+    ""
+  );
+
+  path = path.replace(
+    /^documents\//,
+    ""
+  );
+
+  return path;
+}
+
+// ============================================================
+// DOCUMENT VALUE HELPERS
+// ============================================================
+
+function getDocumentCandidates(application, type) {
+  if (!application) return [];
+
+  if (type === "cv") {
+    return [
+      application.cv_url,
+      application.cv_path,
+      application.cv,
+      application.resume_url,
+      application.resume_path,
+    ].filter(Boolean);
+  }
+
+  return [
+    application.qualification_url,
+    application.qualification_path,
+    application.qualification_document_url,
+    application.qualification_document_path,
+    application.qualification_file_url,
+    application.qualification_file_path,
+  ].filter(Boolean);
+}
+
+// ============================================================
 // PAGE
 // ============================================================
 
@@ -329,10 +444,10 @@ export default function ApplicationDetailsPage() {
     params?.id;
 
   const applicationId =
-  params?.applicationID ||
-  params?.applicationId ||
-  params?.applicationid ||
-  params?.application_id;
+    params?.applicationID ||
+    params?.applicationId ||
+    params?.applicationid ||
+    params?.application_id;
 
   const [internship, setInternship] =
     useState(null);
@@ -344,6 +459,9 @@ export default function ApplicationDetailsPage() {
     useState(true);
 
   const [errorMessage, setErrorMessage] =
+    useState("");
+
+  const [openingDocument, setOpeningDocument] =
     useState("");
 
   // ==========================================================
@@ -482,12 +600,6 @@ export default function ApplicationDetailsPage() {
         // ----------------------------------------------------
         // START WITH APPLICATION DATA
         // ----------------------------------------------------
-        //
-        // IMPORTANT:
-        // The application already stores the applicant
-        // information. Therefore the page does NOT depend
-        // on the graduates table to finish loading.
-        //
 
         let combined = {
           ...applicationData,
@@ -520,8 +632,6 @@ export default function ApplicationDetailsPage() {
                 ...combined,
                 ...graduateData,
 
-                // Preserve application values
-                // when they exist.
                 full_name:
                   applicationData.full_name ||
                   graduateData.full_name,
@@ -549,6 +659,15 @@ export default function ApplicationDetailsPage() {
                 career_goals:
                   applicationData.career_goals ||
                   graduateData.career_goals,
+
+                // Preserve application document paths.
+                cv_url:
+                  applicationData.cv_url ||
+                  graduateData.cv_url,
+
+                qualification_url:
+                  applicationData.qualification_url ||
+                  graduateData.qualification_url,
               };
             }
           } catch (graduateError) {
@@ -676,76 +795,125 @@ export default function ApplicationDetailsPage() {
   // ==========================================================
 
   async function openDocument(
-    url,
+    documentValues,
     label
   ) {
-    if (!url) {
+    const candidates = Array.isArray(
+      documentValues
+    )
+      ? documentValues.filter(Boolean)
+      : [documentValues].filter(Boolean);
+
+    if (candidates.length === 0) {
       alert(
         `This applicant has not uploaded a ${label}.`
       );
       return;
     }
 
-    const newWindow =
-      window.open(
-        "",
-        "_blank"
-      );
-
-    if (!newWindow) {
-      alert(
-        "Please allow pop-ups in your browser to review documents."
-      );
-      return;
-    }
+    setOpeningDocument(label);
 
     try {
-      const cleanPath =
-        String(url)
-          .replace(
-            /^.*\/documents\//,
-            ""
-          )
-          .replace(
-            /^\/+/,
-            ""
+      for (const candidate of candidates) {
+        const value = String(candidate).trim();
+
+        if (!value) continue;
+
+        // ----------------------------------------------------
+        // ALREADY A COMPLETE EXTERNAL URL
+        // ----------------------------------------------------
+
+        if (
+          value.startsWith("http://") ||
+          value.startsWith("https://")
+        ) {
+          try {
+            const parsed = new URL(value);
+
+            // If this is already a normal signed/public URL,
+            // open it directly.
+            if (
+              !parsed.pathname.includes(
+                "/storage/v1/object/"
+              )
+            ) {
+              window.location.assign(value);
+              return;
+            }
+          } catch {
+            // Continue with storage-path handling.
+          }
+        }
+
+        // ----------------------------------------------------
+        // SUPABASE STORAGE PATH
+        // ----------------------------------------------------
+
+        const cleanPath =
+          cleanStoragePath(value);
+
+        if (!cleanPath) continue;
+
+        // If cleanStoragePath returned an external URL,
+        // navigate directly.
+        if (
+          cleanPath.startsWith("http://") ||
+          cleanPath.startsWith("https://")
+        ) {
+          window.location.assign(cleanPath);
+          return;
+        }
+
+        const {
+          data,
+          error,
+        } =
+          await supabase.storage
+            .from("documents")
+            .createSignedUrl(
+              cleanPath,
+              3600
+            );
+
+        if (error) {
+          console.error(
+            `Could not create ${label} signed URL for ${cleanPath}:`,
+            error
           );
 
-      const {
-        data,
-        error,
-      } =
-        await supabase.storage
-          .from("documents")
-          .createSignedUrl(
-            cleanPath,
-            600
+          continue;
+        }
+
+        if (data?.signedUrl) {
+          // --------------------------------------------------
+          // IMPORTANT:
+          // Use location.assign instead of window.open.
+          // This works much better on iPhone/Safari.
+          // --------------------------------------------------
+
+          window.location.assign(
+            data.signedUrl
           );
 
-      if (error) {
-        throw error;
+          return;
+        }
       }
 
-      if (!data?.signedUrl) {
-        throw new Error(
-          `Could not create a secure ${label} link.`
-        );
-      }
-
-      newWindow.location.href =
-        data.signedUrl;
+      throw new Error(
+        `Could not find or open the applicant's ${label}.`
+      );
     } catch (error) {
       console.error(
         `${label} review error:`,
         error
       );
 
-      newWindow.close();
-
       alert(
         error?.message ||
           `Could not open the ${label}.`
       );
+    } finally {
+      setOpeningDocument("");
     }
   }
 
@@ -756,17 +924,18 @@ export default function ApplicationDetailsPage() {
   if (loading) {
     return (
       <main style={pageStyle}>
-        <div style={loadingBox}>
-          <div
-            style={{
-              fontSize: "38px",
-              marginBottom: "15px",
-            }}
-          >
+        <div style={loadingShell}>
+          <div style={loadingIcon}>
             ⏳
           </div>
 
-          Loading application...
+          <h2 style={loadingTitle}>
+            Loading application
+          </h2>
+
+          <p style={loadingText}>
+            Preparing the applicant profile...
+          </p>
         </div>
       </main>
     );
@@ -780,33 +949,24 @@ export default function ApplicationDetailsPage() {
     return (
       <main style={pageStyle}>
         <div style={errorBox}>
-          <div
-            style={{
-              fontSize: "50px",
-            }}
-          >
+          <div style={errorIcon}>
             ⚠️
           </div>
 
-          <h1
-            style={{
-              color: "#c62828",
-              marginBottom: "10px",
-            }}
-          >
+          <div style={eyebrow}>
+            APPLICATION REVIEW
+          </div>
+
+          <h1 style={errorTitle}>
             Unable to load application
           </h1>
 
-          <p
-            style={{
-              color: "#555",
-              lineHeight: "1.6",
-            }}
-          >
+          <p style={errorText}>
             {errorMessage}
           </p>
 
           <button
+            type="button"
             onClick={() =>
               router.push(
                 `/company/internships/${internshipId}/applicants`
@@ -832,27 +992,24 @@ export default function ApplicationDetailsPage() {
     return (
       <main style={pageStyle}>
         <div style={errorBox}>
-          <div
-            style={{
-              fontSize: "50px",
-            }}
-          >
+          <div style={errorIcon}>
             ⚠️
           </div>
 
-          <h1>
+          <div style={eyebrow}>
+            APPLICATION REVIEW
+          </div>
+
+          <h1 style={errorTitle}>
             Application unavailable
           </h1>
 
-          <p
-            style={{
-              color: "#666",
-            }}
-          >
+          <p style={errorText}>
             The application could not be displayed.
           </p>
 
           <button
+            type="button"
             onClick={() =>
               router.push(
                 `/company/internships/${internshipId}/applicants`
@@ -870,122 +1027,204 @@ export default function ApplicationDetailsPage() {
   const score =
     application.matchScore || 0;
 
-  // ==========================================================
-  // PAGE
-  // ==========================================================
+  const cvCandidates =
+    getDocumentCandidates(
+      application,
+      "cv"
+    );
+
+  const qualificationCandidates =
+    getDocumentCandidates(
+      application,
+      "qualification"
+    );
 
   return (
     <main style={pageStyle}>
       <div style={containerStyle}>
 
-        {/* HEADER */}
+        {/* ==================================================
+            TOP NAVIGATION
+        ================================================== */}
 
-        <div style={headerStyle}>
+        <div style={topBar}>
           <button
+            type="button"
             onClick={() =>
               router.push(
                 `/company/internships/${internshipId}/applicants`
               )
             }
-            style={backButton}
+            style={topBackButton}
           >
-            ← Back to Applicants
+            ← Applicants
           </button>
 
-          <div
-            style={{
-              display: "flex",
-              justifyContent:
-                "space-between",
-              gap: "25px",
-              flexWrap: "wrap",
-              alignItems: "center",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: "14px",
-                  opacity: 0.85,
-                  marginBottom: "8px",
-                }}
-              >
-                APPLICATION REVIEW
-              </div>
+          <div style={topBrand}>
+            <span style={brandMark}>
+              GL
+            </span>
 
-              <h1
-                style={{
-                  margin:
-                    "0 0 8px",
-                  fontSize: "32px",
-                }}
-              >
-                {application.full_name ||
-                  "Graduate Applicant"}
-              </h1>
-
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: "17px",
-                  opacity: 0.9,
-                }}
-              >
-                Applied for:{" "}
-                <strong>
-                  {internship.job_title}
-                </strong>
-              </p>
-            </div>
-
-            <div
-              style={{
-                background:
-                  "rgba(255,255,255,0.16)",
-                border:
-                  "1px solid rgba(255,255,255,0.3)",
-                borderRadius: "18px",
-                padding:
-                  "18px 25px",
-                textAlign: "center",
-                minWidth: "140px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "38px",
-                  fontWeight: "800",
-                }}
-              >
-                {score}%
-              </div>
-
-              <div
-                style={{
-                  fontWeight: "700",
-                }}
-              >
-                {application.matchLabel}
-                {" Match"}
-              </div>
-            </div>
+            <span>
+              GradLink SA
+            </span>
           </div>
         </div>
 
-        {/* STATUS */}
+        {/* ==================================================
+            HERO
+        ================================================== */}
 
-        <div style={sectionStyle}>
+        <section style={heroStyle}>
+          <div style={heroContent}>
+            <div style={eyebrowLight}>
+              APPLICATION REVIEW
+            </div>
+
+            <h1 style={heroTitle}>
+              {application.full_name ||
+                "Graduate Applicant"}
+            </h1>
+
+            <p style={heroSubtitle}>
+              Applicant for{" "}
+              <strong>
+                {internship.job_title ||
+                  "Internship"}
+              </strong>
+            </p>
+
+            <div style={heroMeta}>
+              <span style={heroMetaItem}>
+                📍{" "}
+                {internship.location ||
+                  internship.province ||
+                  "South Africa"}
+              </span>
+
+              <span style={heroMetaItem}>
+                📅{" "}
+                {formatDate(
+                  application.created_at
+                )}
+              </span>
+            </div>
+          </div>
+
+          <div style={scoreCard}>
+            <div style={scoreLabel}>
+              MATCH SCORE
+            </div>
+
+            <div style={scoreNumber}>
+              {score}%
+            </div>
+
+            <div style={scoreMatch}>
+              {application.matchLabel}
+            </div>
+          </div>
+        </section>
+
+        {/* ==================================================
+            QUICK ACTIONS
+        ================================================== */}
+
+        <section style={quickActions}>
+          <div>
+            <div style={quickEyebrow}>
+              DOCUMENTS
+            </div>
+
+            <h2 style={quickTitle}>
+              Review applicant documents
+            </h2>
+
+            <p style={quickText}>
+              Open the applicant's uploaded
+              documents using secure temporary
+              links.
+            </p>
+          </div>
+
+          <div style={documentActions}>
+            <button
+              type="button"
+              disabled={
+                openingDocument === "CV"
+              }
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                openDocument(
+                  cvCandidates,
+                  "CV"
+                );
+              }}
+              style={{
+                ...documentButton,
+                opacity:
+                  openingDocument === "CV"
+                    ? 0.65
+                    : 1,
+              }}
+            >
+              {openingDocument === "CV"
+                ? "Opening CV..."
+                : "📄 View CV"}
+            </button>
+
+            <button
+              type="button"
+              disabled={
+                openingDocument ===
+                "qualification"
+              }
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                openDocument(
+                  qualificationCandidates,
+                  "qualification document"
+                );
+              }}
+              style={{
+                ...documentButtonSecondary,
+                opacity:
+                  openingDocument ===
+                  "qualification"
+                    ? 0.65
+                    : 1,
+              }}
+            >
+              {openingDocument ===
+              "qualification"
+                ? "Opening..."
+                : "🎓 View Qualification"}
+            </button>
+          </div>
+        </section>
+
+        {/* ==================================================
+            STATUS
+        ================================================== */}
+
+        <section style={sectionStyle}>
           <div style={sectionHeader}>
             <div>
+              <div style={sectionEyebrow}>
+                APPLICATION
+              </div>
+
               <h2 style={sectionTitle}>
                 Application Status
               </h2>
 
-              <p
-                style={sectionSubtitle}
-              >
-                Decide how you want to
-                proceed with this applicant.
+              <p style={sectionSubtitle}>
+                Update the applicant's progress
+                through your recruitment process.
               </p>
             </div>
 
@@ -997,14 +1236,9 @@ export default function ApplicationDetailsPage() {
             />
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "10px",
-            }}
-          >
+          <div style={statusActions}>
             <button
+              type="button"
               onClick={() =>
                 updateStatus(
                   "shortlisted"
@@ -1018,6 +1252,7 @@ export default function ApplicationDetailsPage() {
             </button>
 
             <button
+              type="button"
               onClick={() =>
                 updateStatus(
                   "rejected"
@@ -1031,26 +1266,42 @@ export default function ApplicationDetailsPage() {
             </button>
 
             <button
+              type="button"
               onClick={() =>
                 updateStatus(
                   "pending"
                 )
               }
               style={statusButton(
-                "#777"
+                "#667085"
               )}
             >
-              ↺ Reset to Pending
+              ↺ Pending
             </button>
           </div>
-        </div>
+        </section>
 
-        {/* PERSONAL INFORMATION */}
+        {/* ==================================================
+            APPLICANT INFORMATION
+        ================================================== */}
 
-        <div style={sectionStyle}>
-          <h2 style={sectionTitle}>
-            👤 Applicant Information
-          </h2>
+        <section style={sectionStyle}>
+          <div style={sectionHeader}>
+            <div>
+              <div style={sectionEyebrow}>
+                PROFILE
+              </div>
+
+              <h2 style={sectionTitle}>
+                Applicant Information
+              </h2>
+
+              <p style={sectionSubtitle}>
+                Key details supplied with this
+                application.
+              </p>
+            </div>
+          </div>
 
           <div style={gridStyle}>
             <Info
@@ -1116,25 +1367,29 @@ export default function ApplicationDetailsPage() {
               )}
             />
           </div>
-        </div>
+        </section>
 
-        {/* SKILLS */}
+        {/* ==================================================
+            SKILLS
+        ================================================== */}
 
-        <div style={sectionStyle}>
-          <h2 style={sectionTitle}>
-            💼 Skills
-          </h2>
+        <section style={sectionStyle}>
+          <div style={sectionHeader}>
+            <div>
+              <div style={sectionEyebrow}>
+                CAPABILITIES
+              </div>
+
+              <h2 style={sectionTitle}>
+                Skills
+              </h2>
+            </div>
+          </div>
 
           {getSkillsArray(
             application.skills
           ).length > 0 ? (
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "10px",
-              }}
-            >
+            <div style={skillsWrap}>
               {getSkillsArray(
                 application.skills
               ).map(
@@ -1150,52 +1405,65 @@ export default function ApplicationDetailsPage() {
             </div>
           ) : (
             <p style={mutedText}>
-              No skills provided.
+              No skills were provided.
             </p>
           )}
-        </div>
+        </section>
 
-        {/* CAREER GOALS */}
+        {/* ==================================================
+            CAREER GOALS
+        ================================================== */}
 
-        <div style={sectionStyle}>
-          <h2 style={sectionTitle}>
-            🎯 Career Goals
-          </h2>
+        <section style={sectionStyle}>
+          <div style={sectionHeader}>
+            <div>
+              <div style={sectionEyebrow}>
+                CAREER DIRECTION
+              </div>
+
+              <h2 style={sectionTitle}>
+                Career Goals
+              </h2>
+            </div>
+          </div>
 
           <div style={textBox}>
             {application.career_goals ||
-              "No career goals provided."}
+              "No career goals were provided."}
           </div>
-        </div>
+        </section>
+        
+                {/* ==================================================
+            AI MATCH ANALYSIS
+        ================================================== */}
 
-        {/* AI MATCH */}
-
-        <div style={sectionStyle}>
+        <section style={sectionStyle}>
           <div style={sectionHeader}>
             <div>
+              <div style={sectionEyebrow}>
+                GRADLINK INTELLIGENCE
+              </div>
+
               <h2 style={sectionTitle}>
-                🤖 AI Match Analysis
+                AI Match Analysis
               </h2>
 
-              <p
-                style={sectionSubtitle}
-              >
-                Compatibility with this
-                specific internship.
+              <p style={sectionSubtitle}>
+                Compatibility analysis based on the
+                requirements of this specific internship.
               </p>
             </div>
 
             <div
               style={{
-                fontSize: "32px",
-                fontWeight: "800",
+                ...analysisScore,
                 color:
                   score >= 85
                     ? "#16803c"
                     : score >= 70
                     ? "#0057B8"
                     : score >= 40
-                    ? "#a66a00"
+                    ? "#9a6700"
                     : "#c62828",
               }}
             >
@@ -1203,119 +1471,97 @@ export default function ApplicationDetailsPage() {
             </div>
           </div>
 
-          <div style={gridStyle}>
+          <div style={analysisGrid}>
             <div
               style={{
-                ...analysisBox,
-                background:
-                  "#f4fbf6",
-                borderColor:
-                  "#ccebd7",
+                ...analysisCard,
+                background: "#f4fbf6",
+                borderColor: "#ccebd7",
               }}
             >
-              <strong
-                style={{
-                  color:
-                    "#16803c",
-                }}
-              >
-                Qualification
-              </strong>
+              <div style={analysisIcon}>
+                🎓
+              </div>
 
-              <p>
-                Required:{" "}
-                <strong>
+              <div>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: "800",
+                    color: "#16803c",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.6px",
+                    marginBottom: "8px",
+                  }}
+                >
+                  Qualification
+                </div>
+
+                <p style={analysisText}>
+                  <strong>Required:</strong>{" "}
                   {internship.qualification ||
-                    "Any"}
-                </strong>
-              </p>
+                    "Any qualification"}
+                </p>
 
-              <p>
-                Applicant:{" "}
-                <strong>
+                <p style={analysisText}>
+                  <strong>Applicant:</strong>{" "}
                   {application.qualification ||
                     "Not provided"}
-                </strong>
-              </p>
+                </p>
+              </div>
             </div>
 
             <div
               style={{
-                ...analysisBox,
-                background:
-                  "#f4f8ff",
-                borderColor:
-                  "#c9dcf5",
+                ...analysisCard,
+                background: "#f4f8ff",
+                borderColor: "#c9dcf5",
               }}
             >
-              <strong
-                style={{
-                  color:
-                    "#0057B8",
-                }}
-              >
-                Field of Study
-              </strong>
+              <div style={analysisIcon}>
+                🎯
+              </div>
 
-              <p>
-                Required:{" "}
-                <strong>
+              <div>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: "800",
+                    color: "#0057B8",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.6px",
+                    marginBottom: "8px",
+                  }}
+                >
+                  Field of Study
+                </div>
+
+                <p style={analysisText}>
+                  <strong>Required:</strong>{" "}
                   {internship.field_of_study ||
-                    "Any"}
-                </strong>
-              </p>
+                    "Any field"}
+                </p>
 
-              <p>
-                Applicant:{" "}
-                <strong>
+                <p style={analysisText}>
+                  <strong>Applicant:</strong>{" "}
                   {application.field_of_study ||
                     "Not provided"}
-                </strong>
-              </p>
+                </p>
+              </div>
             </div>
           </div>
 
-          {application.strengths?.length >
-            0 && (
-            <div
-              style={{
-                background:
-                  "#f4fbf6",
-                border:
-                  "1px solid #ccebd7",
-                borderRadius:
-                  "12px",
-                padding: "18px",
-                marginTop:
-                  "20px",
-              }}
-            >
-              <h3
-                style={{
-                  color:
-                    "#16803c",
-                  marginTop: 0,
-                }}
-              >
-                ✅ Strengths
-              </h3>
+          {application.strengths?.length > 0 && (
+            <div style={strengthBox}>
+              <div style={analysisSectionTitle}>
+                <span>✓</span>
+                Strengths
+              </div>
 
-              <ul
-                style={{
-                  color: "#444",
-                  lineHeight:
-                    "1.8",
-                  marginBottom: 0,
-                }}
-              >
+              <ul style={analysisList}>
                 {application.strengths.map(
-                  (
-                    item,
-                    index
-                  ) => (
-                    <li
-                      key={index}
-                    >
+                  (item, index) => (
+                    <li key={index}>
                       {item}
                     </li>
                   )
@@ -1324,54 +1570,24 @@ export default function ApplicationDetailsPage() {
             </div>
           )}
 
-          {application.matchedSkills?.length >
-            0 && (
-            <div
-              style={{
-                marginTop:
-                  "20px",
-              }}
-            >
-              <h3
-                style={{
-                  color:
-                    "#16803c",
-                }}
-              >
-                ✓ Matched Skills
-              </h3>
-
+          {application.matchedSkills?.length > 0 && (
+            <div style={analysisSubSection}>
               <div
                 style={{
-                  display: "flex",
-                  flexWrap:
-                    "wrap",
-                  gap: "8px",
+                  ...analysisSectionTitle,
+                  color: "#16803c",
                 }}
               >
+                <span>✓</span>
+                Matched Skills
+              </div>
+
+              <div style={skillsWrap}>
                 {application.matchedSkills.map(
-                  (
-                    skill,
-                    index
-                  ) => (
+                  (skill, index) => (
                     <span
                       key={index}
-                      style={{
-                        background:
-                          "#e8f7ee",
-                        color:
-                          "#16803c",
-                        border:
-                          "1px solid #b7e4c7",
-                        padding:
-                          "7px 11px",
-                        borderRadius:
-                          "20px",
-                        fontSize:
-                          "13px",
-                        fontWeight:
-                          "600",
-                      }}
+                      style={matchedSkillBadge}
                     >
                       ✓ {skill}
                     </span>
@@ -1381,60 +1597,24 @@ export default function ApplicationDetailsPage() {
             </div>
           )}
 
-          {application.missingSkills?.length >
-            0 && (
-            <div
-              style={{
-                background:
-                  "#fffaf0",
-                border:
-                  "1px solid #f0dfb2",
-                borderRadius:
-                  "12px",
-                padding: "18px",
-                marginTop:
-                  "20px",
-              }}
-            >
-              <h3
-                style={{
-                  color:
-                    "#9a6700",
-                  marginTop: 0,
-                }}
-              >
-                ⚠️ Skills to Improve
-              </h3>
-
+          {application.missingSkills?.length > 0 && (
+            <div style={missingBox}>
               <div
                 style={{
-                  display: "flex",
-                  flexWrap:
-                    "wrap",
-                  gap: "8px",
+                  ...analysisSectionTitle,
+                  color: "#9a6700",
                 }}
               >
+                <span>!</span>
+                Skills to Improve
+              </div>
+
+              <div style={skillsWrap}>
                 {application.missingSkills.map(
-                  (
-                    skill,
-                    index
-                  ) => (
+                  (skill, index) => (
                     <span
                       key={index}
-                      style={{
-                        background:
-                          "#fff",
-                        color:
-                          "#7a5700",
-                        border:
-                          "1px solid #e1c878",
-                        padding:
-                          "7px 11px",
-                        borderRadius:
-                          "20px",
-                        fontSize:
-                          "13px",
-                      }}
+                      style={missingSkillBadge}
                     >
                       {skill}
                     </span>
@@ -1444,38 +1624,22 @@ export default function ApplicationDetailsPage() {
             </div>
           )}
 
-          {application.improvements?.length >
-            0 && (
-            <div
-              style={{
-                marginTop:
-                  "20px",
-              }}
-            >
-              <h3
+          {application.improvements?.length > 0 && (
+            <div style={considerationBox}>
+              <div
                 style={{
-                  color:
-                    "#9a6700",
+                  ...analysisSectionTitle,
+                  color: "#9a6700",
                 }}
               >
-                💡 Considerations
-              </h3>
+                <span>💡</span>
+                Considerations
+              </div>
 
-              <ul
-                style={{
-                  color: "#555",
-                  lineHeight:
-                    "1.7",
-                }}
-              >
+              <ul style={analysisList}>
                 {application.improvements.map(
-                  (
-                    item,
-                    index
-                  ) => (
-                    <li
-                      key={index}
-                    >
+                  (item, index) => (
+                    <li key={index}>
                       {item}
                     </li>
                   )
@@ -1483,65 +1647,148 @@ export default function ApplicationDetailsPage() {
               </ul>
             </div>
           )}
-        </div>
+        </section>
 
-        {/* DOCUMENTS */}
+        {/* ==================================================
+            DOCUMENTS
+        ================================================== */}
 
-        <div style={sectionStyle}>
-          <h2 style={sectionTitle}>
-            📄 Applicant Documents
-          </h2>
+        <section style={documentSection}>
+          <div style={documentSectionTop}>
+            <div>
+              <div style={sectionEyebrow}>
+                SECURE DOCUMENT REVIEW
+              </div>
 
-          <p
-            style={sectionSubtitle}
-          >
-            Documents are opened through secure
-            temporary links.
-          </p>
+              <h2 style={documentTitle}>
+                Applicant Documents
+              </h2>
 
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "12px",
-            }}
-          >
+              <p style={documentDescription}>
+                Review the applicant's submitted
+                documents using secure temporary
+                access links.
+              </p>
+            </div>
+
+            <div style={secureBadge}>
+              🔒 Secure
+            </div>
+          </div>
+
+          <div style={documentGrid}>
             <button
-              onClick={() =>
-                openDocument(
-                  application.cv_url ||
-                    application.cv ||
-                    application.resume_url,
-                  "CV"
-                )
+              type="button"
+              disabled={
+                openingDocument === "CV"
               }
-              style={documentButton}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                openDocument(
+                  cvCandidates,
+                  "CV"
+                );
+              }}
+              style={{
+                ...largeDocumentButton,
+                opacity:
+                  openingDocument === "CV"
+                    ? 0.65
+                    : 1,
+              }}
             >
-              📄 Review CV
+              <span style={documentButtonIcon}>
+                📄
+              </span>
+
+              <span>
+                <strong>
+                  {openingDocument === "CV"
+                    ? "Opening CV..."
+                    : "View CV"}
+                </strong>
+
+                <small>
+                  Review applicant CV
+                </small>
+              </span>
+
+              <span style={documentArrow}>
+                →
+              </span>
             </button>
 
             <button
-              onClick={() =>
-                openDocument(
-                  application.qualification_url ||
-                    application.qualification_document_url ||
-                    application.qualification_file_url,
-                  "qualification document"
-                )
+              type="button"
+              disabled={
+                openingDocument ===
+                "qualification"
               }
-              style={documentButton}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                openDocument(
+                  qualificationCandidates,
+                  "qualification document"
+                );
+              }}
+              style={{
+                ...largeDocumentButton,
+                opacity:
+                  openingDocument ===
+                  "qualification"
+                    ? 0.65
+                    : 1,
+              }}
             >
-              🎓 Review Qualification
+              <span style={documentButtonIcon}>
+                🎓
+              </span>
+
+              <span>
+                <strong>
+                  {openingDocument ===
+                  "qualification"
+                    ? "Opening..."
+                    : "View Qualification"}
+                </strong>
+
+                <small>
+                  Review qualification document
+                </small>
+              </span>
+
+              <span style={documentArrow}>
+                →
+              </span>
             </button>
           </div>
-        </div>
+        </section>
 
-        {/* INTERNSHIP */}
+        {/* ==================================================
+            INTERNSHIP
+        ================================================== */}
 
-        <div style={sectionStyle}>
-          <h2 style={sectionTitle}>
-            💼 Internship Applied For
-          </h2>
+        <section style={sectionStyle}>
+          <div style={sectionHeader}>
+            <div>
+              <div style={sectionEyebrow}>
+                OPPORTUNITY
+              </div>
+
+              <h2 style={sectionTitle}>
+                Internship Applied For
+              </h2>
+
+              <p style={sectionSubtitle}>
+                Details of the position associated
+                with this application.
+              </p>
+            </div>
+          </div>
 
           <div style={gridStyle}>
             <Info
@@ -1592,90 +1839,92 @@ export default function ApplicationDetailsPage() {
               }
             />
           </div>
-        </div>
+        </section>
 
-        {/* BOTTOM ACTIONS */}
+        {/* ==================================================
+            FINAL ACTION AREA
+        ================================================== */}
 
-        <div
-          style={{
-            background:
-              "linear-gradient(135deg, #0057B8, #0077d9)",
-            color: "#fff",
-            borderRadius:
-              "18px",
-            padding: "28px",
-            textAlign: "center",
-            marginTop: "25px",
-          }}
-        >
-          <h2
-            style={{
-              marginTop: 0,
-            }}
-          >
-            Ready to make a decision?
-          </h2>
+        <section style={finalAction}>
+          <div style={finalActionContent}>
+            <div style={finalIcon}>
+              ✓
+            </div>
 
-          <p
-            style={{
-              opacity: 0.9,
-              marginBottom:
-                "22px",
-            }}
-          >
-            Update the applicant's status or return
-            to the applicant list.
-          </p>
+            <div>
+              <div style={finalEyebrow}>
+                APPLICATION DECISION
+              </div>
 
-          <div
-            style={{
-              display: "flex",
-              justifyContent:
-                "center",
-              flexWrap: "wrap",
-              gap: "10px",
-            }}
-          >
+              <h2 style={finalTitle}>
+                Ready to make a decision?
+              </h2>
+
+              <p style={finalText}>
+                Update this applicant's status or
+                return to the full applicant list.
+              </p>
+            </div>
+          </div>
+
+          <div style={finalActions}>
             <button
+              type="button"
               onClick={() =>
                 updateStatus(
                   "shortlisted"
                 )
               }
-              style={bottomButton(
-                "#16803c"
-              )}
+              style={finalGreenButton}
             >
               ⭐ Shortlist Applicant
             </button>
 
             <button
+              type="button"
               onClick={() =>
                 updateStatus(
                   "rejected"
                 )
               }
-              style={bottomButton(
-                "#c62828"
-              )}
+              style={finalRedButton}
             >
               ✕ Reject Applicant
             </button>
 
             <button
+              type="button"
               onClick={() =>
                 router.push(
                   `/company/internships/${internshipId}/applicants`
                 )
               }
-              style={bottomButton(
-                "#fff",
-                "#0057B8"
-              )}
+              style={finalWhiteButton}
             >
               ← Back to Applicants
             </button>
           </div>
+        </section>
+
+        {/* ==================================================
+            FOOTER
+        ================================================== */}
+
+        <div style={footerStyle}>
+          <div style={footerBrand}>
+            <span style={footerMark}>
+              GL
+            </span>
+
+            <strong>
+              GradLink SA
+            </strong>
+          </div>
+
+          <span>
+            Connecting South African graduates
+            with opportunity.
+          </span>
         </div>
       </div>
     </main>
@@ -1683,7 +1932,7 @@ export default function ApplicationDetailsPage() {
 }
 
 // ============================================================
-// INFO
+// INFO COMPONENT
 // ============================================================
 
 function Info({
@@ -1691,41 +1940,12 @@ function Info({
   value,
 }) {
   return (
-    <div
-      style={{
-        background:
-          "#f7f9fc",
-        borderRadius:
-          "12px",
-        padding: "16px",
-      }}
-    >
-      <div
-        style={{
-          fontSize: "12px",
-          color: "#777",
-          marginBottom:
-            "7px",
-          textTransform:
-            "uppercase",
-          letterSpacing:
-            "0.5px",
-        }}
-      >
+    <div style={infoCard}>
+      <div style={infoLabel}>
         {label}
       </div>
 
-      <div
-        style={{
-          color: "#222",
-          fontWeight:
-            "600",
-          lineHeight:
-            "1.5",
-          wordBreak:
-            "break-word",
-        }}
-      >
+      <div style={infoValue}>
         {value}
       </div>
     </div>
@@ -1741,60 +1961,42 @@ function StatusBadge({
 }) {
   const normalized =
     String(
-      status ||
-        "pending"
+      status || "pending"
     ).toLowerCase();
 
-  let background =
-    "#f1f3f5";
-
-  let color =
-    "#666";
-
-  let text =
-    "Pending";
+  let background = "#f1f3f5";
+  let color = "#667085";
+  let text = "Pending";
 
   if (
-    normalized ===
-    "shortlisted"
+    normalized === "shortlisted"
   ) {
-    background =
-      "#e8f7ee";
-
-    color =
-      "#16803c";
-
-    text =
-      "⭐ Shortlisted";
+    background = "#e8f7ee";
+    color = "#16803c";
+    text = "⭐ Shortlisted";
   }
 
   if (
-    normalized ===
-    "rejected"
+    normalized === "rejected"
   ) {
-    background =
-      "#fff0f0";
-
-    color =
-      "#c62828";
-
-    text =
-      "✕ Rejected";
+    background = "#fff0f0";
+    color = "#c62828";
+    text = "✕ Rejected";
   }
 
   return (
     <span
       style={{
-        display:
-          "inline-block",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
         background,
         color,
-        padding:
-          "9px 14px",
-        borderRadius:
-          "20px",
-        fontWeight:
-          "700",
+        padding: "10px 15px",
+        borderRadius: "999px",
+        fontWeight: "800",
+        fontSize: "13px",
+        whiteSpace: "nowrap",
       }}
     >
       {text}
@@ -1806,9 +2008,7 @@ function StatusBadge({
 // DATE
 // ============================================================
 
-function formatDate(
-  value
-) {
+function formatDate(value) {
   if (!value) {
     return "Not provided";
   }
@@ -1830,266 +2030,748 @@ function formatDate(
 }
 
 // ============================================================
-// STYLES
+// PAGE STYLES
 // ============================================================
 
 const pageStyle = {
   minHeight: "100vh",
   background:
-    "#f4f8fc",
+    "linear-gradient(180deg, #eef5fc 0%, #f7faff 45%, #f4f7fb 100%)",
   padding:
-    "30px 20px 60px",
+    "18px 16px 60px",
+  color: "#172033",
 };
 
 const containerStyle = {
-  maxWidth:
-    "1100px",
-  margin:
-    "0 auto",
+  maxWidth: "1120px",
+  margin: "0 auto",
 };
 
-const loadingBox = {
-  background:
-    "#fff",
-  borderRadius:
-    "18px",
-  padding:
-    "50px",
-  textAlign:
-    "center",
-  color:
-    "#0057B8",
-  fontSize:
-    "22px",
-  fontWeight:
-    "700",
+const topBar = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "15px",
+  marginBottom: "16px",
+  padding: "4px 2px",
+};
+
+const topBackButton = {
+  background: "#ffffff",
+  color: "#0057B8",
+  border: "1px solid #d7e4f2",
+  borderRadius: "10px",
+  padding: "10px 14px",
+  fontWeight: "800",
+  cursor: "pointer",
   boxShadow:
-    "0 8px 30px rgba(0,0,0,0.06)",
+    "0 3px 12px rgba(0,0,0,0.04)",
 };
 
-const errorBox = {
-  maxWidth:
-    "800px",
-  margin:
-    "30px auto",
-  background:
-    "#fff",
-  borderRadius:
-    "18px",
-  padding:
-    "40px",
-  textAlign:
-    "center",
-  boxShadow:
-    "0 8px 30px rgba(0,0,0,0.08)",
+const topBrand = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  color: "#0057B8",
+  fontWeight: "800",
+  fontSize: "15px",
 };
 
-const headerStyle = {
+const brandMark = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: "31px",
+  height: "31px",
+  borderRadius: "9px",
   background:
     "linear-gradient(135deg, #0057B8, #0077d9)",
-  color:
-    "#fff",
-  borderRadius:
-    "20px",
-  padding:
-    "30px",
-  marginBottom:
-    "22px",
-  boxShadow:
-    "0 10px 30px rgba(0,87,184,0.18)",
+  color: "#fff",
+  fontSize: "11px",
+  fontWeight: "900",
 };
 
-const backButton = {
+const heroStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "stretch",
+  gap: "24px",
+  flexWrap: "wrap",
   background:
-    "rgba(255,255,255,0.15)",
-  color:
-    "#fff",
+    "linear-gradient(135deg, #004b9b 0%, #0057B8 48%, #0077d9 100%)",
+  color: "#fff",
+  borderRadius: "24px",
+  padding: "30px",
+  marginBottom: "18px",
+  boxShadow:
+    "0 15px 40px rgba(0,87,184,0.20)",
+};
+
+const heroContent = {
+  flex: "1 1 520px",
+  minWidth: 0,
+};
+
+const eyebrowLight = {
+  fontSize: "11px",
+  fontWeight: "900",
+  letterSpacing: "1.4px",
+  opacity: 0.78,
+  marginBottom: "9px",
+};
+
+const heroTitle = {
+  margin: "0 0 8px",
+  fontSize: "clamp(28px, 5vw, 40px)",
+  lineHeight: "1.12",
+  letterSpacing: "-0.7px",
+};
+
+const heroSubtitle = {
+  margin: 0,
+  fontSize: "16px",
+  lineHeight: "1.6",
+  opacity: 0.92,
+};
+
+const heroMeta = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "9px",
+  marginTop: "20px",
+};
+
+const heroMetaItem = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "6px",
+  background:
+    "rgba(255,255,255,0.13)",
   border:
-    "1px solid rgba(255,255,255,0.35)",
-  borderRadius:
-    "9px",
-  padding:
-    "9px 14px",
-  cursor:
-    "pointer",
-  marginBottom:
-    "22px",
+    "1px solid rgba(255,255,255,0.22)",
+  borderRadius: "999px",
+  padding: "8px 12px",
+  fontSize: "12px",
+  fontWeight: "700",
+};
+
+const scoreCard = {
+  width: "165px",
+  minHeight: "150px",
+  flex: "0 0 165px",
+  background:
+    "rgba(255,255,255,0.13)",
+  border:
+    "1px solid rgba(255,255,255,0.25)",
+  borderRadius: "20px",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  textAlign: "center",
+  backdropFilter: "blur(8px)",
+};
+
+const scoreLabel = {
+  fontSize: "10px",
+  fontWeight: "900",
+  letterSpacing: "1.2px",
+  opacity: 0.75,
+};
+
+const scoreNumber = {
+  fontSize: "44px",
+  lineHeight: "1",
+  fontWeight: "900",
+  margin: "10px 0 7px",
+};
+
+const scoreMatch = {
+  fontSize: "13px",
+  fontWeight: "800",
+};
+
+const quickActions = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "22px",
+  flexWrap: "wrap",
+  background: "#ffffff",
+  border:
+    "1px solid #dce7f2",
+  borderRadius: "18px",
+  padding: "20px 22px",
+  marginBottom: "18px",
+  boxShadow:
+    "0 7px 24px rgba(15,55,90,0.06)",
+};
+
+const quickEyebrow = {
+  fontSize: "10px",
+  fontWeight: "900",
+  letterSpacing: "1.2px",
+  color: "#0057B8",
+  marginBottom: "5px",
+};
+
+const quickTitle = {
+  margin: "0 0 5px",
+  fontSize: "18px",
+  color: "#172033",
+};
+
+const quickText = {
+  margin: 0,
+  color: "#667085",
+  fontSize: "13px",
+  lineHeight: "1.5",
+};
+
+const documentActions = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "9px",
 };
 
 const sectionStyle = {
-  background:
-    "#fff",
-  borderRadius:
-    "18px",
-  padding:
-    "25px",
-  marginBottom:
-    "20px",
+  background: "#ffffff",
+  border:
+    "1px solid #e1eaf3",
+  borderRadius: "18px",
+  padding: "25px",
+  marginBottom: "18px",
   boxShadow:
-    "0 6px 24px rgba(0,0,0,0.06)",
+    "0 7px 25px rgba(15,55,90,0.055)",
 };
 
 const sectionHeader = {
-  display:
-    "flex",
-  justifyContent:
-    "space-between",
-  alignItems:
-    "center",
-  gap:
-    "15px",
-  flexWrap:
-    "wrap",
-  marginBottom:
-    "20px",
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "16px",
+  flexWrap: "wrap",
+  marginBottom: "20px",
+};
+
+const sectionEyebrow = {
+  fontSize: "10px",
+  fontWeight: "900",
+  letterSpacing: "1.2px",
+  color: "#0057B8",
+  marginBottom: "6px",
 };
 
 const sectionTitle = {
-  color:
-    "#0057B8",
-  marginTop:
-    0,
-  marginBottom:
-    "7px",
+  color: "#172033",
+  margin: 0,
+  fontSize: "22px",
+  letterSpacing: "-0.25px",
 };
 
 const sectionSubtitle = {
-  color:
-    "#666",
-  marginTop:
-    0,
-  lineHeight:
-    "1.5",
+  color: "#667085",
+  margin: "7px 0 0",
+  lineHeight: "1.55",
+  fontSize: "14px",
+};
+
+const statusActions = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "9px",
 };
 
 const gridStyle = {
-  display:
-    "grid",
+  display: "grid",
   gridTemplateColumns:
     "repeat(auto-fit,minmax(220px,1fr))",
-  gap:
-    "15px",
+  gap: "12px",
 };
 
-const analysisBox = {
+const infoCard = {
+  background:
+    "linear-gradient(180deg, #f8fafc, #f4f7fb)",
   border:
-    "1px solid",
-  borderRadius:
-    "12px",
-  padding:
-    "18px",
+    "1px solid #e5ebf2",
+  borderRadius: "12px",
+  padding: "15px",
+  minWidth: 0,
+};
+
+const infoLabel = {
+  fontSize: "10px",
+  color: "#7b8798",
+  marginBottom: "6px",
+  textTransform: "uppercase",
+  letterSpacing: "0.8px",
+  fontWeight: "800",
+};
+
+const infoValue = {
+  color: "#202939",
+  fontWeight: "650",
+  lineHeight: "1.5",
+  wordBreak: "break-word",
+  fontSize: "14px",
+};
+
+const skillsWrap = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "8px",
 };
 
 const skillBadge = {
-  background:
-    "#eef5ff",
-  color:
-    "#0057B8",
+  background: "#eef5ff",
+  color: "#0057B8",
   border:
-    "1px solid #c9dcf5",
-  padding:
-    "8px 13px",
-  borderRadius:
-    "20px",
-  fontSize:
-    "14px",
-  fontWeight:
-    "600",
+    "1px solid #cfe0f5",
+  padding: "8px 12px",
+  borderRadius: "999px",
+  fontSize: "13px",
+  fontWeight: "700",
+};
+
+const matchedSkillBadge = {
+  background: "#e9f8ef",
+  color: "#16803c",
+  border:
+    "1px solid #bce4ca",
+  padding: "8px 12px",
+  borderRadius: "999px",
+  fontSize: "13px",
+  fontWeight: "700",
+};
+
+const missingSkillBadge = {
+  background: "#fffaf0",
+  color: "#8a6500",
+  border:
+    "1px solid #e5d49c",
+  padding: "8px 12px",
+  borderRadius: "999px",
+  fontSize: "13px",
+  fontWeight: "700",
 };
 
 const textBox = {
   background:
-    "#f7f9fc",
-  borderRadius:
-    "12px",
-  padding:
-    "18px",
-  color:
-    "#444",
-  lineHeight:
-    "1.8",
-  whiteSpace:
-    "pre-wrap",
+    "linear-gradient(180deg, #f8fafc, #f4f7fb)",
+  border:
+    "1px solid #e5ebf2",
+  borderRadius: "13px",
+  padding: "18px",
+  color: "#4b5565",
+  lineHeight: "1.8",
+  whiteSpace: "pre-wrap",
+  fontSize: "14px",
 };
 
 const mutedText = {
-  color:
-    "#777",
+  color: "#7b8798",
+  fontSize: "14px",
 };
 
-const primaryButton = {
-  background:
-    "#0057B8",
-  color:
-    "#fff",
+const analysisScore = {
+  fontSize: "32px",
+  fontWeight: "900",
+};
+
+const analysisGrid = {
+  display: "grid",
+  gridTemplateColumns:
+    "repeat(auto-fit,minmax(250px,1fr))",
+  gap: "12px",
+};
+
+const analysisCard = {
+  display: "flex",
+  gap: "14px",
+  alignItems: "flex-start",
+  border: "1px solid",
+  borderRadius: "14px",
+  padding: "18px",
+};
+
+const analysisIcon = {
+  width: "42px",
+  height: "42px",
+  flex: "0 0 42px",
+  borderRadius: "12px",
+  background: "#ffffff",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: "20px",
+  boxShadow:
+    "0 3px 12px rgba(0,0,0,0.05)",
+};
+
+const analysisText = {
+  color: "#505b6b",
+  lineHeight: "1.6",
+  margin: "7px 0 0",
+  fontSize: "13px",
+};
+
+const analysisSectionTitle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  fontWeight: "900",
+  fontSize: "15px",
+  marginBottom: "11px",
+};
+
+const analysisList = {
+  margin: 0,
+  paddingLeft: "21px",
+  color: "#505b6b",
+  lineHeight: "1.8",
+  fontSize: "13px",
+};
+
+const strengthBox = {
+  background: "#f4fbf6",
   border:
-    "none",
-  borderRadius:
-    "10px",
-  padding:
-    "12px 18px",
-  fontWeight:
-    "700",
-  cursor:
-    "pointer",
+    "1px solid #ccebd7",
+  borderRadius: "14px",
+  padding: "17px",
+  marginTop: "16px",
+};
+
+const analysisSubSection = {
+  marginTop: "18px",
+};
+
+const missingBox = {
+  background: "#fffaf0",
+  border:
+    "1px solid #f0dfb2",
+  borderRadius: "14px",
+  padding: "17px",
+  marginTop: "16px",
+};
+
+const considerationBox = {
+  background: "#fffaf0",
+  border:
+    "1px solid #f0dfb2",
+  borderRadius: "14px",
+  padding: "17px",
+  marginTop: "16px",
+};
+
+const documentSection = {
+  background:
+    "linear-gradient(135deg, #ffffff 0%, #f6faff 100%)",
+  border:
+    "1px solid #cfe0f3",
+  borderRadius: "20px",
+  padding: "25px",
+  marginBottom: "18px",
+  boxShadow:
+    "0 9px 28px rgba(0,87,184,0.08)",
+};
+
+const documentSectionTop = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: "15px",
+  flexWrap: "wrap",
+  marginBottom: "20px",
+};
+
+const documentTitle = {
+  margin: 0,
+  fontSize: "22px",
+  color: "#172033",
+};
+
+const documentDescription = {
+  margin: "7px 0 0",
+  color: "#667085",
+  lineHeight: "1.55",
+  fontSize: "14px",
+};
+
+const secureBadge = {
+  background: "#eaf3ff",
+  color: "#0057B8",
+  border:
+    "1px solid #c9dcf5",
+  borderRadius: "999px",
+  padding: "8px 12px",
+  fontSize: "12px",
+  fontWeight: "800",
+};
+
+const documentGrid = {
+  display: "grid",
+  gridTemplateColumns:
+    "repeat(auto-fit,minmax(250px,1fr))",
+  gap: "11px",
 };
 
 const documentButton = {
   background:
-    "#0057B8",
-  color:
-    "#fff",
-  border:
-    "none",
-  borderRadius:
-    "10px",
-  padding:
-    "13px 18px",
-  fontWeight:
-    "700",
-  cursor:
-    "pointer",
+    "linear-gradient(135deg, #0057B8, #0077d9)",
+  color: "#fff",
+  border: "none",
+  borderRadius: "11px",
+  padding: "13px 17px",
+  fontWeight: "800",
+  cursor: "pointer",
+  boxShadow:
+    "0 5px 15px rgba(0,87,184,0.16)",
 };
 
-function statusButton(
-  background
-) {
-  return {
-    background,
-    color:
-      "#fff",
-    border:
-      "none",
-    borderRadius:
-      "9px",
-    padding:
-      "11px 16px",
-    fontWeight:
-      "700",
-    cursor:
-      "pointer",
-  };
-}
+const documentButtonSecondary = {
+  background: "#ffffff",
+  color: "#0057B8",
+  border:
+    "1px solid #c9dcf5",
+  borderRadius: "11px",
+  padding: "13px 17px",
+  fontWeight: "800",
+  cursor: "pointer",
+};
 
-function bottomButton(
-  background,
-  color = "#fff"
-) {
+const largeDocumentButton = {
+  display: "grid",
+  gridTemplateColumns:
+    "45px 1fr auto",
+  alignItems: "center",
+  gap: "12px",
+  width: "100%",
+  textAlign: "left",
+  background: "#ffffff",
+  color: "#172033",
+  border:
+    "1px solid #d8e5f2",
+  borderRadius: "14px",
+  padding: "14px",
+  cursor: "pointer",
+  boxShadow:
+    "0 4px 15px rgba(0,0,0,0.04)",
+};
+
+const documentButtonIcon = {
+  width: "45px",
+  height: "45px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: "12px",
+  background: "#eef5ff",
+  color: "#0057B8",
+  fontSize: "20px",
+};
+
+const documentArrow = {
+  color: "#0057B8",
+  fontSize: "21px",
+  fontWeight: "900",
+};
+
+const finalAction = {
+  background:
+    "linear-gradient(135deg, #063f82 0%, #0057B8 55%, #0077d9 100%)",
+  color: "#fff",
+  borderRadius: "20px",
+  padding: "25px",
+  marginTop: "4px",
+  boxShadow:
+    "0 14px 35px rgba(0,87,184,0.18)",
+};
+
+const finalActionContent = {
+  display: "flex",
+  alignItems: "center",
+  gap: "15px",
+  marginBottom: "21px",
+};
+
+const finalIcon = {
+  width: "48px",
+  height: "48px",
+  flex: "0 0 48px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: "14px",
+  background:
+    "rgba(255,255,255,0.14)",
+  border:
+    "1px solid rgba(255,255,255,0.2)",
+  fontSize: "22px",
+};
+
+const finalEyebrow = {
+  fontSize: "10px",
+  fontWeight: "900",
+  letterSpacing: "1.2px",
+  opacity: 0.72,
+  marginBottom: "5px",
+};
+
+const finalTitle = {
+  margin: 0,
+  fontSize: "22px",
+};
+
+const finalText = {
+  margin: "5px 0 0",
+  opacity: 0.84,
+  fontSize: "13px",
+  lineHeight: "1.5",
+};
+
+const finalActions = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "9px",
+};
+
+const finalGreenButton = {
+  background: "#16803c",
+  color: "#fff",
+  border: "none",
+  borderRadius: "10px",
+  padding: "12px 16px",
+  fontWeight: "800",
+  cursor: "pointer",
+};
+
+const finalRedButton = {
+  background: "#c62828",
+  color: "#fff",
+  border: "none",
+  borderRadius: "10px",
+  padding: "12px 16px",
+  fontWeight: "800",
+  cursor: "pointer",
+};
+
+const finalWhiteButton = {
+  background: "#fff",
+  color: "#0057B8",
+  border: "none",
+  borderRadius: "10px",
+  padding: "12px 16px",
+  fontWeight: "800",
+  cursor: "pointer",
+};
+
+const loadingShell = {
+  maxWidth: "500px",
+  margin: "80px auto",
+  background: "#fff",
+  border:
+    "1px solid #dce7f2",
+  borderRadius: "20px",
+  padding: "45px 25px",
+  textAlign: "center",
+  boxShadow:
+    "0 12px 35px rgba(0,0,0,0.07)",
+};
+
+const loadingIcon = {
+  fontSize: "38px",
+  marginBottom: "12px",
+};
+
+const loadingTitle = {
+  color: "#0057B8",
+  margin: 0,
+};
+
+const loadingText = {
+  color: "#667085",
+  margin: "8px 0 0",
+};
+
+const errorBox = {
+  maxWidth: "650px",
+  margin: "70px auto",
+  background: "#fff",
+  border:
+    "1px solid #e1e8f0",
+  borderRadius: "20px",
+  padding: "40px 25px",
+  textAlign: "center",
+  boxShadow:
+    "0 12px 35px rgba(0,0,0,0.07)",
+};
+
+const errorIcon = {
+  fontSize: "45px",
+  marginBottom: "12px",
+};
+
+const errorTitle = {
+  color: "#172033",
+  margin: "6px 0 10px",
+};
+
+const errorText = {
+  color: "#667085",
+  lineHeight: "1.7",
+  marginBottom: "22px",
+};
+
+const primaryButton = {
+  background:
+    "linear-gradient(135deg, #0057B8, #0077d9)",
+  color: "#fff",
+  border: "none",
+  borderRadius: "10px",
+  padding: "12px 18px",
+  fontWeight: "800",
+  cursor: "pointer",
+};
+
+const footerStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "12px",
+  flexWrap: "wrap",
+  padding: "22px 4px 0",
+  color: "#8793a5",
+  fontSize: "12px",
+};
+
+const footerBrand = {
+  display: "flex",
+  alignItems: "center",
+  gap: "7px",
+  color: "#0057B8",
+};
+
+const footerMark = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: "25px",
+  height: "25px",
+  borderRadius: "7px",
+  background: "#0057B8",
+  color: "#fff",
+  fontSize: "9px",
+  fontWeight: "900",
+};
+
+function statusButton(background) {
   return {
     background,
-    color,
-    border:
-      background ===
-      "#fff"
-        ? "none"
-        : "1px solid rgba(255,255,255,0.2)",
-    borderRadius:
-      "10px",
-    padding:
-      "12px 17px",
-    fontWeight:
-      "700",
-    cursor:
-      "pointer",
+    color: "#fff",
+    border: "none",
+    borderRadius: "9px",
+    padding: "11px 16px",
+    fontWeight: "800",
+    cursor: "pointer",
   };
 }
