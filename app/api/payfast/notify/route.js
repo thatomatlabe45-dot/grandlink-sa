@@ -1,425 +1,170 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 
-// ============================================================
-// GRADLINK SA - PAYFAST ITN NOTIFICATION
-// ============================================================
-// IMPORTANT:
-// - This route does NOT require SUPABASE_SECRET_KEY.
-// - This route does NOT require SUPABASE_SERVICE_ROLE_KEY.
-// - Supabase activation is handled by the existing
-//   activate-payfast Edge Function.
-// ============================================================
-
-export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// ============================================================
-// ENVIRONMENT VARIABLES
-// ============================================================
+export async function POST(request) {
+  try {
+    console.log("========================================");
+    console.log("GRADLINK SA PAYFAST ITN RECEIVED");
+    console.log("========================================");
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const payfastMode = process.env.PAYFAST_MODE || "sandbox";
 
-const PAYFAST_MODE =
-  (process.env.PAYFAST_MODE || "sandbox").toLowerCase();
+    const payfastEndpoint =
+      payfastMode === "sandbox"
+        ? "https://sandbox.payfast.co.za"
+        : "https://www.payfast.co.za";
 
-const PAYFAST_MERCHANT_ID =
-  process.env.PAYFAST_MERCHANT_ID ||
-  process.env.NEXT_PUBLIC_PAYFAST_MERCHANT_ID;
+    console.log("PayFast mode:", payfastMode);
+    console.log("PayFast endpoint:", payfastEndpoint);
 
-const PAYFAST_PASSPHRASE =
-  process.env.PAYFAST_PASSPHRASE || "";
+    const contentType = request.headers.get("content-type") || "";
 
-const PAYFAST_ENDPOINT =
-  PAYFAST_MODE === "sandbox"
-    ? "https://sandbox.payfast.co.za"
-    : "https://www.payfast.co.za";
+    console.log("PayFast Content-Type:", contentType);
 
-// ============================================================
-// HELPERS
-// ============================================================
+    let params = {};
 
-function logHeader(title) {
-  console.log("");
-  console.log("========================================");
-  console.log(title);
-  console.log("========================================");
-}
+    /*
+     * PayFast normally sends multipart/form-data.
+     * We also support application/x-www-form-urlencoded.
+     */
 
-function md5(value) {
-  return crypto
-    .createHash("md5")
-    .update(value, "utf8")
-    .digest("hex");
-}
+    if (contentType.includes("multipart/form-data")) {
+      console.log("Parsing PayFast notification as multipart/form-data.");
 
-// ============================================================
-// PAYFAST SIGNATURE
-// ============================================================
-// PayFast signs the received fields in their original order,
-// excluding the signature field itself.
-// ============================================================
+      const formData = await request.formData();
 
-function calculatePayFastSignature(data) {
-  const pairs = [];
+      for (const [key, value] of formData.entries()) {
+        params[key] = String(value);
+      }
+    } else {
+      console.log("Parsing PayFast notification as URL encoded data.");
 
-  for (const [key, value] of Object.entries(data)) {
-    if (key === "signature") {
-      continue;
-    }
+      const rawBody = await request.text();
 
-    if (value === null || value === undefined) {
-      continue;
-    }
+      const searchParams = new URLSearchParams(rawBody);
 
-    const stringValue = String(value).trim();
-
-    pairs.push(
-      `${key}=${encodeURIComponent(stringValue).replace(/%20/g, "+")}`
-    );
-  }
-
-  let parameterString = pairs.join("&");
-
-  if (PAYFAST_PASSPHRASE) {
-    parameterString +=
-      `&passphrase=${encodeURIComponent(PAYFAST_PASSPHRASE).replace(
-        /%20/g,
-        "+"
-      )}`;
-  }
-
-  return md5(parameterString);
-}
-
-// ============================================================
-// PARSE PAYFAST REQUEST
-// ============================================================
-
-async function parsePayFastRequest(request) {
-  const contentType =
-    request.headers.get("content-type") || "";
-
-  console.log(`PayFast Content-Type: ${contentType}`);
-
-  // ----------------------------------------------------------
-  // MULTIPART/FORM-DATA
-  // ----------------------------------------------------------
-
-  if (
-    contentType.toLowerCase().includes("multipart/form-data")
-  ) {
-    console.log(
-      "Parsing PayFast notification as multipart/form-data."
-    );
-
-    const formData = await request.formData();
-
-    const data = {};
-
-    for (const [key, value] of formData.entries()) {
-      if (typeof value === "string") {
-        data[key] = value;
-      } else {
-        data[key] = String(value);
+      for (const [key, value] of searchParams.entries()) {
+        params[key] = value;
       }
     }
 
-    console.log(
-      "PayFast request parsed successfully."
-    );
-
-    return data;
-  }
-
-  // ----------------------------------------------------------
-  // APPLICATION/X-WWW-FORM-URLENCODED
-  // ----------------------------------------------------------
-
-  if (
-    contentType
-      .toLowerCase()
-      .includes("application/x-www-form-urlencoded")
-  ) {
-    console.log(
-      "Parsing PayFast notification as application/x-www-form-urlencoded."
-    );
-
-    const body = await request.text();
-
-    const params = new URLSearchParams(body);
-
-    const data = {};
-
-    for (const [key, value] of params.entries()) {
-      data[key] = value;
-    }
-
-    console.log(
-      "PayFast request parsed successfully."
-    );
-
-    return data;
-  }
-
-  // ----------------------------------------------------------
-  // FALLBACK
-  // ----------------------------------------------------------
-
-  console.log(
-    "Unknown PayFast content type. Attempting URL-encoded parsing."
-  );
-
-  const body = await request.text();
-
-  const params = new URLSearchParams(body);
-
-  const data = {};
-
-  for (const [key, value] of params.entries()) {
-    data[key] = value;
-  }
-
-  return data;
-}
-
-// ============================================================
-// EXTRACT SUBSCRIPTION ID
-// ============================================================
-
-function extractSubscriptionId(mPaymentId) {
-  if (!mPaymentId) {
-    return null;
-  }
-
-  const value = String(mPaymentId).trim();
-
-  console.log(
-    `Extracting subscription ID from: ${value}`
-  );
-
-  // Expected format:
-  //
-  // GL-4-1790367560936
-  //    ^
-  //    subscription ID
-  //
-
-  const match = value.match(/^GL-(\d+)-/i);
-
-  if (match) {
-    const subscriptionId = Number(match[1]);
-
-    console.log(
-      `Extracted subscription ID: ${subscriptionId}`
-    );
-
-    return subscriptionId;
-  }
-
-  // Fallback in case the format changes.
-  const parts = value.split("-");
-
-  if (parts.length >= 3) {
-    const possibleId = Number(parts[1]);
-
-    if (Number.isInteger(possibleId)) {
-      console.log(
-        `Extracted subscription ID using fallback: ${possibleId}`
-      );
-
-      return possibleId;
-    }
-  }
-
-  return null;
-}
-
-// ============================================================
-// CALL EXISTING SUPABASE EDGE FUNCTION
-// ============================================================
-
-async function activateSubscription({
-  subscriptionId,
-  paymentReference,
-  amount,
-}) {
-  if (!SUPABASE_URL) {
-    throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL"
-    );
-  }
-
-  const functionUrl =
-    `${SUPABASE_URL}/functions/v1/activate-payfast`;
-
-  console.log("");
-  console.log(
-    "Calling Supabase activate-payfast Edge Function."
-  );
-  console.log(`Edge Function URL: ${functionUrl}`);
-  console.log(
-    `Subscription ID: ${subscriptionId}`
-  );
-  console.log(
-    `Payment reference: ${paymentReference}`
-  );
-  console.log(`Amount: ${amount}`);
-
-  const response = await fetch(functionUrl, {
-    method: "POST",
-
-    headers: {
-      "Content-Type": "application/json",
-    },
-
-    body: JSON.stringify({
-      subscription_id: subscriptionId,
-      payment_reference: String(paymentReference),
-      amount: Number(amount),
-    }),
-
-    cache: "no-store",
-  });
-
-  const responseText = await response.text();
-
-  console.log(
-    `activate-payfast HTTP status: ${response.status}`
-  );
-
-  console.log(
-    `activate-payfast response: ${responseText}`
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `activate-payfast failed with HTTP ${response.status}: ${responseText}`
-    );
-  }
-
-  return responseText;
-}
-
-// ============================================================
-// POST
-// ============================================================
-
-export async function POST(request) {
-  logHeader(
-    "GRADLINK SA PAYFAST ITN RECEIVED"
-  );
-
-  try {
-    console.log(
-      `PayFast mode: ${PAYFAST_MODE}`
-    );
-
-    console.log(
-      `PayFast endpoint: ${PAYFAST_ENDPOINT}`
-    );
-
-    // --------------------------------------------------------
-    // PARSE REQUEST
-    // --------------------------------------------------------
-
-    const data =
-      await parsePayFastRequest(request);
+    console.log("PayFast request parsed successfully.");
 
     console.log(
       "PayFast parameters received:",
-      Object.keys(data)
+      Object.keys(params)
     );
 
-    // --------------------------------------------------------
-    // BASIC VALUES
-    // --------------------------------------------------------
+    const {
+      m_payment_id,
+      pf_payment_id,
+      payment_status,
+      amount_gross,
+      amount_fee,
+      amount_net,
+      merchant_id,
+      signature,
+    } = params;
 
-    const mPaymentId =
-      data.m_payment_id || "";
+    console.log("m_payment_id:", m_payment_id);
+    console.log("pf_payment_id:", pf_payment_id);
+    console.log("payment_status:", payment_status);
+    console.log("amount_gross:", amount_gross);
+    console.log("amount_fee:", amount_fee);
+    console.log("amount_net:", amount_net);
+    console.log("merchant_id:", merchant_id);
 
-    const pfPaymentId =
-      data.pf_payment_id || "";
+    /*
+     * ---------------------------------------------------------
+     * REQUIRED PAYFAST VALUES
+     * ---------------------------------------------------------
+     */
 
-    const paymentStatus =
-      data.payment_status || "";
-
-    const amountGross =
-      data.amount_gross || "";
-
-    const merchantId =
-      data.merchant_id || "";
-
-    const receivedSignature =
-      data.signature || "";
-
-    console.log(
-      `m_payment_id: ${mPaymentId}`
-    );
-
-    console.log(
-      `pf_payment_id: ${pfPaymentId}`
-    );
-
-    console.log(
-      `payment_status: ${paymentStatus}`
-    );
-
-    console.log(
-      `amount_gross: ${amountGross}`
-    );
-
-    console.log(
-      `amount_fee: ${data.amount_fee || ""}`
-    );
-
-    console.log(
-      `amount_net: ${data.amount_net || ""}`
-    );
-
-    console.log(
-      `merchant_id: ${merchantId}`
-    );
-
-    console.log(
-      `PayFast signature received: ${receivedSignature}`
-    );
-
-    // --------------------------------------------------------
-    // REQUIRE SIGNATURE
-    // --------------------------------------------------------
-
-    if (!receivedSignature) {
-      throw new Error(
-        "PayFast signature was not received"
-      );
+    if (!m_payment_id) {
+      throw new Error("Missing m_payment_id.");
     }
 
-    // --------------------------------------------------------
-    // CALCULATE SIGNATURE
-    // --------------------------------------------------------
+    if (!pf_payment_id) {
+      throw new Error("Missing pf_payment_id.");
+    }
 
-    const calculatedSignature =
-      calculatePayFastSignature(data);
+    if (!payment_status) {
+      throw new Error("Missing payment_status.");
+    }
+
+    if (!amount_gross) {
+      throw new Error("Missing amount_gross.");
+    }
+
+    if (!merchant_id) {
+      throw new Error("Missing merchant_id.");
+    }
+
+    if (!signature) {
+      throw new Error("PayFast signature was not received.");
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * PAYFAST SIGNATURE VERIFICATION
+     * ---------------------------------------------------------
+     */
 
     console.log(
-      `Calculated PayFast signature: ${calculatedSignature}`
+      "PayFast signature received:",
+      signature
+    );
+
+    /*
+     * PayFast signature is calculated from all received fields
+     * except the signature field itself.
+     */
+
+    const signatureData = Object.keys(params)
+      .filter((key) => key !== "signature")
+      .map((key) => {
+        return (
+          encodeURIComponent(key) +
+          "=" +
+          encodeURIComponent(params[key]).replace(/%20/g, "+")
+        );
+      })
+      .join("&");
+
+    const passphrase =
+      process.env.PAYFAST_PASSPHRASE || "";
+
+    let signatureString = signatureData;
+
+    if (passphrase) {
+      signatureString +=
+        "&passphrase=" +
+        encodeURIComponent(passphrase).replace(/%20/g, "+");
+    }
+
+    const calculatedSignature = crypto
+      .createHash("md5")
+      .update(signatureString)
+      .digest("hex");
+
+    console.log(
+      "Calculated PayFast signature:",
+      calculatedSignature
     );
 
     console.log(
-      `Received PayFast signature: ${receivedSignature}`
+      "Received PayFast signature:",
+      signature
     );
-
-    // --------------------------------------------------------
-    // VERIFY SIGNATURE
-    // --------------------------------------------------------
 
     if (
       calculatedSignature.toLowerCase() !==
-      receivedSignature.toLowerCase()
+      signature.toLowerCase()
     ) {
       throw new Error(
-        "PayFast signature verification FAILED"
+        "PayFast signature verification failed."
       );
     }
 
@@ -427,22 +172,22 @@ export async function POST(request) {
       "PayFast signature verification PASSED."
     );
 
-    // --------------------------------------------------------
-    // VERIFY MERCHANT ID
-    // --------------------------------------------------------
+    /*
+     * ---------------------------------------------------------
+     * MERCHANT VERIFICATION
+     * ---------------------------------------------------------
+     */
 
-    if (!PAYFAST_MERCHANT_ID) {
-      throw new Error(
-        "Missing PAYFAST_MERCHANT_ID"
-      );
-    }
+    const expectedMerchantId =
+      process.env.PAYFAST_MERCHANT_ID;
 
     if (
-      String(merchantId) !==
-      String(PAYFAST_MERCHANT_ID)
+      expectedMerchantId &&
+      String(merchant_id) !==
+        String(expectedMerchantId)
     ) {
       throw new Error(
-        `PayFast merchant ID mismatch. Received ${merchantId}, expected ${PAYFAST_MERCHANT_ID}`
+        `PayFast merchant ID mismatch. Received ${merchant_id}, expected ${expectedMerchantId}.`
       );
     }
 
@@ -450,164 +195,297 @@ export async function POST(request) {
       "PayFast merchant ID verified."
     );
 
-    // --------------------------------------------------------
-    // VERIFY PAYMENT STATUS
-    // --------------------------------------------------------
+    /*
+     * ---------------------------------------------------------
+     * PAYMENT STATUS
+     * ---------------------------------------------------------
+     */
 
     console.log(
-      `PayFast payment status: ${paymentStatus}`
+      "PayFast payment status:",
+      payment_status
     );
 
     if (
-      paymentStatus.toUpperCase() !==
+      String(payment_status).toUpperCase() !==
       "COMPLETE"
     ) {
       console.log(
-        `Payment status is ${paymentStatus}; subscription will not be activated.`
+        "Payment is not COMPLETE. No subscription activation."
       );
 
-      return new NextResponse(
-        "Payment received but not COMPLETE.",
-        {
-          status: 200,
-        }
-      );
+      return NextResponse.json({
+        success: true,
+        message:
+          "PayFast notification received but payment is not COMPLETE.",
+        payment_status,
+      });
     }
 
-    // --------------------------------------------------------
-    // VERIFY M_PAYMENT_ID
-    // --------------------------------------------------------
+    /*
+     * ---------------------------------------------------------
+     * EXTRACT GRADLINK SUBSCRIPTION ID
+     *
+     * Example:
+     *
+     * GL-4-1790367560936
+     *
+     * Subscription ID = 4
+     * ---------------------------------------------------------
+     */
 
     console.log(
-      `GradLink m_payment_id: ${mPaymentId}`
+      "GradLink m_payment_id:",
+      m_payment_id
     );
 
-    if (!mPaymentId) {
-      throw new Error(
-        "Missing m_payment_id"
+    console.log(
+      "Extracting subscription ID from:",
+      m_payment_id
+    );
+
+    const paymentIdString =
+      String(m_payment_id).trim();
+
+    let subscriptionId = null;
+
+    /*
+     * Primary expected format:
+     *
+     * GL-4-1790367560936
+     */
+
+    const match =
+      paymentIdString.match(
+        /^GL-(\d+)-/
       );
+
+    if (match && match[1]) {
+      subscriptionId = Number(match[1]);
     }
 
-    // --------------------------------------------------------
-    // EXTRACT SUBSCRIPTION ID
-    // --------------------------------------------------------
-
-    const subscriptionId =
-      extractSubscriptionId(mPaymentId);
+    /*
+     * Fallback:
+     * Find the number immediately after GL-
+     */
 
     if (!subscriptionId) {
-      throw new Error(
-        `Could not extract subscription ID from m_payment_id: ${mPaymentId}`
-      );
+      const fallbackMatch =
+        paymentIdString.match(
+          /GL-(\d+)/
+        );
+
+      if (
+        fallbackMatch &&
+        fallbackMatch[1]
+      ) {
+        subscriptionId =
+          Number(fallbackMatch[1]);
+      }
     }
 
     console.log(
-      `Subscription ID extracted successfully: ${subscriptionId}`
+      "Extracted subscription ID:",
+      subscriptionId
     );
-
-    // --------------------------------------------------------
-    // VERIFY AMOUNT
-    // --------------------------------------------------------
-
-    const verifiedAmount =
-      Number.parseFloat(amountGross);
 
     if (
-      !Number.isFinite(verifiedAmount)
+      !Number.isInteger(subscriptionId) ||
+      subscriptionId <= 0
     ) {
       throw new Error(
-        `Invalid PayFast amount: ${amountGross}`
+        `Could not extract subscription ID from m_payment_id: ${m_payment_id}`
       );
     }
 
     console.log(
-      `Verified PayFast amount: ${verifiedAmount}`
+      "Subscription ID extracted successfully:",
+      subscriptionId
     );
 
-    // --------------------------------------------------------
-    // PAYMENT REFERENCE
-    // --------------------------------------------------------
+    /*
+     * ---------------------------------------------------------
+     * VERIFY AMOUNT
+     * ---------------------------------------------------------
+     */
 
-    if (!pfPaymentId) {
+    const verifiedAmount =
+      Number(amount_gross);
+
+    if (
+      !Number.isFinite(verifiedAmount) ||
+      verifiedAmount <= 0
+    ) {
       throw new Error(
-        "Missing PayFast payment reference"
+        `Invalid PayFast amount: ${amount_gross}`
       );
     }
+
+    console.log(
+      "Verified PayFast amount:",
+      verifiedAmount
+    );
+
+    /*
+     * ---------------------------------------------------------
+     * PAYMENT REFERENCE
+     * ---------------------------------------------------------
+     */
 
     const paymentReference =
-      String(pfPaymentId).trim();
+      String(pf_payment_id).trim();
 
     console.log(
-      `PayFast payment reference: ${paymentReference}`
+      "PayFast payment reference:",
+      paymentReference
     );
 
-    // ========================================================
-    // ACTIVATE THROUGH EDGE FUNCTION
-    // ========================================================
-    //
-    // NO SUPABASE SECRET KEY REQUIRED HERE.
-    //
-    // The activate-payfast Edge Function handles the
-    // database operation server-side.
-    // ========================================================
+    /*
+     * ---------------------------------------------------------
+     * SUPABASE ACTIVATE-PAYFAST EDGE FUNCTION
+     * ---------------------------------------------------------
+     */
 
-    const activationResult =
-      await activateSubscription({
-        subscriptionId,
-        paymentReference,
-        amount: verifiedAmount,
+    const supabaseUrl =
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      process.env.SUPABASE_URL;
+
+    if (!supabaseUrl) {
+      throw new Error(
+        "Supabase URL environment variable is missing."
+      );
+    }
+
+    /*
+     * IMPORTANT:
+     *
+     * Remove any trailing slash so that we don't create:
+     *
+     * https://project.supabase.co//functions/v1/...
+     *
+     * Instead we create:
+     *
+     * https://project.supabase.co/functions/v1/...
+     */
+
+    const cleanSupabaseUrl =
+      supabaseUrl.replace(/\/+$/, "");
+
+    const edgeFunctionUrl =
+      `${cleanSupabaseUrl}/functions/v1/activate-payfast`;
+
+    console.log(
+      "Calling Supabase activate-payfast Edge Function."
+    );
+
+    console.log(
+      "Edge Function URL:",
+      edgeFunctionUrl
+    );
+
+    console.log(
+      "Subscription ID:",
+      subscriptionId
+    );
+
+    console.log(
+      "Payment reference:",
+      paymentReference
+    );
+
+    console.log(
+      "Amount:",
+      verifiedAmount
+    );
+
+    /*
+     * IMPORTANT:
+     *
+     * We deliberately do NOT require the Supabase
+     * secret/service-role key here.
+     *
+     * The activate-payfast Edge Function must have
+     * verify_jwt = false because PayFast itself does
+     * not send a Supabase JWT.
+     */
+
+    const edgeFunctionResponse =
+      await fetch(edgeFunctionUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+        body: JSON.stringify({
+          subscription_id:
+            subscriptionId,
+          payment_reference:
+            paymentReference,
+          amount:
+            verifiedAmount,
+        }),
       });
 
-    // --------------------------------------------------------
-    // SUCCESS
-    // --------------------------------------------------------
+    const edgeFunctionText =
+      await edgeFunctionResponse.text();
 
-    logHeader(
+    console.log(
+      "activate-payfast HTTP status:",
+      edgeFunctionResponse.status
+    );
+
+    console.log(
+      "activate-payfast response:",
+      edgeFunctionText
+    );
+
+    if (!edgeFunctionResponse.ok) {
+      throw new Error(
+        `activate-payfast failed with HTTP ${edgeFunctionResponse.status}: ${edgeFunctionText}`
+      );
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * SUCCESS
+     * ---------------------------------------------------------
+     */
+
+    console.log("========================================");
+    console.log(
       "GRADLINK SA PAYFAST ITN SUCCESS"
     );
+    console.log("========================================");
 
-    console.log(
-      `Subscription ${subscriptionId} activation request completed.`
-    );
-
-    console.log(
-      `Payment reference: ${paymentReference}`
-    );
-
-    console.log(
-      `Amount: ${verifiedAmount}`
-    );
-
-    console.log(
-      `Edge Function result: ${activationResult}`
-    );
-
-    return new NextResponse(
-      "OK",
-      {
-        status: 200,
-      }
-    );
+    return NextResponse.json({
+      success: true,
+      message:
+        "PayFast payment verified and subscription activation requested.",
+      subscription_id:
+        subscriptionId,
+      payment_reference:
+        paymentReference,
+      amount:
+        verifiedAmount,
+      payment_status,
+    });
   } catch (error) {
-    // --------------------------------------------------------
-    // ERROR
-    // --------------------------------------------------------
-
-    logHeader(
+    console.log("========================================");
+    console.log(
       "GRADLINK SA PAYFAST ITN ERROR"
     );
+    console.log("========================================");
 
-    console.error(
-      "Error:",
-      error
-    );
+    console.error("Error:", error);
 
-    return new NextResponse(
-      `PayFast ITN error: ${
-        error instanceof Error
-          ? error.message
-          : String(error)
-      }`,
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
       {
         status: 400,
       }
@@ -615,15 +493,15 @@ export async function POST(request) {
   }
 }
 
-// ============================================================
-// GET
-// ============================================================
+/*
+ * Optional GET endpoint so opening the URL in a browser
+ * confirms that the endpoint exists.
+ */
 
 export async function GET() {
-  return new NextResponse(
-    "GradLink SA PayFast notification endpoint is online",
-    {
-      status: 200,
-    }
-  );
+  return NextResponse.json({
+    success: true,
+    message:
+      "GradLink SA PayFast notification endpoint is online",
+  });
 }
