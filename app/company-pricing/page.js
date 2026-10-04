@@ -237,14 +237,33 @@ function PlanCard({
 
         <h2>{plan.name}</h2>
 
-        <p className="plan-description">
-          {plan.description}
-        </p>
+        {/* ==================================================
+            PLAN DESCRIPTION CARD
+        ================================================== */}
+
+        <div className="plan-description-card">
+
+          <div className="description-card-top">
+            <span className="description-card-icon">
+              ✦
+            </span>
+
+            <span className="description-card-label">
+              PLAN OVERVIEW
+            </span>
+          </div>
+
+          <p className="plan-description">
+            {plan.description}
+          </p>
+
+        </div>
 
         {/* Price */}
         <div className="price-area">
 
           <div className="price-line">
+
             <span className="price">
               {formatMoney(price)}
             </span>
@@ -256,6 +275,7 @@ function PlanCard({
                   ? " / year"
                   : " / month"}
             </span>
+
           </div>
 
           {!plan.oneTime && isAnnual && (
@@ -270,17 +290,22 @@ function PlanCard({
               SAVE 2 MONTHS
             </span>
           )}
+
         </div>
 
         {/* Listing limit */}
         <div className="listing-limit">
-          <span className="listing-icon">▣</span>
+
+          <span className="listing-icon">
+            ▣
+          </span>
 
           <span>
             {plan.listings === 1
               ? "1 active internship listing"
               : `Up to ${plan.listings} active internship listings`}
           </span>
+
         </div>
 
         {/* Divider */}
@@ -298,13 +323,16 @@ function PlanCard({
               className="feature-row"
               key={`${plan.key}-feature-${index}`}
             >
+
               <span className="feature-check">
                 <CheckIcon />
               </span>
 
               <span>{feature}</span>
+
             </div>
           ))}
+
         </div>
 
         {/* Button */}
@@ -320,6 +348,7 @@ function PlanCard({
             onClick={() => onSelect(plan.key)}
             disabled={loading}
           >
+
             {loading && loadingPlan === plan.key ? (
               <>
                 <span className="button-spinner" />
@@ -334,6 +363,7 @@ function PlanCard({
                 <ArrowIcon />
               </>
             )}
+
           </button>
 
         </div>
@@ -408,6 +438,7 @@ export default function CompanyPricingPage() {
         if (!mounted) return;
 
         if (subscriptionError) {
+
           console.error(
             "Subscription lookup error:",
             subscriptionError
@@ -478,9 +509,11 @@ export default function CompanyPricingPage() {
       const plan = PLANS[planKey];
 
       if (!plan) {
+
         throw new Error(
           "The selected plan could not be found."
         );
+
       }
 
       // -------------------------------------------------------
@@ -722,6 +755,7 @@ export default function CompanyPricingPage() {
               className="brand"
               onClick={() => router.push("/")}
             >
+
               <span className="brand-mark">
                 G
               </span>
@@ -730,6 +764,7 @@ export default function CompanyPricingPage() {
                 GradLink
                 <span>SA</span>
               </span>
+
             </button>
 
             <div className="nav-links">
@@ -881,6 +916,7 @@ export default function CompanyPricingPage() {
               </span>
 
               <div>
+
                 <strong>
                   Something went wrong
                 </strong>
@@ -888,6 +924,7 @@ export default function CompanyPricingPage() {
                 <p>
                   {error}
                 </p>
+
               </div>
 
             </div>
@@ -1069,6 +1106,7 @@ export default function CompanyPricingPage() {
                   </div>
 
                   <div>
+
                     <h3>
                       Choose your plan
                     </h3>
@@ -1077,6 +1115,7 @@ export default function CompanyPricingPage() {
                       Select the plan that matches
                       your company's recruitment needs.
                     </p>
+
                   </div>
 
                 </div>
@@ -1089,6 +1128,7 @@ export default function CompanyPricingPage() {
                   </div>
 
                   <div>
+
                     <h3>
                       Complete payment
                     </h3>
@@ -1097,6 +1137,7 @@ export default function CompanyPricingPage() {
                       Complete your secure payment
                       through PayFast.
                     </p>
+
                   </div>
 
                 </div>
@@ -1109,6 +1150,7 @@ export default function CompanyPricingPage() {
                   </div>
 
                   <div>
+
                     <h3>
                       Start hiring
                     </h3>
@@ -1118,6 +1160,7 @@ export default function CompanyPricingPage() {
                       access your company dashboard
                       and start recruiting.
                     </p>
+
                   </div>
 
                 </div>
@@ -1199,6 +1242,7 @@ export default function CompanyPricingPage() {
               </span>
 
               <div>
+
                 <strong>
                   GradLink SA
                 </strong>
@@ -1207,6 +1251,7 @@ export default function CompanyPricingPage() {
                   Connecting South African graduates
                   with opportunity.
                 </span>
+
               </div>
 
             </div>
@@ -1974,16 +2019,90 @@ export default function CompanyPricingPage() {
           font-weight:950;
         }
 
+        /* ==================================================
+           PREMIUM PLAN DESCRIPTION CARD
+        ================================================== */
+
+        .plan-description-card {
+          width:100%;
+
+          margin-top:15px;
+
+          padding:15px 16px;
+
+          border-radius:16px;
+
+          background:
+            linear-gradient(
+              135deg,
+              #f8fbff 0%,
+              #eff6ff 100%
+            );
+
+          border:1px solid #dbeafe;
+
+          box-shadow:
+            0 8px 22px
+            rgba(37,99,235,.06);
+
+          box-sizing:border-box;
+        }
+
+        .description-card-top {
+          display:flex;
+
+          align-items:center;
+
+          gap:7px;
+
+          margin-bottom:7px;
+        }
+
+        .description-card-icon {
+          width:22px;
+          height:22px;
+
+          flex:0 0 auto;
+
+          display:flex;
+
+          align-items:center;
+
+          justify-content:center;
+
+          border-radius:7px;
+
+          background:#dbeafe;
+
+          color:#2563eb;
+
+          font-size:10px;
+
+          font-weight:950;
+        }
+
+        .description-card-label {
+          color:#2563eb;
+
+          font-size:8px;
+
+          line-height:1;
+
+          font-weight:950;
+
+          letter-spacing:.11em;
+        }
+
         .plan-description {
-          max-width:620px;
+          margin:0;
 
-          margin:12px 0 0;
+          color:#475569;
 
-          color:#64748b;
+          font-size:13px;
 
-          font-size:14px;
+          line-height:1.65;
 
-          line-height:1.7;
+          font-weight:650;
         }
 
 
@@ -2832,8 +2951,31 @@ export default function CompanyPricingPage() {
             padding-right:90px;
           }
 
+          .plan-description-card {
+            margin-top:14px;
+
+            padding:13px 14px;
+
+            border-radius:14px;
+          }
+
+          .description-card-icon {
+            width:20px;
+            height:20px;
+
+            border-radius:6px;
+
+            font-size:9px;
+          }
+
+          .description-card-label {
+            font-size:7px;
+          }
+
           .plan-description {
-            font-size:13px;
+            font-size:12px;
+
+            line-height:1.6;
           }
 
           .price {
