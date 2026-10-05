@@ -728,28 +728,26 @@ export default function CompanyPricingPage() {
           letter-spacing: -0.025em;
         }
 
-        /* =====================================================
-           BLUE PLAN DESCRIPTION CARD
+                /* =====================================================
+           PREMIUM PLAN DESCRIPTION CARD
         ===================================================== */
 
         .plan-description-card {
           width: 100%;
           margin-top: 15px;
-          padding: 17px 17px 18px;
-          border-radius: 17px;
+          padding: 16px 17px 17px;
+          border-radius: 16px;
 
           background: linear-gradient(
             135deg,
-            #2563eb 0%,
-            #1d4ed8 55%,
-            #1e40af 100%
+            #f8fbff 0%,
+            #eef6ff 100%
           );
 
-          border: 1px solid rgba(255, 255, 255, 0.18);
+          border: 1px solid #d7e7fb;
 
           box-shadow:
-            0 10px 25px rgba(37, 99, 235, 0.20),
-            inset 0 1px 0 rgba(255, 255, 255, 0.12);
+            0 8px 22px rgba(30, 64, 175, 0.07);
 
           box-sizing: border-box;
           position: relative;
@@ -759,41 +757,51 @@ export default function CompanyPricingPage() {
         .plan-description-card::before {
           content: "";
           position: absolute;
-          top: -45px;
-          right: -45px;
-          width: 120px;
-          height: 120px;
-          border-radius: 50%;
-          background: rgba(255, 255, 255, 0.10);
-          pointer-events: none;
+          top: 0;
+          left: 0;
+          width: 4px;
+          height: 100%;
+          background: linear-gradient(
+            180deg,
+            #2563eb,
+            #60a5fa
+          );
+          border-radius: 16px 0 0 16px;
         }
 
         .description-card-top {
           position: relative;
           z-index: 1;
+
           display: flex;
           align-items: center;
           gap: 8px;
-          margin-bottom: 8px;
+
+          margin-bottom: 9px;
         }
 
         .description-card-icon {
-          width: 24px;
-          height: 24px;
+          width: 25px;
+          height: 25px;
           flex: 0 0 auto;
+
           display: flex;
           align-items: center;
           justify-content: center;
+
           border-radius: 8px;
-          background: rgba(255, 255, 255, 0.16);
-          color: #ffffff;
+
+          background: #dbeafe;
+          color: #2563eb;
+
           font-size: 11px;
           font-weight: 950;
-          border: 1px solid rgba(255, 255, 255, 0.18);
+
+          border: 1px solid #bfdbfe;
         }
 
         .description-card-label {
-          color: #ffffff;
+          color: #1d4ed8;
           font-size: 8px;
           line-height: 1;
           font-weight: 950;
@@ -803,9 +811,13 @@ export default function CompanyPricingPage() {
         .plan-description {
           position: relative;
           z-index: 1;
+
           margin: 0;
-          color: #ffffff;
-          font-size: 13px;
+          padding-left: 33px;
+
+          color: #334155;
+
+          font-size: 12.5px;
           line-height: 1.65;
           font-weight: 600;
         }
