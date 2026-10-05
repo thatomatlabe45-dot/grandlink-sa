@@ -230,7 +230,7 @@ function PlanCard({
         {/* Plan icon */}
         <PlanIcon icon={plan.icon} />
 
-        {/* Heading */}
+        {/* Plan heading */}
         <div className="plan-eyebrow">
           {plan.eyebrow}
         </div>
@@ -238,12 +238,13 @@ function PlanCard({
         <h2>{plan.name}</h2>
 
         {/* ==================================================
-            PLAN DESCRIPTION CARD
+            BLUE PLAN DESCRIPTION CARD
         ================================================== */}
 
         <div className="plan-description-card">
 
           <div className="description-card-top">
+
             <span className="description-card-icon">
               ✦
             </span>
@@ -251,6 +252,7 @@ function PlanCard({
             <span className="description-card-label">
               PLAN OVERVIEW
             </span>
+
           </div>
 
           <p className="plan-description">
@@ -280,7 +282,8 @@ function PlanCard({
 
           {!plan.oneTime && isAnnual && (
             <div className="annual-note">
-              Equivalent to {formatMoney(annualMonthlyEquivalent)}
+              Equivalent to{" "}
+              {formatMoney(annualMonthlyEquivalent)}
               /month
             </div>
           )}
@@ -424,16 +427,18 @@ export default function CompanyPricingPage() {
           return;
         }
 
-        const { data: subscription, error: subscriptionError } =
-          await supabase
-            .from("company_subscriptions")
-            .select("*")
-            .eq("company_id", currentUser.id)
-            .order("created_at", {
-              ascending: false,
-            })
-            .limit(1)
-            .maybeSingle();
+        const {
+          data: subscription,
+          error: subscriptionError,
+        } = await supabase
+          .from("company_subscriptions")
+          .select("*")
+          .eq("company_id", currentUser.id)
+          .order("created_at", {
+            ascending: false,
+          })
+          .limit(1)
+          .maybeSingle();
 
         if (!mounted) return;
 
@@ -447,7 +452,9 @@ export default function CompanyPricingPage() {
           return;
         }
 
-        setCurrentSubscription(subscription || null);
+        setCurrentSubscription(
+          subscription || null
+        );
 
       } catch (err) {
 
@@ -529,16 +536,18 @@ export default function CompanyPricingPage() {
       // CHECK ACTIVE SUBSCRIPTION
       // -------------------------------------------------------
 
-      const { data: activeRows, error: activeError } =
-        await supabase
-          .from("company_subscriptions")
-          .select("*")
-          .eq("company_id", user.id)
-          .ilike("status", "active")
-          .order("created_at", {
-            ascending: false,
-          })
-          .limit(1);
+      const {
+        data: activeRows,
+        error: activeError,
+      } = await supabase
+        .from("company_subscriptions")
+        .select("*")
+        .eq("company_id", user.id)
+        .ilike("status", "active")
+        .order("created_at", {
+          ascending: false,
+        })
+        .limit(1);
 
       if (activeError) {
 
@@ -560,7 +569,7 @@ export default function CompanyPricingPage() {
 
       if (existingActive && !plan.oneTime) {
 
-        router.push("/company");
+        router.push("/company-dashboard");
 
         return;
       }
@@ -579,16 +588,18 @@ export default function CompanyPricingPage() {
       // FIND INACTIVE SUBSCRIPTION
       // -------------------------------------------------------
 
-      const { data: inactiveRows, error: inactiveError } =
-        await supabase
-          .from("company_subscriptions")
-          .select("*")
-          .eq("company_id", user.id)
-          .ilike("status", "inactive")
-          .order("created_at", {
-            ascending: false,
-          })
-          .limit(1);
+      const {
+        data: inactiveRows,
+        error: inactiveError,
+      } = await supabase
+        .from("company_subscriptions")
+        .select("*")
+        .eq("company_id", user.id)
+        .ilike("status", "inactive")
+        .order("created_at", {
+          ascending: false,
+        })
+        .limit(1);
 
       if (inactiveError) {
 
@@ -612,21 +623,23 @@ export default function CompanyPricingPage() {
 
       if (existingInactive) {
 
-        const { data: updatedSubscription, error: updateError } =
-          await supabase
-            .from("company_subscriptions")
-            .update({
-              plan: plan.key,
-              status: "inactive",
-              amount: amount,
-              monthly_price: amount,
-              payment_provider: "payfast",
-              payment_reference: null,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", existingInactive.id)
-            .select()
-            .maybeSingle();
+        const {
+          data: updatedSubscription,
+          error: updateError,
+        } = await supabase
+          .from("company_subscriptions")
+          .update({
+            plan: plan.key,
+            status: "inactive",
+            amount: amount,
+            monthly_price: amount,
+            payment_provider: "payfast",
+            payment_reference: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingInactive.id)
+          .select()
+          .maybeSingle();
 
         if (updateError) {
 
@@ -653,20 +666,22 @@ export default function CompanyPricingPage() {
 
       else {
 
-        const { data: newSubscription, error: insertError } =
-          await supabase
-            .from("company_subscriptions")
-            .insert({
-              company_id: user.id,
-              plan: plan.key,
-              status: "inactive",
-              amount: amount,
-              monthly_price: amount,
-              payment_provider: "payfast",
-              payment_reference: null,
-            })
-            .select()
-            .maybeSingle();
+        const {
+          data: newSubscription,
+          error: insertError,
+        } = await supabase
+          .from("company_subscriptions")
+          .insert({
+            company_id: user.id,
+            plan: plan.key,
+            status: "inactive",
+            amount: amount,
+            monthly_price: amount,
+            payment_provider: "payfast",
+            payment_reference: null,
+          })
+          .select()
+          .maybeSingle();
 
         if (insertError) {
 
@@ -735,7 +750,7 @@ export default function CompanyPricingPage() {
   }
 
   // ==========================================================
-  // PART 2 STARTS BELOW
+  // PART 2 CONTINUES...
   // ==========================================================
 
   return (
@@ -769,9 +784,12 @@ export default function CompanyPricingPage() {
 
             <div className="nav-links">
 
+              {/* FIXED: REAL COMPANY DASHBOARD */}
               <button
                 type="button"
-                onClick={() => router.push("/company")}
+                onClick={() =>
+                  router.push("/company-dashboard")
+                }
               >
                 Dashboard
               </button>
@@ -786,7 +804,9 @@ export default function CompanyPricingPage() {
               {!user && (
                 <button
                   type="button"
-                  onClick={() => router.push("/login")}
+                  onClick={() =>
+                    router.push("/login")
+                  }
                 >
                   Sign in
                 </button>
@@ -888,9 +908,12 @@ export default function CompanyPricingPage() {
 
               </div>
 
+              {/* FIXED: REAL COMPANY DASHBOARD */}
               <button
                 type="button"
-                onClick={() => router.push("/company")}
+                onClick={() =>
+                  router.push("/company-dashboard")
+                }
               >
                 Go to Dashboard
                 <ArrowIcon />
@@ -975,7 +998,9 @@ export default function CompanyPricingPage() {
                       ? "billing-active"
                       : ""
                   }
-                  onClick={() => setBilling("monthly")}
+                  onClick={() =>
+                    setBilling("monthly")
+                  }
                 >
                   Monthly
                 </button>
@@ -987,7 +1012,9 @@ export default function CompanyPricingPage() {
                       ? "billing-active"
                       : ""
                   }
-                  onClick={() => setBilling("annual")}
+                  onClick={() =>
+                    setBilling("annual")
+                  }
                 >
                   Annual
 
@@ -1300,19 +1327,25 @@ export default function CompanyPricingPage() {
           top:0;
           z-index:100;
           width:100%;
+
           background:rgba(255,255,255,.94);
+
           backdrop-filter:blur(18px);
+
           border-bottom:1px solid #e5edf6;
         }
 
         .nav-inner {
           width:min(1180px, calc(100% - 32px));
+
           min-height:72px;
+
           margin:0 auto;
 
           display:flex;
           align-items:center;
           justify-content:space-between;
+
           gap:20px;
         }
 
@@ -1323,6 +1356,7 @@ export default function CompanyPricingPage() {
 
           display:flex;
           align-items:center;
+
           gap:10px;
 
           cursor:pointer;
@@ -1331,19 +1365,22 @@ export default function CompanyPricingPage() {
         .brand-mark {
           width:38px;
           height:38px;
+
           border-radius:12px;
 
           display:flex;
           align-items:center;
           justify-content:center;
 
-          background:linear-gradient(
-            135deg,
-            #2563eb,
-            #1d4ed8
-          );
+          background:
+            linear-gradient(
+              135deg,
+              #2563eb,
+              #1d4ed8
+            );
 
           color:white;
+
           font-size:19px;
           font-weight:950;
 
@@ -1355,7 +1392,9 @@ export default function CompanyPricingPage() {
         .brand-text {
           font-size:19px;
           font-weight:950;
+
           letter-spacing:-.04em;
+
           color:#0f172a;
         }
 
@@ -1367,6 +1406,7 @@ export default function CompanyPricingPage() {
         .nav-links {
           display:flex;
           align-items:center;
+
           gap:6px;
         }
 
@@ -1405,6 +1445,7 @@ export default function CompanyPricingPage() {
 
         .hero-section {
           position:relative;
+
           overflow:hidden;
 
           background:
@@ -1435,14 +1476,18 @@ export default function CompanyPricingPage() {
 
         .hero-glow {
           position:absolute;
+
           border-radius:50%;
+
           filter:blur(3px);
+
           pointer-events:none;
         }
 
         .hero-glow-one {
           width:430px;
           height:430px;
+
           top:-260px;
           right:-120px;
 
@@ -1453,6 +1498,7 @@ export default function CompanyPricingPage() {
         .hero-glow-two {
           width:350px;
           height:350px;
+
           bottom:-260px;
           left:-100px;
 
@@ -1463,6 +1509,7 @@ export default function CompanyPricingPage() {
         .hero-badge {
           display:inline-flex;
           align-items:center;
+
           gap:8px;
 
           padding:8px 13px;
@@ -1479,13 +1526,16 @@ export default function CompanyPricingPage() {
 
           font-size:10px;
           font-weight:950;
+
           letter-spacing:.1em;
         }
 
         .hero-dot {
           width:7px;
           height:7px;
+
           border-radius:50%;
+
           background:#38bdf8;
 
           box-shadow:
@@ -1526,7 +1576,9 @@ export default function CompanyPricingPage() {
           margin-top:30px;
 
           display:flex;
+
           justify-content:center;
+
           flex-wrap:wrap;
 
           gap:10px 22px;
@@ -1535,6 +1587,7 @@ export default function CompanyPricingPage() {
         .hero-trust div {
           display:flex;
           align-items:center;
+
           gap:7px;
 
           color:#dbeafe;
@@ -1545,6 +1598,7 @@ export default function CompanyPricingPage() {
 
         .hero-trust span {
           color:#67e8f9;
+
           font-weight:950;
         }
 
@@ -1555,12 +1609,15 @@ export default function CompanyPricingPage() {
 
         .active-banner-wrap {
           width:min(900px, calc(100% - 32px));
+
           margin:30px auto 0;
         }
 
         .active-banner {
           display:flex;
+
           align-items:center;
+
           gap:15px;
 
           padding:17px 20px;
@@ -1596,16 +1653,19 @@ export default function CompanyPricingPage() {
 
           display:flex;
           flex-direction:column;
+
           gap:3px;
         }
 
         .active-content strong {
           color:#14532d;
+
           font-size:14px;
         }
 
         .active-content span {
           color:#166534;
+
           font-size:12px;
         }
 
@@ -1613,12 +1673,14 @@ export default function CompanyPricingPage() {
           flex:0 0 auto;
 
           border:0;
+
           background:transparent;
 
           color:#15803d;
 
           display:flex;
           align-items:center;
+
           gap:6px;
 
           font-size:12px;
@@ -1634,12 +1696,15 @@ export default function CompanyPricingPage() {
 
         .error-wrap {
           width:min(900px, calc(100% - 32px));
+
           margin:24px auto 0;
         }
 
         .error-box {
           display:flex;
+
           align-items:flex-start;
+
           gap:13px;
 
           padding:17px;
@@ -1674,42 +1739,56 @@ export default function CompanyPricingPage() {
 
         .error-box strong {
           display:block;
+
           font-size:13px;
         }
 
         .error-box p {
           margin:4px 0 0;
+
           font-size:12px;
+
           line-height:1.5;
         }
 
 
         /* ==================================================
-           PRICING SECTION
+           PRICING
         ================================================== */
 
         .pricing-section {
           width:100%;
-          padding:80px 16px 100px;
+
+          padding:
+            80px 16px
+            100px;
+
           background:#f6f9fd;
         }
 
         .pricing-container {
           width:100%;
+
           max-width:920px;
+
           margin:0 auto;
         }
 
         .section-heading {
           text-align:center;
+
           max-width:700px;
+
           margin:0 auto;
         }
 
         .section-kicker {
           color:#2563eb;
+
           font-size:10px;
+
           font-weight:950;
+
           letter-spacing:.12em;
         }
 
@@ -1730,11 +1809,13 @@ export default function CompanyPricingPage() {
 
         .section-heading p {
           max-width:620px;
+
           margin:17px auto 0;
 
           color:#64748b;
 
           font-size:14px;
+
           line-height:1.75;
         }
 
@@ -1745,7 +1826,9 @@ export default function CompanyPricingPage() {
 
         .billing-wrapper {
           display:flex;
+
           flex-direction:column;
+
           align-items:center;
 
           margin:35px 0 38px;
@@ -1782,6 +1865,7 @@ export default function CompanyPricingPage() {
           color:#64748b;
 
           font-size:12px;
+
           font-weight:900;
 
           cursor:pointer;
@@ -1791,6 +1875,7 @@ export default function CompanyPricingPage() {
 
         .billing-switch button.billing-active {
           background:#0f172a;
+
           color:white;
 
           box-shadow:
@@ -1810,6 +1895,7 @@ export default function CompanyPricingPage() {
           color:#15803d;
 
           font-size:8px;
+
           font-weight:950;
         }
 
@@ -1819,6 +1905,7 @@ export default function CompanyPricingPage() {
           color:#94a3b8;
 
           font-size:11px;
+
           font-weight:650;
         }
 
@@ -1829,9 +1916,11 @@ export default function CompanyPricingPage() {
 
         .plans-list {
           width:min(760px, 100%);
+
           margin:0 auto;
 
           display:flex;
+
           flex-direction:column;
 
           gap:24px;
@@ -1867,6 +1956,7 @@ export default function CompanyPricingPage() {
             border-color .25s ease;
 
           opacity:1;
+
           visibility:visible;
         }
 
@@ -1926,7 +2016,9 @@ export default function CompanyPricingPage() {
           z-index:5;
 
           display:flex;
+
           align-items:center;
+
           gap:5px;
 
           padding:7px 11px;
@@ -1943,6 +2035,7 @@ export default function CompanyPricingPage() {
           color:white;
 
           font-size:9px;
+
           font-weight:950;
 
           letter-spacing:.06em;
@@ -1959,6 +2052,7 @@ export default function CompanyPricingPage() {
 
         .plan-content {
           position:relative;
+
           z-index:2;
 
           padding:34px;
@@ -1969,7 +2063,9 @@ export default function CompanyPricingPage() {
           height:56px;
 
           display:flex;
+
           align-items:center;
+
           justify-content:center;
 
           margin-bottom:20px;
@@ -2000,6 +2096,7 @@ export default function CompanyPricingPage() {
           color:#2563eb;
 
           font-size:9px;
+
           font-weight:950;
 
           letter-spacing:.12em;
@@ -2019,48 +2116,97 @@ export default function CompanyPricingPage() {
           font-weight:950;
         }
 
+
         /* ==================================================
-           PREMIUM PLAN DESCRIPTION CARD
+           BLUE PREMIUM PLAN DESCRIPTION CARD
         ================================================== */
 
         .plan-description-card {
+          position:relative;
+
           width:100%;
 
-          margin-top:15px;
+          margin-top:16px;
 
-          padding:15px 16px;
+          padding:17px 18px;
 
-          border-radius:16px;
+          box-sizing:border-box;
+
+          border-radius:17px;
 
           background:
             linear-gradient(
               135deg,
-              #f8fbff 0%,
-              #eff6ff 100%
+              #2563eb 0%,
+              #1d4ed8 55%,
+              #1e40af 100%
             );
 
-          border:1px solid #dbeafe;
+          border:1px solid
+            rgba(96,165,250,.55);
 
           box-shadow:
-            0 8px 22px
-            rgba(37,99,235,.06);
+            0 12px 28px
+            rgba(37,99,235,.20);
 
-          box-sizing:border-box;
+          overflow:hidden;
+        }
+
+        .plan-description-card::before {
+          content:"";
+
+          position:absolute;
+
+          width:130px;
+          height:130px;
+
+          right:-60px;
+          top:-70px;
+
+          border-radius:50%;
+
+          background:
+            rgba(125,211,252,.16);
+
+          pointer-events:none;
+        }
+
+        .plan-description-card::after {
+          content:"";
+
+          position:absolute;
+
+          left:-35px;
+          bottom:-65px;
+
+          width:110px;
+          height:110px;
+
+          border-radius:50%;
+
+          background:
+            rgba(255,255,255,.06);
+
+          pointer-events:none;
         }
 
         .description-card-top {
+          position:relative;
+
+          z-index:2;
+
           display:flex;
 
           align-items:center;
 
-          gap:7px;
+          gap:8px;
 
-          margin-bottom:7px;
+          margin-bottom:8px;
         }
 
         .description-card-icon {
-          width:22px;
-          height:22px;
+          width:23px;
+          height:23px;
 
           flex:0 0 auto;
 
@@ -2072,17 +2218,21 @@ export default function CompanyPricingPage() {
 
           border-radius:7px;
 
-          background:#dbeafe;
+          background:
+            rgba(255,255,255,.16);
 
-          color:#2563eb;
+          color:#ffffff;
 
           font-size:10px;
 
           font-weight:950;
+
+          border:1px solid
+            rgba(255,255,255,.16);
         }
 
         .description-card-label {
-          color:#2563eb;
+          color:#bfdbfe;
 
           font-size:8px;
 
@@ -2090,13 +2240,17 @@ export default function CompanyPricingPage() {
 
           font-weight:950;
 
-          letter-spacing:.11em;
+          letter-spacing:.12em;
         }
 
         .plan-description {
+          position:relative;
+
+          z-index:2;
+
           margin:0;
 
-          color:#475569;
+          color:#ffffff;
 
           font-size:13px;
 
@@ -2116,8 +2270,11 @@ export default function CompanyPricingPage() {
 
         .price-line {
           display:flex;
+
           align-items:baseline;
+
           flex-wrap:wrap;
+
           gap:5px;
         }
 
@@ -2178,7 +2335,9 @@ export default function CompanyPricingPage() {
           margin-top:23px;
 
           display:flex;
+
           align-items:center;
+
           gap:9px;
 
           padding:14px 16px;
@@ -2203,7 +2362,9 @@ export default function CompanyPricingPage() {
           flex:0 0 auto;
 
           display:flex;
+
           align-items:center;
+
           justify-content:center;
 
           border-radius:7px;
@@ -2235,6 +2396,7 @@ export default function CompanyPricingPage() {
 
         .features {
           display:flex;
+
           flex-direction:column;
 
           gap:13px;
@@ -2252,6 +2414,7 @@ export default function CompanyPricingPage() {
 
         .feature-row {
           display:flex;
+
           align-items:center;
 
           gap:11px;
@@ -2270,7 +2433,9 @@ export default function CompanyPricingPage() {
           flex:0 0 auto;
 
           display:flex;
+
           align-items:center;
+
           justify-content:center;
 
           border-radius:50%;
@@ -2297,7 +2462,9 @@ export default function CompanyPricingPage() {
           border-radius:15px;
 
           display:flex;
+
           align-items:center;
+
           justify-content:center;
 
           gap:9px;
@@ -2313,6 +2480,7 @@ export default function CompanyPricingPage() {
 
         .plan-button:disabled {
           cursor:not-allowed;
+
           opacity:.7;
         }
 
@@ -2351,6 +2519,7 @@ export default function CompanyPricingPage() {
 
         .plan-button-secondary:hover {
           background:#eff6ff;
+
           border-color:#93c5fd;
         }
 
@@ -2378,7 +2547,9 @@ export default function CompanyPricingPage() {
           margin-top:13px;
 
           display:flex;
+
           align-items:center;
+
           justify-content:center;
 
           gap:6px;
@@ -2403,6 +2574,7 @@ export default function CompanyPricingPage() {
           padding:18px 20px;
 
           display:flex;
+
           align-items:center;
 
           gap:13px;
@@ -2421,7 +2593,9 @@ export default function CompanyPricingPage() {
           flex:0 0 auto;
 
           display:flex;
+
           align-items:center;
+
           justify-content:center;
 
           border-radius:12px;
@@ -2435,6 +2609,7 @@ export default function CompanyPricingPage() {
           flex:1;
 
           display:flex;
+
           flex-direction:column;
 
           gap:3px;
@@ -2442,11 +2617,13 @@ export default function CompanyPricingPage() {
 
         .payment-trust strong {
           font-size:12px;
+
           color:#0f172a;
         }
 
         .payment-trust span {
           color:#64748b;
+
           font-size:10px;
         }
 
@@ -2499,6 +2676,7 @@ export default function CompanyPricingPage() {
           margin-top:30px;
 
           display:flex;
+
           flex-direction:column;
 
           gap:14px;
@@ -2527,7 +2705,9 @@ export default function CompanyPricingPage() {
           flex:0 0 auto;
 
           display:flex;
+
           align-items:center;
+
           justify-content:center;
 
           border-radius:12px;
@@ -2614,6 +2794,7 @@ export default function CompanyPricingPage() {
 
         .value-content {
           position:relative;
+
           z-index:2;
 
           max-width:500px;
@@ -2653,11 +2834,13 @@ export default function CompanyPricingPage() {
 
         .value-points {
           position:relative;
+
           z-index:2;
 
           min-width:210px;
 
           display:flex;
+
           flex-direction:column;
 
           gap:13px;
@@ -2665,6 +2848,7 @@ export default function CompanyPricingPage() {
 
         .value-points div {
           display:flex;
+
           align-items:center;
 
           gap:12px;
@@ -2715,6 +2899,7 @@ export default function CompanyPricingPage() {
 
         .footer-brand {
           display:flex;
+
           align-items:center;
 
           gap:10px;
@@ -2722,6 +2907,7 @@ export default function CompanyPricingPage() {
 
         .footer-brand > div {
           display:flex;
+
           flex-direction:column;
 
           gap:3px;
@@ -2760,6 +2946,7 @@ export default function CompanyPricingPage() {
 
           .nav-links button {
             padding:8px 8px;
+
             font-size:11px;
           }
 
@@ -2779,12 +2966,15 @@ export default function CompanyPricingPage() {
 
           .hero-trust {
             flex-direction:column;
+
             align-items:center;
+
             gap:9px;
           }
 
           .active-banner {
             align-items:flex-start;
+
             flex-wrap:wrap;
           }
 
@@ -2799,7 +2989,8 @@ export default function CompanyPricingPage() {
           }
 
           .plan-content {
-            padding:27px 21px;
+            padding:
+              27px 21px;
           }
 
           .plan-content h2 {
@@ -2812,8 +3003,11 @@ export default function CompanyPricingPage() {
 
           .value-section {
             flex-direction:column;
+
             align-items:flex-start;
-            padding:27px 22px;
+
+            padding:
+              27px 22px;
           }
 
           .value-points {
@@ -2822,6 +3016,7 @@ export default function CompanyPricingPage() {
 
           .footer-inner {
             flex-direction:column;
+
             align-items:flex-start;
 
             padding:25px 0;
@@ -2848,6 +3043,7 @@ export default function CompanyPricingPage() {
           .brand-mark {
             width:34px;
             height:34px;
+
             border-radius:10px;
           }
 
@@ -2874,6 +3070,7 @@ export default function CompanyPricingPage() {
 
           .hero-content > p {
             font-size:13px;
+
             line-height:1.65;
           }
 
@@ -2905,6 +3102,7 @@ export default function CompanyPricingPage() {
 
           .billing-switch button {
             flex:1;
+
             padding:0 8px;
           }
 
@@ -2914,6 +3112,7 @@ export default function CompanyPricingPage() {
 
           .plans-list {
             width:100%;
+
             gap:18px;
           }
 
@@ -2928,6 +3127,7 @@ export default function CompanyPricingPage() {
 
           .popular-badge {
             top:16px;
+
             right:15px;
 
             font-size:7px;
@@ -2951,12 +3151,19 @@ export default function CompanyPricingPage() {
             padding-right:90px;
           }
 
+          /* BLUE DESCRIPTION CARD ON MOBILE */
+
           .plan-description-card {
             margin-top:14px;
 
-            padding:13px 14px;
+            padding:
+              14px 14px;
 
-            border-radius:14px;
+            border-radius:15px;
+
+            box-shadow:
+              0 10px 22px
+              rgba(37,99,235,.18);
           }
 
           .description-card-icon {
