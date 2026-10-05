@@ -45,14 +45,29 @@ function calculateMatch(internship, graduate) {
     };
   }
 
-  const qualificationRequired = normalizeText(internship.qualification);
-  const qualificationGraduate = normalizeText(graduate.qualification);
+  const qualificationRequired = normalizeText(
+    internship.qualification
+  );
 
-  const fieldRequired = normalizeText(internship.field_of_study);
-  const fieldGraduate = normalizeText(graduate.field_of_study);
+  const qualificationGraduate = normalizeText(
+    graduate.qualification
+  );
 
-  const requiredSkills = splitSkills(internship.skills).map(normalizeText);
-  const graduateSkills = splitSkills(graduate.skills).map(normalizeText);
+  const fieldRequired = normalizeText(
+    internship.field_of_study
+  );
+
+  const fieldGraduate = normalizeText(
+    graduate.field_of_study
+  );
+
+  const requiredSkills = splitSkills(
+    internship.skills
+  ).map(normalizeText);
+
+  const graduateSkills = splitSkills(
+    graduate.skills
+  ).map(normalizeText);
 
   let qualificationScore = 0;
   let fieldScore = 0;
@@ -62,8 +77,12 @@ function calculateMatch(internship, graduate) {
     qualificationRequired &&
     qualificationGraduate &&
     (
-      qualificationGraduate.includes(qualificationRequired) ||
-      qualificationRequired.includes(qualificationGraduate)
+      qualificationGraduate.includes(
+        qualificationRequired
+      ) ||
+      qualificationRequired.includes(
+        qualificationGraduate
+      )
     )
   ) {
     qualificationScore = 35;
@@ -96,13 +115,17 @@ function calculateMatch(internship, graduate) {
     });
 
     skillsScore = Math.round(
-      (matchedSkills.length / requiredSkills.length) * 30
+      (matchedSkills.length /
+        requiredSkills.length) *
+        30
     );
   }
 
   const score = Math.min(
     100,
-    qualificationScore + fieldScore + skillsScore
+    qualificationScore +
+      fieldScore +
+      skillsScore
   );
 
   let label = "Weak";
@@ -146,22 +169,12 @@ function cleanStoragePath(documentPath) {
   try {
     filePath = decodeURIComponent(filePath);
   } catch (error) {
-    console.log("Document decode warning:", error);
+    console.log(
+      "Document decode warning:",
+      error
+    );
   }
 
-  /*
-   * If this is already a normal storage path such as:
-   *
-   * cv/123/example.pdf
-   *
-   * or:
-   *
-   * qualifications/123/example.pdf
-   *
-   * keep it.
-   */
-
-  // Supabase storage URL
   if (
     filePath.startsWith("http://") ||
     filePath.startsWith("https://")
@@ -170,14 +183,6 @@ function cleanStoragePath(documentPath) {
       const parsedUrl = new URL(filePath);
 
       const pathname = parsedUrl.pathname;
-
-      /*
-       * Examples:
-       *
-       * /storage/v1/object/sign/documents/cv/file.pdf
-       * /storage/v1/object/public/documents/cv/file.pdf
-       * /storage/v1/object/authenticated/documents/cv/file.pdf
-       */
 
       const storageMatch = pathname.match(
         /\/storage\/v1\/object\/(?:sign|public|authenticated)\/(.+)$/i
@@ -193,20 +198,22 @@ function cleanStoragePath(documentPath) {
         if (documentsMatch?.[1]) {
           filePath = documentsMatch[1];
         } else {
-          /*
-           * If this is not a Supabase storage URL, return the
-           * original URL. The caller can open it directly.
-           */
           return filePath;
         }
       }
     } catch (error) {
-      console.log("URL parsing warning:", error);
+      console.log(
+        "URL parsing warning:",
+        error
+      );
     }
   }
 
   filePath = filePath.replace(/^\/+/, "");
-  filePath = filePath.replace(/^documents\//i, "");
+  filePath = filePath.replace(
+    /^documents\//i,
+    ""
+  );
 
   filePath = filePath.split("?")[0];
   filePath = filePath.split("#")[0];
@@ -218,7 +225,11 @@ function cleanStoragePath(documentPath) {
 // DOCUMENT VALUE COLLECTION
 // ============================================================
 
-function getDocumentValues(application, graduate, type) {
+function getDocumentValues(
+  application,
+  graduate,
+  type
+) {
   const values = [];
 
   if (type === "cv") {
@@ -229,21 +240,34 @@ function getDocumentValues(application, graduate, type) {
   }
 
   if (type === "qualification") {
-    values.push(application?.qualification_url);
-    values.push(application?.qualification_path);
+    values.push(
+      application?.qualification_url
+    );
+    values.push(
+      application?.qualification_path
+    );
     values.push(graduate?.qualification_url);
     values.push(graduate?.qualification_path);
   }
 
-  return [...new Set(values.filter(Boolean))];
+  return [
+    ...new Set(
+      values.filter(Boolean)
+    ),
+  ];
 }
 
 // ============================================================
 // OPEN DOCUMENT
 // ============================================================
 
-async function openStorageDocument(documentValues, label = "Document") {
-  const values = Array.isArray(documentValues)
+async function openStorageDocument(
+  documentValues,
+  label = "Document"
+) {
+  const values = Array.isArray(
+    documentValues
+  )
     ? documentValues
     : [documentValues];
 
@@ -256,19 +280,13 @@ async function openStorageDocument(documentValues, label = "Document") {
 
     if (!value) continue;
 
-    /*
-     * Keep external URLs as direct candidates.
-     */
     if (
       value.startsWith("http://") ||
       value.startsWith("https://")
     ) {
-      const cleaned = cleanStoragePath(value);
+      const cleaned =
+        cleanStoragePath(value);
 
-      /*
-       * If cleanStoragePath returned a storage path, use that.
-       * Otherwise keep the original external URL.
-       */
       if (
         cleaned &&
         !cleaned.startsWith("http://") &&
@@ -288,7 +306,8 @@ async function openStorageDocument(documentValues, label = "Document") {
       continue;
     }
 
-    const cleaned = cleanStoragePath(value);
+    const cleaned =
+      cleanStoragePath(value);
 
     if (cleaned) {
       cleanedCandidates.push({
@@ -311,36 +330,40 @@ async function openStorageDocument(documentValues, label = "Document") {
   }
 
   if (uniqueCandidates.length === 0) {
-    alert(`No ${label} was uploaded for this application.`);
+    alert(
+      `No ${label} was uploaded for this application.`
+    );
     return;
   }
 
   let lastError = null;
 
   try {
-    /*
-     * IMPORTANT:
-     *
-     * We do NOT use window.open() here.
-     *
-     * The old code opened a blank tab and then waited for Supabase.
-     * That can cause problems on iPhone/Safari.
-     *
-     * We first obtain the secure URL and then navigate directly.
-     */
-
     for (const candidate of uniqueCandidates) {
       if (candidate.type === "external") {
-        window.location.assign(candidate.value);
+        window.location.assign(
+          candidate.value
+        );
         return;
       }
 
-      const { data, error } = await supabase.storage
+      const {
+        data,
+        error,
+      } = await supabase.storage
         .from("documents")
-        .createSignedUrl(candidate.value, 3600);
+        .createSignedUrl(
+          candidate.value,
+          3600
+        );
 
-      if (!error && data?.signedUrl) {
-        window.location.assign(data.signedUrl);
+      if (
+        !error &&
+        data?.signedUrl
+      ) {
+        window.location.assign(
+          data.signedUrl
+        );
         return;
       }
 
@@ -367,7 +390,8 @@ async function openStorageDocument(documentValues, label = "Document") {
 
     alert(
       `Could not open the ${label}.\n\n${
-        error?.message || "Unknown error."
+        error?.message ||
+        "Unknown error."
       }`
     );
   }
@@ -380,10 +404,17 @@ async function openStorageDocument(documentValues, label = "Document") {
 function getStatusLabel(status) {
   const value = normalizeText(status);
 
-  if (value === "shortlisted") return "Shortlisted";
-  if (value === "rejected") return "Rejected";
-  if (value === "reviewed") return "Reviewed";
-  if (value === "hired") return "Hired";
+  if (value === "shortlisted")
+    return "Shortlisted";
+
+  if (value === "rejected")
+    return "Rejected";
+
+  if (value === "reviewed")
+    return "Reviewed";
+
+  if (value === "hired")
+    return "Hired";
 
   return "Applied";
 }
@@ -391,10 +422,17 @@ function getStatusLabel(status) {
 function getStatusClass(status) {
   const value = normalizeText(status);
 
-  if (value === "shortlisted") return "shortlisted";
-  if (value === "rejected") return "rejected";
-  if (value === "reviewed") return "reviewed";
-  if (value === "hired") return "hired";
+  if (value === "shortlisted")
+    return "shortlisted";
+
+  if (value === "rejected")
+    return "rejected";
+
+  if (value === "reviewed")
+    return "reviewed";
+
+  if (value === "hired")
+    return "hired";
 
   return "applied";
 }
@@ -409,23 +447,50 @@ export default function ApplicantsPage() {
 
   const internshipId = params?.id;
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState("");
-  const [openingDocument, setOpeningDocument] = useState("");
+  const [loading, setLoading] =
+    useState(true);
 
-  const [user, setUser] = useState(null);
-  const [company, setCompany] = useState(null);
-  const [internship, setInternship] = useState(null);
-  const [applications, setApplications] = useState([]);
+  const [saving, setSaving] =
+    useState("");
 
-  const [subscription, setSubscription] = useState(null);
-  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  const [
+    openingDocument,
+    setOpeningDocument,
+  ] = useState("");
 
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [sortBy, setSortBy] = useState("match");
+  const [user, setUser] =
+    useState(null);
 
-  const [error, setError] = useState("");
+  const [company, setCompany] =
+    useState(null);
+
+  const [internship, setInternship] =
+    useState(null);
+
+  const [applications, setApplications] =
+    useState([]);
+
+  const [subscription, setSubscription] =
+    useState(null);
+
+  const [
+    subscriptionLoading,
+    setSubscriptionLoading,
+  ] = useState(true);
+
+  const [search, setSearch] =
+    useState("");
+
+  const [
+    statusFilter,
+    setStatusFilter,
+  ] = useState("all");
+
+  const [sortBy, setSortBy] =
+    useState("match");
+
+  const [error, setError] =
+    useState("");
 
   // ==========================================================
   // LOAD PAGE
@@ -440,9 +505,12 @@ export default function ApplicantsPage() {
         setError("");
 
         const {
-          data: { user: currentUser },
+          data: {
+            user: currentUser,
+          },
           error: userError,
-        } = await supabase.auth.getUser();
+        } =
+          await supabase.auth.getUser();
 
         if (userError) {
           throw userError;
@@ -463,12 +531,14 @@ export default function ApplicantsPage() {
         // COMPANY
         // ------------------------------------------------------
 
-        const { data: companyData, error: companyError } =
-          await supabase
-            .from("companies")
-            .select("*")
-            .eq("id", currentUser.id)
-            .maybeSingle();
+        const {
+          data: companyData,
+          error: companyError,
+        } = await supabase
+          .from("companies")
+          .select("*")
+          .eq("id", currentUser.id)
+          .maybeSingle();
 
         if (companyError) {
           console.log(
@@ -478,14 +548,19 @@ export default function ApplicantsPage() {
         }
 
         if (mounted) {
-          setCompany(companyData || null);
+          setCompany(
+            companyData || null
+          );
         }
 
         // ------------------------------------------------------
         // INTERNSHIP
         // ------------------------------------------------------
 
-        const { data: internshipData, error: internshipError } =
+        const {
+          data: internshipData,
+          error: internshipError,
+        } =
           await supabase
             .from("internships")
             .select("*")
@@ -502,23 +577,18 @@ export default function ApplicantsPage() {
           );
         }
 
-        /*
-         * Verify that this internship belongs to the logged-in
-         * company.
-         *
-         * Existing GradLink internships use company_name, so
-         * keep that compatibility here.
-         */
-
         const companyName =
           companyData?.company_name ||
-          currentUser.user_metadata?.company_name ||
+          currentUser.user_metadata
+            ?.company_name ||
           "";
 
         if (
           companyName &&
           internshipData.company_name &&
-          normalizeText(internshipData.company_name) !==
+          normalizeText(
+            internshipData.company_name
+          ) !==
             normalizeText(companyName)
         ) {
           throw new Error(
@@ -527,18 +597,26 @@ export default function ApplicantsPage() {
         }
 
         if (mounted) {
-          setInternship(internshipData);
+          setInternship(
+            internshipData
+          );
         }
 
         // ------------------------------------------------------
         // APPLICATIONS
         // ------------------------------------------------------
 
-        const { data: applicationData, error: applicationError } =
+        const {
+          data: applicationData,
+          error: applicationError,
+        } =
           await supabase
             .from("applications")
             .select("*")
-            .eq("internship_id", internshipId)
+            .eq(
+              "internship_id",
+              internshipId
+            )
             .order("created_at", {
               ascending: false,
             });
@@ -547,7 +625,8 @@ export default function ApplicantsPage() {
           throw applicationError;
         }
 
-        const applicationRows = applicationData || [];
+        const applicationRows =
+          applicationData || [];
 
         // ------------------------------------------------------
         // GRADUATES
@@ -556,19 +635,30 @@ export default function ApplicantsPage() {
         const graduateIds = [
           ...new Set(
             applicationRows
-              .map((application) => application.graduate_id)
+              .map(
+                (application) =>
+                  application.graduate_id
+              )
               .filter(Boolean)
           ),
         ];
 
         let graduateRows = [];
 
-        if (graduateIds.length > 0) {
-          const { data: graduatesData, error: graduatesError } =
+        if (
+          graduateIds.length > 0
+        ) {
+          const {
+            data: graduatesData,
+            error: graduatesError,
+          } =
             await supabase
               .from("graduates")
               .select("*")
-              .in("id", graduateIds);
+              .in(
+                "id",
+                graduateIds
+              );
 
           if (graduatesError) {
             console.log(
@@ -576,54 +666,74 @@ export default function ApplicantsPage() {
               graduatesError
             );
           } else {
-            graduateRows = graduatesData || [];
+            graduateRows =
+              graduatesData || [];
           }
         }
 
-        const graduateMap = new Map(
-          graduateRows.map((graduate) => [
-            String(graduate.id),
-            graduate,
-          ])
-        );
+        const graduateMap =
+          new Map(
+            graduateRows.map(
+              (graduate) => [
+                String(
+                  graduate.id
+                ),
+                graduate,
+              ]
+            )
+          );
 
         // ------------------------------------------------------
-        // COMBINE APPLICATION + GRADUATE DATA
+        // COMBINE APPLICATION + GRADUATE
         // ------------------------------------------------------
 
-        const combinedApplications = applicationRows.map(
-          (application) => {
-            const graduate =
-              graduateMap.get(
-                String(application.graduate_id)
-              ) || {};
+        const combinedApplications =
+          applicationRows.map(
+            (application) => {
+              const graduate =
+                graduateMap.get(
+                  String(
+                    application.graduate_id
+                  )
+                ) || {};
 
-            const match = calculateMatch(
-              internshipData,
-              graduate
-            );
+              const match =
+                calculateMatch(
+                  internshipData,
+                  graduate
+                );
 
-            return {
-              ...application,
-              graduate,
-              match,
-            };
-          }
-        );
+              return {
+                ...application,
+                graduate,
+                match,
+              };
+            }
+          );
 
         if (mounted) {
-          setApplications(combinedApplications);
+          setApplications(
+            combinedApplications
+          );
         }
 
         // ------------------------------------------------------
         // COMPANY SUBSCRIPTION
         // ------------------------------------------------------
 
-        const { data: subscriptionData, error: subscriptionError } =
+        const {
+          data: subscriptionData,
+          error: subscriptionError,
+        } =
           await supabase
-            .from("company_subscriptions")
+            .from(
+              "company_subscriptions"
+            )
             .select("*")
-            .eq("company_id", currentUser.id)
+            .eq(
+              "company_id",
+              currentUser.id
+            )
             .order("created_at", {
               ascending: false,
             })
@@ -638,7 +748,9 @@ export default function ApplicantsPage() {
         }
 
         if (mounted) {
-          setSubscription(subscriptionData || null);
+          setSubscription(
+            subscriptionData || null
+          );
         }
       } catch (pageError) {
         console.error(
@@ -655,7 +767,9 @@ export default function ApplicantsPage() {
       } finally {
         if (mounted) {
           setLoading(false);
-          setSubscriptionLoading(false);
+          setSubscriptionLoading(
+            false
+          );
         }
       }
     }
@@ -696,19 +810,24 @@ export default function ApplicantsPage() {
   // SUBSCRIPTION STATUS
   // ==========================================================
 
-  const subscriptionStatus = normalizeText(
-    subscription?.status
-  );
+  const subscriptionStatus =
+    normalizeText(
+      subscription?.status
+    );
 
   const hasActiveSubscription =
     subscriptionStatus === "active";
 
   const planName =
     subscription?.plan
-      ? String(subscription.plan)
+      ? String(
+          subscription.plan
+        )
           .replace(/_/g, " ")
-          .replace(/\b\w/g, (letter) =>
-            letter.toUpperCase()
+          .replace(
+            /\b\w/g,
+            (letter) =>
+              letter.toUpperCase()
           )
       : "No active plan";
 
@@ -716,117 +835,148 @@ export default function ApplicantsPage() {
   // FILTERED APPLICATIONS
   // ==========================================================
 
-  const filteredApplications = useMemo(() => {
-    let rows = [...applications];
+  const filteredApplications =
+    useMemo(() => {
+      let rows = [
+        ...applications,
+      ];
 
-    const searchValue = normalizeText(search);
+      const searchValue =
+        normalizeText(search);
 
-    if (searchValue) {
-      rows = rows.filter((application) => {
-        const graduate = application.graduate || {};
+      if (searchValue) {
+        rows = rows.filter(
+          (application) => {
+            const graduate =
+              application.graduate ||
+              {};
 
-        const searchable = [
-          graduate.full_name,
-          graduate.email,
-          graduate.phone,
-          graduate.qualification,
-          graduate.field_of_study,
-          graduate.institution,
-          graduate.province,
-          graduate.career_goals,
-          graduate.skills,
-          application.status,
-        ]
-          .map(normalizeText)
-          .join(" ");
+            const searchable = [
+              graduate.full_name,
+              graduate.email,
+              graduate.phone,
+              graduate.qualification,
+              graduate.field_of_study,
+              graduate.institution,
+              graduate.province,
+              graduate.career_goals,
+              graduate.skills,
+              application.status,
+            ]
+              .map(normalizeText)
+              .join(" ");
 
-        return searchable.includes(searchValue);
-      });
-    }
+            return searchable.includes(
+              searchValue
+            );
+          }
+        );
+      }
 
-    if (statusFilter !== "all") {
-      rows = rows.filter(
-        (application) =>
-          normalizeText(application.status) ===
-          normalizeText(statusFilter)
-      );
-    }
+      if (
+        statusFilter !== "all"
+      ) {
+        rows = rows.filter(
+          (application) =>
+            normalizeText(
+              application.status
+            ) ===
+            normalizeText(
+              statusFilter
+            )
+        );
+      }
 
-    if (sortBy === "match") {
-      rows.sort(
-        (a, b) =>
-          (b.match?.score || 0) -
-          (a.match?.score || 0)
-      );
-    }
+      if (sortBy === "match") {
+        rows.sort(
+          (a, b) =>
+            (b.match?.score ||
+              0) -
+            (a.match?.score ||
+              0)
+        );
+      }
 
-    if (sortBy === "newest") {
-      rows.sort(
-        (a, b) =>
-          new Date(b.created_at || 0).getTime() -
-          new Date(a.created_at || 0).getTime()
-      );
-    }
+      if (sortBy === "newest") {
+        rows.sort(
+          (a, b) =>
+            new Date(
+              b.created_at || 0
+            ).getTime() -
+            new Date(
+              a.created_at || 0
+            ).getTime()
+        );
+      }
 
-    if (sortBy === "name") {
-      rows.sort((a, b) =>
-        String(
-          a.graduate?.full_name || ""
-        ).localeCompare(
+      if (sortBy === "name") {
+        rows.sort((a, b) =>
           String(
-            b.graduate?.full_name || ""
+            a.graduate
+              ?.full_name || ""
+          ).localeCompare(
+            String(
+              b.graduate
+                ?.full_name || ""
+            )
           )
-        )
-      );
-    }
+        );
+      }
 
-    return rows;
-  }, [
-    applications,
-    search,
-    statusFilter,
-    sortBy,
-  ]);
+      return rows;
+    }, [
+      applications,
+      search,
+      statusFilter,
+      sortBy,
+    ]);
 
   // ==========================================================
   // COUNTS
   // ==========================================================
 
-  const totalApplications = applications.length;
+  const totalApplications =
+    applications.length;
 
-  const shortlistedCount = applications.filter(
-    (application) =>
-      normalizeText(application.status) ===
-      "shortlisted"
-  ).length;
+  const shortlistedCount =
+    applications.filter(
+      (application) =>
+        normalizeText(
+          application.status
+        ) === "shortlisted"
+    ).length;
 
-  const reviewedCount = applications.filter(
-    (application) =>
-      normalizeText(application.status) ===
-      "reviewed"
-  ).length;
+  const reviewedCount =
+    applications.filter(
+      (application) =>
+        normalizeText(
+          application.status
+        ) === "reviewed"
+    ).length;
 
-  const strongMatches = applications.filter(
-    (application) =>
-      (application.match?.score || 0) >= 85
-  ).length;
+  const strongMatches =
+    applications.filter(
+      (application) =>
+        (application.match?.score ||
+          0) >= 85
+    ).length;
 
   // ==========================================================
-  // PART 2 STARTS HERE
-  // ================================================
-  
-    // ==========================================================
   // DOCUMENT HANDLERS
   // ==========================================================
 
-  async function handleCV(application) {
-    const graduate = application?.graduate || {};
+  async function handleCV(
+    application
+  ) {
+    const graduate =
+      application?.graduate || {};
 
-    const values = getDocumentValues(
-      application,
-      graduate,
-      "cv"
-    );
+    const values =
+      getDocumentValues(
+        application,
+        graduate,
+        "cv"
+      );
 
     setOpeningDocument(
       `cv-${application?.id || "document"}`
@@ -842,14 +992,18 @@ export default function ApplicantsPage() {
     }
   }
 
-  async function handleQualification(application) {
-    const graduate = application?.graduate || {};
+  async function handleQualification(
+    application
+  ) {
+    const graduate =
+      application?.graduate || {};
 
-    const values = getDocumentValues(
-      application,
-      graduate,
-      "qualification"
-    );
+    const values =
+      getDocumentValues(
+        application,
+        graduate,
+        "qualification"
+      );
 
     setOpeningDocument(
       `qualification-${application?.id || "document"}`
@@ -880,28 +1034,38 @@ export default function ApplicantsPage() {
     );
 
     try {
-      const { error: updateError } =
-        await supabase
-          .from("applications")
-          .update({
-            status,
-          })
-          .eq("id", applicationId);
+      const {
+        error: updateError,
+      } = await supabase
+        .from("applications")
+        .update({
+          status,
+        })
+        .eq(
+          "id",
+          applicationId
+        );
 
       if (updateError) {
         throw updateError;
       }
 
-      setApplications((current) =>
-        current.map((application) =>
-          String(application.id) ===
-          String(applicationId)
-            ? {
-                ...application,
-                status,
-              }
-            : application
-        )
+      setApplications(
+        (current) =>
+          current.map(
+            (application) =>
+              String(
+                application.id
+              ) ===
+              String(
+                applicationId
+              )
+                ? {
+                    ...application,
+                    status,
+                  }
+                : application
+          )
       );
     } catch (updateError) {
       console.error(
@@ -933,10 +1097,13 @@ export default function ApplicantsPage() {
 
             <div className="spinner" />
 
-            <h2>Loading applicants</h2>
+            <h2>
+              Loading applicants
+            </h2>
 
             <p>
-              Preparing your applicant dashboard...
+              Preparing your applicant
+              dashboard...
             </p>
           </div>
         </div>
@@ -989,12 +1156,23 @@ export default function ApplicantsPage() {
             width: 100%;
             max-width: 430px;
             text-align: center;
-            background: rgba(255, 255, 255, 0.96);
+            background: rgba(
+              255,
+              255,
+              255,
+              0.96
+            );
             border: 1px solid #e1eaf5;
             border-radius: 24px;
             padding: 42px 26px;
             box-shadow:
-              0 24px 70px rgba(15, 35, 63, 0.1);
+              0 24px 70px
+                rgba(
+                  15,
+                  35,
+                  63,
+                  0.1
+                );
           }
 
           .loading-logo {
@@ -1015,7 +1193,13 @@ export default function ApplicantsPage() {
             font-weight: 900;
             letter-spacing: -1px;
             box-shadow:
-              0 12px 28px rgba(7, 89, 216, 0.24);
+              0 12px 28px
+                rgba(
+                  7,
+                  89,
+                  216,
+                  0.24
+                );
           }
 
           .spinner {
@@ -1025,12 +1209,15 @@ export default function ApplicantsPage() {
             border: 3px solid #dce8f7;
             border-top-color: #0969e8;
             border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+            animation:
+              spin 0.8s linear infinite;
           }
 
           @keyframes spin {
             to {
-              transform: rotate(360deg);
+              transform: rotate(
+                360deg
+              );
             }
           }
 
@@ -1063,7 +1250,9 @@ export default function ApplicantsPage() {
               !
             </div>
 
-            <h2>We couldn't load this page</h2>
+            <h2>
+              We couldn't load this page
+            </h2>
 
             <p>{error}</p>
 
@@ -1071,7 +1260,9 @@ export default function ApplicantsPage() {
               <button
                 type="button"
                 className="primary-button"
-                onClick={() => window.location.reload()}
+                onClick={() =>
+                  window.location.reload()
+                }
               >
                 Try Again
               </button>
@@ -1124,7 +1315,13 @@ export default function ApplicantsPage() {
             border: 1px solid #e3ebf5;
             border-radius: 24px;
             box-shadow:
-              0 24px 70px rgba(15, 35, 63, 0.1);
+              0 24px 70px
+                rgba(
+                  15,
+                  35,
+                  63,
+                  0.1
+                );
           }
 
           .error-icon {
@@ -1215,8 +1412,13 @@ export default function ApplicantsPage() {
               </span>
 
               <span className="brand-text">
-                <strong>GradLink</strong>
-                <small>Company Portal</small>
+                <strong>
+                  GradLink
+                </strong>
+
+                <small>
+                  Company Portal
+                </small>
               </span>
             </Link>
 
@@ -1271,9 +1473,10 @@ export default function ApplicantsPage() {
               </h1>
 
               <p>
-                Review candidates, compare match scores,
-                access submitted documents and manage
-                application statuses from one place.
+                Review candidates, compare
+                match scores, access submitted
+                documents and manage application
+                statuses from one place.
               </p>
 
               <div className="hero-meta">
@@ -1295,7 +1498,9 @@ export default function ApplicantsPage() {
                     📅 Deadline{" "}
                     {new Date(
                       internship.deadline
-                    ).toLocaleDateString("en-ZA")}
+                    ).toLocaleDateString(
+                      "en-ZA"
+                    )}
                   </span>
                 )}
               </div>
@@ -1303,8 +1508,13 @@ export default function ApplicantsPage() {
 
             <div className="hero-actions">
 
+              {/* =================================================
+                  FIXED INTERNSHIP BUTTON
+                  NOW GOES TO /internships
+              ================================================= */}
+
               <Link
-                href={`/company/internships/${internshipId}`}
+                href="/internships"
                 className="hero-secondary"
               >
                 ← Internship
@@ -1356,6 +1566,7 @@ export default function ApplicantsPage() {
                 }
               >
                 <span className="status-dot" />
+
                 {hasActiveSubscription
                   ? "Active"
                   : "Inactive"}
@@ -1368,6 +1579,7 @@ export default function ApplicantsPage() {
                 {hasActiveSubscription
                   ? "View Plans"
                   : "Choose a Plan"}
+
                 <span>→</span>
               </Link>
             </div>
@@ -1385,7 +1597,10 @@ export default function ApplicantsPage() {
               </div>
 
               <div>
-                <span>Total Applicants</span>
+                <span>
+                  Total Applicants
+                </span>
+
                 <strong>
                   {totalApplications}
                 </strong>
@@ -1398,7 +1613,10 @@ export default function ApplicantsPage() {
               </div>
 
               <div>
-                <span>Strong Matches</span>
+                <span>
+                  Strong Matches
+                </span>
+
                 <strong>
                   {strongMatches}
                 </strong>
@@ -1411,7 +1629,10 @@ export default function ApplicantsPage() {
               </div>
 
               <div>
-                <span>Shortlisted</span>
+                <span>
+                  Shortlisted
+                </span>
+
                 <strong>
                   {shortlistedCount}
                 </strong>
@@ -1424,7 +1645,10 @@ export default function ApplicantsPage() {
               </div>
 
               <div>
-                <span>Reviewed</span>
+                <span>
+                  Reviewed
+                </span>
+
                 <strong>
                   {reviewedCount}
                 </strong>
@@ -1444,9 +1668,12 @@ export default function ApplicantsPage() {
             </div>
 
             <div className="premium-copy">
+
               <div className="premium-title">
                 Smart applicant matching
-                <span>PRO</span>
+                <span>
+                  PRO
+                </span>
               </div>
 
               <p>
@@ -1477,14 +1704,18 @@ export default function ApplicantsPage() {
 
             <div className="toolbar-heading">
               <div>
-                <h2>Candidate applications</h2>
+                <h2>
+                  Candidate applications
+                </h2>
 
                 <p>
                   {filteredApplications.length}{" "}
                   candidate
-                  {filteredApplications.length === 1
+                  {filteredApplications.length ===
+                  1
                     ? ""
-                    : "s"} shown
+                    : "s"}{" "}
+                  shown
                 </p>
               </div>
             </div>
@@ -1498,7 +1729,9 @@ export default function ApplicantsPage() {
                   type="text"
                   value={search}
                   onChange={(event) =>
-                    setSearch(event.target.value)
+                    setSearch(
+                      event.target.value
+                    )
                   }
                   placeholder="Search applicants..."
                 />
@@ -1507,7 +1740,9 @@ export default function ApplicantsPage() {
               <select
                 value={statusFilter}
                 onChange={(event) =>
-                  setStatusFilter(event.target.value)
+                  setStatusFilter(
+                    event.target.value
+                  )
                 }
                 className="filter-select"
               >
@@ -1539,7 +1774,9 @@ export default function ApplicantsPage() {
               <select
                 value={sortBy}
                 onChange={(event) =>
-                  setSortBy(event.target.value)
+                  setSortBy(
+                    event.target.value
+                  )
                 }
                 className="filter-select"
               >
@@ -1565,7 +1802,8 @@ export default function ApplicantsPage() {
 
           <section className="applicants-section">
 
-            {filteredApplications.length === 0 ? (
+            {filteredApplications.length ===
+            0 ? (
               <div className="empty-state">
 
                 <div className="empty-icon">
@@ -1577,19 +1815,23 @@ export default function ApplicantsPage() {
                 </h3>
 
                 <p>
-                  {applications.length === 0
+                  {applications.length ===
+                  0
                     ? "There are currently no applications for this internship."
                     : "Try changing your search or filter."}
                 </p>
 
                 {search ||
-                statusFilter !== "all" ? (
+                statusFilter !==
+                  "all" ? (
                   <button
                     type="button"
                     className="clear-button"
                     onClick={() => {
                       setSearch("");
-                      setStatusFilter("all");
+                      setStatusFilter(
+                        "all"
+                      );
                     }}
                   >
                     Clear filters
@@ -1601,19 +1843,26 @@ export default function ApplicantsPage() {
               <div className="applicant-list">
 
                 {filteredApplications.map(
-                  (application, index) => {
+                  (
+                    application,
+                    index
+                  ) => {
 
                     const graduate =
-                      application.graduate || {};
+                      application.graduate ||
+                      {};
 
                     const match =
-                      application.match || {};
+                      application.match ||
+                      {};
 
                     const score =
                       match.score || 0;
 
                     const matchClass =
-                      getMatchClass(score);
+                      getMatchClass(
+                        score
+                      );
 
                     const status =
                       application.status ||
@@ -1632,7 +1881,8 @@ export default function ApplicantsPage() {
                           (name) =>
                             name[0]?.toUpperCase()
                         )
-                        .join("") || "A";
+                        .join("") ||
+                      "A";
 
                     const cvOpening =
                       openingDocument ===
@@ -1657,7 +1907,9 @@ export default function ApplicantsPage() {
                     return (
                       <article
                         className="applicant-card"
-                        key={application.id}
+                        key={
+                          application.id
+                        }
                       >
 
                         {/* CARD HEADER */}
@@ -1674,7 +1926,9 @@ export default function ApplicantsPage() {
 
                               <div className="candidate-name-row">
                                 <h3>
-                                  {candidateName}
+                                  {
+                                    candidateName
+                                  }
                                 </h3>
 
                                 <span
@@ -1698,14 +1952,18 @@ export default function ApplicantsPage() {
                                 {graduate.phone && (
                                   <span>
                                     ☎{" "}
-                                    {graduate.phone}
+                                    {
+                                      graduate.phone
+                                    }
                                   </span>
                                 )}
 
                                 {graduate.province && (
                                   <span>
                                     📍{" "}
-                                    {graduate.province}
+                                    {
+                                      graduate.province
+                                    }
                                   </span>
                                 )}
 
@@ -1793,13 +2051,20 @@ export default function ApplicantsPage() {
                                 ? splitSkills(
                                     graduate.skills
                                   )
-                                    .slice(0, 4)
-                                    .join(", ")
+                                    .slice(
+                                      0,
+                                      4
+                                    )
+                                    .join(
+                                      ", "
+                                    )
                                 : "Not provided"}
                             </strong>
 
-                            {match.matchedSkills
-                              ?.length > 0 && (
+                            {match
+                              .matchedSkills
+                              ?.length >
+                              0 && (
                               <em>
                                 {
                                   match
@@ -1966,7 +2231,8 @@ export default function ApplicantsPage() {
                                 )
                               }
                               disabled={
-                                saving !== ""
+                                saving !==
+                                ""
                               }
                             >
                               {shortlistSaving
@@ -1984,7 +2250,8 @@ export default function ApplicantsPage() {
                                 )
                               }
                               disabled={
-                                saving !== ""
+                                saving !==
+                                ""
                               }
                             >
                               {rejectSaving
@@ -1994,7 +2261,8 @@ export default function ApplicantsPage() {
 
                             {normalizeText(
                               status
-                            ) !== "applied" && (
+                            ) !==
+                              "applied" && (
                               <button
                                 type="button"
                                 className="reset-button"
@@ -2005,7 +2273,8 @@ export default function ApplicantsPage() {
                                   )
                                 }
                                 disabled={
-                                  saving !== ""
+                                  saving !==
+                                  ""
                                 }
                               >
                                 {resetSaving
@@ -2020,6 +2289,7 @@ export default function ApplicantsPage() {
                         {/* APPLICATION DATE */}
 
                         <div className="application-footer">
+
                           <span>
                             Application #
                             {index + 1}
@@ -2040,6 +2310,7 @@ export default function ApplicantsPage() {
                               )}
                             </span>
                           )}
+
                         </div>
 
                       </article>
@@ -2060,21 +2331,26 @@ export default function ApplicantsPage() {
 
         <footer className="page-footer">
           <div>
-            <strong>GradLink SA</strong>
+            <strong>
+              GradLink SA
+            </strong>
+
             <span>
-              Connecting South African graduates
-              with opportunity.
+              Connecting South African
+              graduates with opportunity.
             </span>
           </div>
 
           <span>
-            © {new Date().getFullYear()} GradLink SA
+            ©{" "}
+            {new Date().getFullYear()}{" "}
+            GradLink SA
           </span>
         </footer>
 
       </div>
-
-      {/* ======================================================
+      
+            {/* ======================================================
           STYLES
       ====================================================== */}
 
@@ -2127,7 +2403,12 @@ export default function ApplicantsPage() {
           background:
             radial-gradient(
               circle at 85% 0%,
-              rgba(30, 117, 236, 0.07),
+              rgba(
+                30,
+                117,
+                236,
+                0.07
+              ),
               transparent 26%
             ),
             #f4f7fb;
@@ -2302,7 +2583,12 @@ export default function ApplicantsPage() {
           right: -100px;
           top: -130px;
           border: 1px solid
-            rgba(255, 255, 255, 0.12);
+            rgba(
+              255,
+              255,
+              255,
+              0.12
+            );
           border-radius: 50%;
         }
 
@@ -2416,7 +2702,12 @@ export default function ApplicantsPage() {
           color: #075ed1;
           box-shadow:
             0 8px 20px
-              rgba(0, 0, 0, 0.12);
+              rgba(
+                0,
+                0,
+                0,
+                0.12
+              );
         }
 
         .hero-secondary {
@@ -3072,7 +3363,8 @@ export default function ApplicantsPage() {
         .progress-fill {
           height: 100%;
           border-radius: inherit;
-          transition: width 0.35s ease;
+          transition:
+            width 0.35s ease;
         }
 
         .progress-fill.strong {
@@ -3553,6 +3845,7 @@ export default function ApplicantsPage() {
             align-items: flex-start;
             flex-direction: column;
           }
+
         }
 
         /* =====================================================
@@ -3561,7 +3854,8 @@ export default function ApplicantsPage() {
 
         @media (max-width: 420px) {
 
-          .top-actions .nav-link:nth-child(3) {
+          .top-actions
+            .nav-link:nth-child(3) {
             display: none;
           }
 
@@ -3607,6 +3901,7 @@ export default function ApplicantsPage() {
           .candidate-name-row h3 {
             font-size: 15px;
           }
+
         }
 
       `}</style>
