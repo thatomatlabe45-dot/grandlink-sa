@@ -23,7 +23,7 @@ const PLANS = {
     monthly: 500,
     annual: 5000,
     listings: 5,
-    icon: "🚀",
+    listingLabel: "Up to 5 active internship listings",
     features: [
       "Up to 5 active internship listings",
       "Graduate applications",
@@ -43,7 +43,7 @@ const PLANS = {
     monthly: 950,
     annual: 9500,
     listings: 15,
-    icon: "✦",
+    listingLabel: "Up to 15 active internship listings",
     popular: true,
     features: [
       "Up to 15 active internship listings",
@@ -64,7 +64,7 @@ const PLANS = {
     monthly: 1500,
     annual: 15000,
     listings: 30,
-    icon: "◆",
+    listingLabel: "Up to 30 active internship listings",
     features: [
       "Up to 30 active internship listings",
       "Everything in Professional",
@@ -75,8 +75,8 @@ const PLANS = {
     ],
   },
 
-  pay_per_listing: {
-    key: "pay_per_listing",
+  listing: {
+    key: "listing",
     name: "Pay Per Listing",
     eyebrow: "FLEXIBLE OPTION",
     description:
@@ -84,8 +84,7 @@ const PLANS = {
     monthly: 250,
     annual: 250,
     listings: 1,
-    icon: "◎",
-    oneTime: true,
+    listingLabel: "1 active internship listing",
     features: [
       "1 active internship listing",
       "Graduate applications",
@@ -97,3133 +96,1315 @@ const PLANS = {
   },
 };
 
-// ============================================================
-// HELPERS
-// ============================================================
-
-function formatMoney(amount) {
-  return `R${Number(amount).toLocaleString("en-ZA")}`;
-}
-
-// ============================================================
-// ICONS
-// ============================================================
-
-function CheckIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M5 12.5L9.5 17L19 7.5"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ArrowIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M5 12H19M13 6L19 12L13 18"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function LockIcon() {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden="true"
-    >
-      <rect
-        x="5"
-        y="10"
-        width="14"
-        height="10"
-        rx="2"
-        stroke="currentColor"
-        strokeWidth="2"
-      />
-      <path
-        d="M8 10V7C8 4.79 9.79 3 12 3C14.21 3 16 4.79 16 7V10"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-// ============================================================
-// PLAN ICON
-// ============================================================
-
-function PlanIcon({ icon }) {
-  return (
-    <div className="plan-icon">
-      <span>{icon}</span>
-    </div>
-  );
-}
-
-// ============================================================
-// PLAN CARD
-// ============================================================
-
-function PlanCard({
-  plan,
-  billing,
-  loading,
-  loadingPlan,
-  onSelect,
-}) {
-  const isAnnual = billing === "annual";
-
-  const price = plan.oneTime
-    ? plan.monthly
-    : isAnnual
-      ? plan.annual
-      : plan.monthly;
-
-  const annualMonthlyEquivalent = plan.oneTime
-    ? null
-    : Math.round(plan.annual / 12);
-
-  return (
-    <article
-      className={`plan-card ${
-        plan.popular ? "plan-card-popular" : ""
-      }`}
-    >
-      {plan.popular && (
-        <div className="popular-badge">
-          <span>✦</span>
-          MOST POPULAR
-        </div>
-      )}
-
-      <div className="plan-content">
-
-        {/* Plan icon */}
-        <PlanIcon icon={plan.icon} />
-
-        {/* Plan heading */}
-        <div className="plan-eyebrow">
-          {plan.eyebrow}
-        </div>
-
-        <h2>{plan.name}</h2>
-
-        {/* ==================================================
-            BLUE PLAN DESCRIPTION CARD
-        ================================================== */}
-
-        <div className="plan-description-card">
-
-          <div className="description-card-top">
-
-            <span className="description-card-icon">
-              ✦
-            </span>
-
-            <span className="description-card-label">
-              PLAN OVERVIEW
-            </span>
-
-          </div>
-
-          <p className="plan-description">
-            {plan.description}
-          </p>
-
-        </div>
-
-        {/* Price */}
-        <div className="price-area">
-
-          <div className="price-line">
-
-            <span className="price">
-              {formatMoney(price)}
-            </span>
-
-            <span className="price-period">
-              {plan.oneTime
-                ? " / listing"
-                : isAnnual
-                  ? " / year"
-                  : " / month"}
-            </span>
-
-          </div>
-
-          {!plan.oneTime && isAnnual && (
-            <div className="annual-note">
-              Equivalent to{" "}
-              {formatMoney(annualMonthlyEquivalent)}
-              /month
-            </div>
-          )}
-
-          {!plan.oneTime && isAnnual && (
-            <span className="save-badge">
-              SAVE 2 MONTHS
-            </span>
-          )}
-
-        </div>
-
-        {/* Listing limit */}
-        <div className="listing-limit">
-
-          <span className="listing-icon">
-            ▣
-          </span>
-
-          <span>
-            {plan.listings === 1
-              ? "1 active internship listing"
-              : `Up to ${plan.listings} active internship listings`}
-          </span>
-
-        </div>
-
-        {/* Divider */}
-        <div className="card-divider" />
-
-        {/* Features */}
-        <div className="features">
-
-          <div className="features-heading">
-            What's included
-          </div>
-
-          {plan.features.map((feature, index) => (
-            <div
-              className="feature-row"
-              key={`${plan.key}-feature-${index}`}
-            >
-
-              <span className="feature-check">
-                <CheckIcon />
-              </span>
-
-              <span>{feature}</span>
-
-            </div>
-          ))}
-
-        </div>
-
-        {/* Button */}
-        <div className="plan-action">
-
-          <button
-            type="button"
-            className={`plan-button ${
-              plan.popular
-                ? "plan-button-primary"
-                : "plan-button-secondary"
-            }`}
-            onClick={() => onSelect(plan.key)}
-            disabled={loading}
-          >
-
-            {loading && loadingPlan === plan.key ? (
-              <>
-                <span className="button-spinner" />
-                Preparing...
-              </>
-            ) : (
-              <>
-                {plan.oneTime
-                  ? "Choose Listing"
-                  : "Choose Plan"}
-
-                <ArrowIcon />
-              </>
-            )}
-
-          </button>
-
-        </div>
-
-        {/* Security */}
-        <div className="secure-note">
-          <LockIcon />
-          Secure payment via PayFast
-        </div>
-
-      </div>
-    </article>
-  );
-}
-
-// ============================================================
-// MAIN PAGE
-// ============================================================
-
 export default function CompanyPricingPage() {
-
   const router = useRouter();
 
   const [billing, setBilling] = useState("monthly");
-
-  const [loading, setLoading] = useState(false);
-
-  const [loadingPlan, setLoadingPlan] = useState("");
-
+  const [loading, setLoading] = useState(true);
+  const [processingPlan, setProcessingPlan] = useState(null);
   const [user, setUser] = useState(null);
-
-  const [currentSubscription, setCurrentSubscription] =
-    useState(null);
-
+  const [subscription, setSubscription] = useState(null);
   const [error, setError] = useState("");
 
-  // ==========================================================
+  // ============================================================
   // LOAD USER + SUBSCRIPTION
-  // ==========================================================
+  // ============================================================
 
   useEffect(() => {
-
     let mounted = true;
 
-    async function loadAccount() {
-
+    async function loadCompanyData() {
       try {
+        setLoading(true);
+        setError("");
 
         const {
           data: { user: currentUser },
+          error: authError,
         } = await supabase.auth.getUser();
 
-        if (!mounted) return;
-
-        setUser(currentUser || null);
+        if (authError) {
+          console.error("Auth error:", authError);
+        }
 
         if (!currentUser) {
+          router.replace(
+            "/signup?role=company&redirect=/company-pricing"
+          );
           return;
         }
 
-        const {
-          data: subscription,
-          error: subscriptionError,
-        } = await supabase
-          .from("company_subscriptions")
-          .select("*")
-          .eq("company_id", currentUser.id)
-          .order("created_at", {
-            ascending: false,
-          })
-          .limit(1)
-          .maybeSingle();
-
         if (!mounted) return;
 
-        if (subscriptionError) {
+        setUser(currentUser);
 
+        const { data: subscriptionData, error: subscriptionError } =
+          await supabase
+            .from("company_subscriptions")
+            .select("*")
+            .eq("company_id", currentUser.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (subscriptionError) {
           console.error(
             "Subscription lookup error:",
             subscriptionError
           );
-
-          return;
         }
 
-        setCurrentSubscription(
-          subscription || null
-        );
-
+        if (mounted) {
+          setSubscription(subscriptionData || null);
+        }
       } catch (err) {
+        console.error("Pricing page error:", err);
 
-        console.error(
-          "Account loading error:",
-          err
-        );
-
+        if (mounted) {
+          setError("Unable to load your company account.");
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
-
     }
 
-    loadAccount();
+    loadCompanyData();
 
     return () => {
       mounted = false;
     };
+  }, [router]);
 
-  }, []);
+  // ============================================================
+  // HELPERS
+  // ============================================================
 
-  // ==========================================================
-  // ACTIVE SUBSCRIPTION
-  // ==========================================================
+  const isActive =
+    subscription?.status &&
+    String(subscription.status).toLowerCase() === "active";
 
-  const activeSubscription =
-    currentSubscription?.status?.toLowerCase() === "active";
+  function formatPrice(value) {
+    return new Intl.NumberFormat("en-ZA", {
+      maximumFractionDigits: 0,
+    }).format(value);
+  }
 
-  // ==========================================================
-  // CONTINUE TO PAYMENT
-  // ==========================================================
+  function getPlanPrice(plan) {
+    if (plan.key === "listing") {
+      return 250;
+    }
 
-  async function continueToPayment(planKey) {
+    return billing === "annual" ? plan.annual : plan.monthly;
+  }
 
-    setError("");
+  function getBillingLabel(plan) {
+    if (plan.key === "listing") {
+      return "listing";
+    }
 
-    setLoading(true);
+    return billing === "annual" ? "year" : "month";
+  }
 
-    setLoadingPlan(planKey);
+  // ============================================================
+  // CHOOSE PLAN
+  // ============================================================
+
+  async function choosePlan(plan) {
+    if (!user) {
+      router.push(
+        "/signup?role=company&redirect=/company-pricing"
+      );
+      return;
+    }
 
     try {
-
-      // -------------------------------------------------------
-      // AUTH CHECK
-      // -------------------------------------------------------
-
-      if (!user) {
-
-        router.push(
-          "/signup?role=company&redirect=/company-pricing"
-        );
-
-        return;
-      }
-
-      // -------------------------------------------------------
-      // PLAN CHECK
-      // -------------------------------------------------------
-
-      const plan = PLANS[planKey];
-
-      if (!plan) {
-
-        throw new Error(
-          "The selected plan could not be found."
-        );
-
-      }
-
-      // -------------------------------------------------------
-      // BILLING
-      // -------------------------------------------------------
+      setProcessingPlan(plan.key);
+      setError("");
 
       const selectedBilling =
-        plan.oneTime
-          ? "listing"
-          : billing;
+        plan.key === "listing" ? "listing" : billing;
 
-      // -------------------------------------------------------
-      // CHECK ACTIVE SUBSCRIPTION
-      // -------------------------------------------------------
+      const amount = getPlanPrice(plan);
 
-      const {
-        data: activeRows,
-        error: activeError,
-      } = await supabase
-        .from("company_subscriptions")
-        .select("*")
-        .eq("company_id", user.id)
-        .ilike("status", "active")
-        .order("created_at", {
-          ascending: false,
-        })
-        .limit(1);
+      // --------------------------------------------------------
+      // Create/update inactive subscription.
+      // Activation happens ONLY after verified PayFast payment.
+      // --------------------------------------------------------
 
-      if (activeError) {
+      const { data: existingSubscription, error: existingError } =
+        await supabase
+          .from("company_subscriptions")
+          .select("*")
+          .eq("company_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
+      if (existingError) {
         console.error(
-          "Active subscription check:",
-          activeError
+          "Existing subscription lookup:",
+          existingError
         );
-
       }
 
-      const existingActive =
-        activeRows && activeRows.length > 0
-          ? activeRows[0]
-          : null;
+      let subscriptionId = existingSubscription?.id;
 
-      // -------------------------------------------------------
-      // ALREADY ACTIVE
-      // -------------------------------------------------------
-
-      if (existingActive && !plan.oneTime) {
-
-        router.push("/company-dashboard");
-
-        return;
-      }
-
-      // -------------------------------------------------------
-      // AMOUNT
-      // -------------------------------------------------------
-
-      const amount = plan.oneTime
-        ? plan.monthly
-        : billing === "annual"
-          ? plan.annual
-          : plan.monthly;
-
-      // -------------------------------------------------------
-      // FIND INACTIVE SUBSCRIPTION
-      // -------------------------------------------------------
-
-      const {
-        data: inactiveRows,
-        error: inactiveError,
-      } = await supabase
-        .from("company_subscriptions")
-        .select("*")
-        .eq("company_id", user.id)
-        .ilike("status", "inactive")
-        .order("created_at", {
-          ascending: false,
-        })
-        .limit(1);
-
-      if (inactiveError) {
-
-        console.error(
-          "Inactive subscription lookup:",
-          inactiveError
-        );
-
-      }
-
-      let subscriptionId = null;
-
-      const existingInactive =
-        inactiveRows && inactiveRows.length > 0
-          ? inactiveRows[0]
-          : null;
-
-      // -------------------------------------------------------
-      // UPDATE EXISTING INACTIVE SUBSCRIPTION
-      // -------------------------------------------------------
-
-      if (existingInactive) {
-
-        const {
-          data: updatedSubscription,
-          error: updateError,
-        } = await supabase
+      if (subscriptionId) {
+        const { error: updateError } = await supabase
           .from("company_subscriptions")
           .update({
             plan: plan.key,
-            status: "inactive",
-            amount: amount,
-            monthly_price: amount,
+            amount,
+            billing_cycle: selectedBilling,
             payment_provider: "payfast",
-            payment_reference: null,
-            updated_at: new Date().toISOString(),
+            status: isActive ? "active" : "inactive",
           })
-          .eq("id", existingInactive.id)
-          .select()
-          .maybeSingle();
+          .eq("id", subscriptionId);
 
         if (updateError) {
-
-          console.error(
-            "Subscription update error:",
-            updateError
-          );
-
-          throw new Error(
-            updateError.message ||
-              "Could not prepare your subscription."
-          );
+          console.error("Subscription update:", updateError);
+          throw updateError;
         }
-
-        subscriptionId =
-          updatedSubscription?.id ||
-          existingInactive.id;
-
-      }
-
-      // -------------------------------------------------------
-      // CREATE NEW INACTIVE SUBSCRIPTION
-      // -------------------------------------------------------
-
-      else {
-
-        const {
-          data: newSubscription,
-          error: insertError,
-        } = await supabase
-          .from("company_subscriptions")
-          .insert({
-            company_id: user.id,
-            plan: plan.key,
-            status: "inactive",
-            amount: amount,
-            monthly_price: amount,
-            payment_provider: "payfast",
-            payment_reference: null,
-          })
-          .select()
-          .maybeSingle();
+      } else {
+        const { data: newSubscription, error: insertError } =
+          await supabase
+            .from("company_subscriptions")
+            .insert({
+              company_id: user.id,
+              plan: plan.key,
+              amount,
+              billing_cycle: selectedBilling,
+              payment_provider: "payfast",
+              status: "inactive",
+            })
+            .select()
+            .single();
 
         if (insertError) {
-
-          console.error(
-            "Subscription insert error:",
-            insertError
-          );
-
-          throw new Error(
-            insertError.message ||
-              "Could not create your subscription."
-          );
+          console.error("Subscription insert:", insertError);
+          throw insertError;
         }
 
-        subscriptionId =
-          newSubscription?.id || null;
-
+        subscriptionId = newSubscription?.id;
       }
-
-      // -------------------------------------------------------
-      // MAKE SURE WE HAVE SUBSCRIPTION ID
-      // -------------------------------------------------------
 
       if (!subscriptionId) {
-
-        throw new Error(
-          "Could not create a subscription reference."
-        );
-
+        throw new Error("Could not create subscription.");
       }
 
-      // -------------------------------------------------------
-      // GO TO PAYMENT
-      // -------------------------------------------------------
+      // --------------------------------------------------------
+      // PayFast payment page
+      // --------------------------------------------------------
 
       router.push(
         `/company/payment?plan=${encodeURIComponent(
           plan.key
         )}&billing=${encodeURIComponent(
           selectedBilling
-        )}&subscription=${encodeURIComponent(
-          subscriptionId
-        )}`
+        )}&subscription=${encodeURIComponent(subscriptionId)}`
       );
-
     } catch (err) {
-
-      console.error(
-        "Pricing selection error:",
-        err
-      );
+      console.error("Choose plan error:", err);
 
       setError(
         err?.message ||
-          "Something went wrong. Please try again."
+          "Unable to continue with this plan. Please try again."
       );
 
-    } finally {
-
-      setLoading(false);
-
-      setLoadingPlan("");
-
+      setProcessingPlan(null);
     }
-
   }
 
-  // ==========================================================
-  // PART 2 CONTINUES...
-  // ==========================================================
+  // ============================================================
+  // LOADING
+  // ============================================================
+
+  if (loading) {
+    return (
+      <>
+        <style jsx>{`
+          .loading-page {
+            min-height: 100vh;
+            background: #f8fbff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+          }
+
+          .loading-box {
+            width: 100%;
+            max-width: 420px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 22px;
+            padding: 34px 24px;
+            text-align: center;
+            box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+          }
+
+          .loading-logo {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 16px;
+            border-radius: 15px;
+            background: linear-gradient(
+              135deg,
+              #2563eb,
+              #1d4ed8
+            );
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 950;
+            font-size: 20px;
+          }
+
+          .loading-title {
+            margin: 0;
+            color: #0f172a;
+            font-size: 18px;
+            font-weight: 850;
+          }
+
+          .loading-text {
+            margin: 8px 0 0;
+            color: #64748b;
+            font-size: 13px;
+          }
+        `}</style>
+
+        <main className="loading-page">
+          <div className="loading-box">
+            <div className="loading-logo">G</div>
+            <h1 className="loading-title">
+              Loading GradLink SA
+            </h1>
+            <p className="loading-text">
+              Preparing your company plans...
+            </p>
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  // ============================================================
+  // PAGE
+  // ============================================================
 
   return (
     <>
-      <main className="pricing-page">
-
-        {/* ==================================================
-            NAVBAR
-        ================================================== */}
-
-        <nav className="pricing-nav">
-
-          <div className="nav-inner">
-
-            <button
-              type="button"
-              className="brand"
-              onClick={() => router.push("/")}
-            >
-
-              <span className="brand-mark">
-                G
-              </span>
-
-              <span className="brand-text">
-                GradLink
-                <span>SA</span>
-              </span>
-
-            </button>
-
-            <div className="nav-links">
-
-              {/* FIXED: REAL COMPANY DASHBOARD */}
-              <button
-                type="button"
-                onClick={() =>
-                  router.push("/company-dashboard")
-                }
-              >
-                Dashboard
-              </button>
-
-              <button
-                type="button"
-                className="nav-active"
-              >
-                Pricing
-              </button>
-
-              {!user && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push("/login")
-                  }
-                >
-                  Sign in
-                </button>
-              )}
-
-            </div>
-
-          </div>
-
-        </nav>
-
-
-        {/* ==================================================
-            HERO
-        ================================================== */}
-
-        <section className="hero-section">
-
-          <div className="hero-glow hero-glow-one" />
-          <div className="hero-glow hero-glow-two" />
-
-          <div className="hero-content">
-
-            <div className="hero-badge">
-              <span className="hero-dot" />
-              RECRUIT WITH CONFIDENCE
-            </div>
-
-            <h1>
-              Find the right graduates.
-              <br />
-
-              <span>
-                Build your future team.
-              </span>
-            </h1>
-
-            <p>
-              Choose the GradLink SA plan that fits
-              your recruitment needs and connect with
-              talented South African graduates.
-            </p>
-
-            <div className="hero-trust">
-
-              <div>
-                <span>✓</span>
-                Verified graduate profiles
-              </div>
-
-              <div>
-                <span>✓</span>
-                Secure PayFast payments
-              </div>
-
-              <div>
-                <span>✓</span>
-                Flexible plans
-              </div>
-
-            </div>
-
-          </div>
-
-        </section>
-
-
-        {/* ==================================================
-            ACTIVE SUBSCRIPTION
-        ================================================== */}
-
-        {activeSubscription && (
-          <section className="active-banner-wrap">
-
-            <div className="active-banner">
-
-              <div className="active-icon">
-                ✓
-              </div>
-
-              <div className="active-content">
-
-                <strong>
-                  Your company plan is active
-                </strong>
-
-                <span>
-                  {currentSubscription?.plan
-                    ? `${String(
-                        currentSubscription.plan
-                      )
-                        .charAt(0)
-                        .toUpperCase()}${String(
-                        currentSubscription.plan
-                      ).slice(1)} plan`
-                    : "Active subscription"}
-                  {" "}is currently active.
-                </span>
-
-              </div>
-
-              {/* FIXED: REAL COMPANY DASHBOARD */}
-              <button
-                type="button"
-                onClick={() =>
-                  router.push("/company-dashboard")
-                }
-              >
-                Go to Dashboard
-                <ArrowIcon />
-              </button>
-
-            </div>
-
-          </section>
-        )}
-
-
-        {/* ==================================================
-            ERROR
-        ================================================== */}
-
-        {error && (
-          <section className="error-wrap">
-
-            <div className="error-box">
-
-              <span className="error-symbol">
-                !
-              </span>
-
-              <div>
-
-                <strong>
-                  Something went wrong
-                </strong>
-
-                <p>
-                  {error}
-                </p>
-
-              </div>
-
-            </div>
-
-          </section>
-        )}
-
-
-        {/* ==================================================
-            PRICING
-        ================================================== */}
-
-        <section className="pricing-section">
-
-          <div className="pricing-container">
-
-            <div className="section-heading">
-
-              <div className="section-kicker">
-                SIMPLE & TRANSPARENT
-              </div>
-
-              <h2>
-                Choose your recruitment plan
-              </h2>
-
-              <p>
-                Start with the plan that matches your
-                hiring volume. You can change your
-                approach as your recruitment needs grow.
-              </p>
-
-            </div>
-
-
-            {/* ==================================================
-                BILLING SWITCH
-            ================================================== */}
-
-            <div className="billing-wrapper">
-
-              <div className="billing-switch">
-
-                <button
-                  type="button"
-                  className={
-                    billing === "monthly"
-                      ? "billing-active"
-                      : ""
-                  }
-                  onClick={() =>
-                    setBilling("monthly")
-                  }
-                >
-                  Monthly
-                </button>
-
-                <button
-                  type="button"
-                  className={
-                    billing === "annual"
-                      ? "billing-active"
-                      : ""
-                  }
-                  onClick={() =>
-                    setBilling("annual")
-                  }
-                >
-                  Annual
-
-                  <span className="billing-save">
-                    SAVE 2 MONTHS
-                  </span>
-
-                </button>
-
-              </div>
-
-              <p className="billing-caption">
-                Choose annual billing and pay for only
-                10 months.
-              </p>
-
-            </div>
-
-
-            {/* ==================================================
-                STACKED PLAN CARDS
-            ================================================== */}
-
-            <div className="plans-list">
-
-              <PlanCard
-                plan={PLANS.starter}
-                billing={billing}
-                loading={loading}
-                loadingPlan={loadingPlan}
-                onSelect={continueToPayment}
-              />
-
-              <PlanCard
-                plan={PLANS.professional}
-                billing={billing}
-                loading={loading}
-                loadingPlan={loadingPlan}
-                onSelect={continueToPayment}
-              />
-
-              <PlanCard
-                plan={PLANS.enterprise}
-                billing={billing}
-                loading={loading}
-                loadingPlan={loadingPlan}
-                onSelect={continueToPayment}
-              />
-
-              <PlanCard
-                plan={PLANS.pay_per_listing}
-                billing={billing}
-                loading={loading}
-                loadingPlan={loadingPlan}
-                onSelect={continueToPayment}
-              />
-
-            </div>
-
-
-            {/* ==================================================
-                PAYMENT TRUST
-            ================================================== */}
-
-            <div className="payment-trust">
-
-              <div className="trust-lock">
-                <LockIcon />
-              </div>
-
-              <div>
-
-                <strong>
-                  Secure payments
-                </strong>
-
-                <span>
-                  Payments are securely processed
-                  through PayFast.
-                </span>
-
-              </div>
-
-              <div className="payfast-label">
-                PAYFAST
-              </div>
-
-            </div>
-
-
-            {/* ==================================================
-                HOW IT WORKS
-            ================================================== */}
-
-            <section className="how-section">
-
-              <div className="how-heading">
-
-                <span>
-                  HOW IT WORKS
-                </span>
-
-                <h2>
-                  Start recruiting in three steps
-                </h2>
-
-              </div>
-
-
-              <div className="steps">
-
-                <div className="step">
-
-                  <div className="step-number">
-                    01
-                  </div>
-
-                  <div>
-
-                    <h3>
-                      Choose your plan
-                    </h3>
-
-                    <p>
-                      Select the plan that matches
-                      your company's recruitment needs.
-                    </p>
-
-                  </div>
-
-                </div>
-
-
-                <div className="step">
-
-                  <div className="step-number">
-                    02
-                  </div>
-
-                  <div>
-
-                    <h3>
-                      Complete payment
-                    </h3>
-
-                    <p>
-                      Complete your secure payment
-                      through PayFast.
-                    </p>
-
-                  </div>
-
-                </div>
-
-
-                <div className="step">
-
-                  <div className="step-number">
-                    03
-                  </div>
-
-                  <div>
-
-                    <h3>
-                      Start hiring
-                    </h3>
-
-                    <p>
-                      Once your payment is verified,
-                      access your company dashboard
-                      and start recruiting.
-                    </p>
-
-                  </div>
-
-                </div>
-
-              </div>
-
-            </section>
-
-
-            {/* ==================================================
-                VALUE SECTION
-            ================================================== */}
-
-            <section className="value-section">
-
-              <div className="value-content">
-
-                <div className="value-kicker">
-                  BUILT FOR MODERN RECRUITMENT
-                </div>
-
-                <h2>
-                  More than just an internship listing.
-                </h2>
-
-                <p>
-                  GradLink SA helps companies discover,
-                  review and connect with graduates through
-                  one streamlined recruitment experience.
-                </p>
-
-              </div>
-
-
-              <div className="value-points">
-
-                <div>
-                  <span>01</span>
-                  <strong>
-                    Discover talent
-                  </strong>
-                </div>
-
-                <div>
-                  <span>02</span>
-                  <strong>
-                    Review applicants
-                  </strong>
-                </div>
-
-                <div>
-                  <span>03</span>
-                  <strong>
-                    Build your pipeline
-                  </strong>
-                </div>
-
-              </div>
-
-            </section>
-
-          </div>
-
-        </section>
-
-
-        {/* ==================================================
-            FOOTER
-        ================================================== */}
-
-        <footer className="pricing-footer">
-
-          <div className="footer-inner">
-
-            <div className="footer-brand">
-
-              <span className="brand-mark">
-                G
-              </span>
-
-              <div>
-
-                <strong>
-                  GradLink SA
-                </strong>
-
-                <span>
-                  Connecting South African graduates
-                  with opportunity.
-                </span>
-
-              </div>
-
-            </div>
-
-            <div className="footer-copy">
-              © {new Date().getFullYear()} GradLink SA.
-              All rights reserved.
-            </div>
-
-          </div>
-
-        </footer>
-
-      </main>
-
-
-      {/* ==================================================
-          COMPLETE PREMIUM CSS
-      ================================================== */}
-
       <style jsx>{`
-
-        /* ==================================================
-           RESET
-        ================================================== */
-
-        .pricing-page {
-          min-height:100vh;
-          width:100%;
-          background:#f6f9fd;
-          color:#0f172a;
-          overflow-x:hidden;
+        * {
+          box-sizing: border-box;
         }
 
-        button {
-          font-family:inherit;
+        .page {
+          min-height: 100vh;
+          background:
+            radial-gradient(
+              circle at 50% -10%,
+              rgba(37, 99, 235, 0.10),
+              transparent 35%
+            ),
+            #f8fbff;
+          color: #0f172a;
+          padding-bottom: 60px;
         }
 
+        /* =====================================================
+           HEADER
+        ===================================================== */
 
-        /* ==================================================
-           NAVBAR
-        ================================================== */
-
-        .pricing-nav {
-          position:sticky;
-          top:0;
-          z-index:100;
-          width:100%;
-
-          background:rgba(255,255,255,.94);
-
-          backdrop-filter:blur(18px);
-
-          border-bottom:1px solid #e5edf6;
+        .header {
+          width: 100%;
+          background: rgba(255, 255, 255, 0.94);
+          border-bottom: 1px solid #e2e8f0;
+          position: sticky;
+          top: 0;
+          z-index: 50;
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
         }
 
-        .nav-inner {
-          width:min(1180px, calc(100% - 32px));
-
-          min-height:72px;
-
-          margin:0 auto;
-
-          display:flex;
-          align-items:center;
-          justify-content:space-between;
-
-          gap:20px;
+        .header-inner {
+          width: min(1120px, calc(100% - 32px));
+          min-height: 72px;
+          margin: 0 auto;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 18px;
         }
 
         .brand {
-          border:0;
-          background:transparent;
-          padding:0;
-
-          display:flex;
-          align-items:center;
-
-          gap:10px;
-
-          cursor:pointer;
+          display: flex;
+          align-items: center;
+          gap: 11px;
+          min-width: 0;
         }
 
         .brand-mark {
-          width:38px;
-          height:38px;
-
-          border-radius:12px;
-
-          display:flex;
-          align-items:center;
-          justify-content:center;
-
-          background:
-            linear-gradient(
-              135deg,
-              #2563eb,
-              #1d4ed8
-            );
-
-          color:white;
-
-          font-size:19px;
-          font-weight:950;
-
+          width: 42px;
+          height: 42px;
+          flex: 0 0 auto;
+          border-radius: 13px;
+          background: linear-gradient(
+            135deg,
+            #2563eb,
+            #1d4ed8
+          );
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 19px;
+          font-weight: 950;
           box-shadow:
-            0 8px 20px
-            rgba(37,99,235,.22);
+            0 8px 20px rgba(37, 99, 235, 0.22);
         }
 
-        .brand-text {
-          font-size:19px;
-          font-weight:950;
-
-          letter-spacing:-.04em;
-
-          color:#0f172a;
+        .brand-copy {
+          min-width: 0;
         }
 
-        .brand-text span {
-          color:#2563eb;
-          margin-left:2px;
+        .brand-name {
+          margin: 0;
+          color: #0f172a;
+          font-size: 15px;
+          line-height: 1.1;
+          font-weight: 950;
         }
 
-        .nav-links {
-          display:flex;
-          align-items:center;
-
-          gap:6px;
+        .brand-subtitle {
+          margin: 4px 0 0;
+          color: #64748b;
+          font-size: 10px;
+          font-weight: 700;
         }
 
-        .nav-links button {
-          border:0;
-          background:transparent;
-
-          padding:10px 13px;
-
-          border-radius:10px;
-
-          color:#64748b;
-
-          font-size:13px;
-          font-weight:800;
-
-          cursor:pointer;
-
-          transition:.2s ease;
+        .dashboard-button {
+          min-height: 40px;
+          padding: 0 15px;
+          border: 1px solid #dbe3ef;
+          border-radius: 11px;
+          background: #ffffff;
+          color: #1e40af;
+          font-size: 12px;
+          font-weight: 850;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          transition: 0.2s ease;
         }
 
-        .nav-links button:hover {
-          color:#2563eb;
-          background:#eff6ff;
+        .dashboard-button:hover {
+          border-color: #93c5fd;
+          background: #eff6ff;
+          transform: translateY(-1px);
         }
 
-        .nav-links .nav-active {
-          color:#2563eb;
-          background:#eff6ff;
+        .arrow {
+          font-size: 15px;
+          line-height: 1;
         }
 
-
-        /* ==================================================
+        /* =====================================================
            HERO
-        ================================================== */
+        ===================================================== */
 
-        .hero-section {
-          position:relative;
-
-          overflow:hidden;
-
-          background:
-            linear-gradient(
-              135deg,
-              #071a3a 0%,
-              #0b2c63 48%,
-              #1558c0 100%
-            );
-
-          color:white;
-        }
-
-        .hero-content {
-          position:relative;
-          z-index:2;
-
-          width:min(850px, calc(100% - 32px));
-
-          margin:0 auto;
-
-          padding:
-            92px 0
-            88px;
-
-          text-align:center;
-        }
-
-        .hero-glow {
-          position:absolute;
-
-          border-radius:50%;
-
-          filter:blur(3px);
-
-          pointer-events:none;
-        }
-
-        .hero-glow-one {
-          width:430px;
-          height:430px;
-
-          top:-260px;
-          right:-120px;
-
-          background:
-            rgba(56,189,248,.17);
-        }
-
-        .hero-glow-two {
-          width:350px;
-          height:350px;
-
-          bottom:-260px;
-          left:-100px;
-
-          background:
-            rgba(96,165,250,.13);
+        .hero {
+          width: min(850px, calc(100% - 32px));
+          margin: 0 auto;
+          padding: 48px 0 28px;
+          text-align: center;
         }
 
         .hero-badge {
-          display:inline-flex;
-          align-items:center;
-
-          gap:8px;
-
-          padding:8px 13px;
-
-          border-radius:999px;
-
-          border:1px solid
-            rgba(255,255,255,.18);
-
-          background:
-            rgba(255,255,255,.08);
-
-          color:#dbeafe;
-
-          font-size:10px;
-          font-weight:950;
-
-          letter-spacing:.1em;
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 7px 11px;
+          border-radius: 999px;
+          background: #eff6ff;
+          border: 1px solid #bfdbfe;
+          color: #2563eb;
+          font-size: 9px;
+          font-weight: 950;
+          letter-spacing: 0.12em;
         }
 
-        .hero-dot {
-          width:7px;
-          height:7px;
-
-          border-radius:50%;
-
-          background:#38bdf8;
-
-          box-shadow:
-            0 0 0 5px
-            rgba(56,189,248,.12);
+        .hero-title {
+          margin: 15px 0 0;
+          font-size: clamp(30px, 6vw, 48px);
+          line-height: 1.05;
+          letter-spacing: -0.04em;
+          font-weight: 950;
+          color: #0f172a;
         }
 
-        .hero-content h1 {
-          margin:24px 0 0;
-
-          font-size:
-            clamp(38px, 6vw, 66px);
-
-          line-height:1.03;
-
-          letter-spacing:-.055em;
-
-          font-weight:950;
+        .hero-title span {
+          color: #2563eb;
         }
 
-        .hero-content h1 span {
-          color:#7dd3fc;
+        .hero-text {
+          max-width: 650px;
+          margin: 15px auto 0;
+          color: #64748b;
+          font-size: 14px;
+          line-height: 1.7;
+          font-weight: 550;
         }
 
-        .hero-content > p {
-          max-width:650px;
-
-          margin:25px auto 0;
-
-          color:#cbdaf2;
-
-          font-size:16px;
-
-          line-height:1.75;
-        }
-
-        .hero-trust {
-          margin-top:30px;
-
-          display:flex;
-
-          justify-content:center;
-
-          flex-wrap:wrap;
-
-          gap:10px 22px;
-        }
-
-        .hero-trust div {
-          display:flex;
-          align-items:center;
-
-          gap:7px;
-
-          color:#dbeafe;
-
-          font-size:12px;
-          font-weight:700;
-        }
-
-        .hero-trust span {
-          color:#67e8f9;
-
-          font-weight:950;
-        }
-
-
-        /* ==================================================
-           ACTIVE BANNER
-        ================================================== */
-
-        .active-banner-wrap {
-          width:min(900px, calc(100% - 32px));
-
-          margin:30px auto 0;
-        }
+        /* =====================================================
+           ACTIVE SUBSCRIPTION
+        ===================================================== */
 
         .active-banner {
-          display:flex;
-
-          align-items:center;
-
-          gap:15px;
-
-          padding:17px 20px;
-
-          border-radius:18px;
-
-          background:#ecfdf5;
-
-          border:1px solid #bbf7d0;
+          width: min(900px, calc(100% - 32px));
+          margin: 0 auto 25px;
+          padding: 15px 17px;
+          border-radius: 17px;
+          background: linear-gradient(
+            135deg,
+            #eff6ff,
+            #dbeafe
+          );
+          border: 1px solid #bfdbfe;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 15px;
         }
 
-        .active-icon {
-          flex:0 0 auto;
-
-          width:40px;
-          height:40px;
-
-          border-radius:12px;
-
-          display:flex;
-          align-items:center;
-          justify-content:center;
-
-          background:#16a34a;
-
-          color:white;
-
-          font-weight:950;
+        .active-copy {
+          min-width: 0;
         }
 
-        .active-content {
-          flex:1;
-
-          display:flex;
-          flex-direction:column;
-
-          gap:3px;
+        .active-label {
+          color: #2563eb;
+          font-size: 9px;
+          font-weight: 950;
+          letter-spacing: 0.1em;
         }
 
-        .active-content strong {
-          color:#14532d;
-
-          font-size:14px;
+        .active-title {
+          margin: 4px 0 0;
+          color: #0f172a;
+          font-size: 14px;
+          font-weight: 900;
         }
 
-        .active-content span {
-          color:#166534;
-
-          font-size:12px;
+        .active-button {
+          flex: 0 0 auto;
+          min-height: 38px;
+          padding: 0 13px;
+          border: 0;
+          border-radius: 10px;
+          background: #2563eb;
+          color: #ffffff;
+          font-size: 11px;
+          font-weight: 850;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
         }
 
-        .active-banner button {
-          flex:0 0 auto;
+        /* =====================================================
+           BILLING SWITCH
+        ===================================================== */
 
-          border:0;
-
-          background:transparent;
-
-          color:#15803d;
-
-          display:flex;
-          align-items:center;
-
-          gap:6px;
-
-          font-size:12px;
-          font-weight:900;
-
-          cursor:pointer;
-        }
-
-
-        /* ==================================================
-           ERROR
-        ================================================== */
-
-        .error-wrap {
-          width:min(900px, calc(100% - 32px));
-
-          margin:24px auto 0;
-        }
-
-        .error-box {
-          display:flex;
-
-          align-items:flex-start;
-
-          gap:13px;
-
-          padding:17px;
-
-          border-radius:16px;
-
-          background:#fff7ed;
-
-          border:1px solid #fed7aa;
-
-          color:#9a3412;
-        }
-
-        .error-symbol {
-          width:28px;
-          height:28px;
-
-          flex:0 0 auto;
-
-          border-radius:50%;
-
-          display:flex;
-          align-items:center;
-          justify-content:center;
-
-          background:#ea580c;
-
-          color:white;
-
-          font-weight:950;
-        }
-
-        .error-box strong {
-          display:block;
-
-          font-size:13px;
-        }
-
-        .error-box p {
-          margin:4px 0 0;
-
-          font-size:12px;
-
-          line-height:1.5;
-        }
-
-
-        /* ==================================================
-           PRICING
-        ================================================== */
-
-        .pricing-section {
-          width:100%;
-
-          padding:
-            80px 16px
-            100px;
-
-          background:#f6f9fd;
-        }
-
-        .pricing-container {
-          width:100%;
-
-          max-width:920px;
-
-          margin:0 auto;
-        }
-
-        .section-heading {
-          text-align:center;
-
-          max-width:700px;
-
-          margin:0 auto;
-        }
-
-        .section-kicker {
-          color:#2563eb;
-
-          font-size:10px;
-
-          font-weight:950;
-
-          letter-spacing:.12em;
-        }
-
-        .section-heading h2 {
-          margin:12px 0 0;
-
-          font-size:
-            clamp(30px, 5vw, 46px);
-
-          line-height:1.08;
-
-          letter-spacing:-.05em;
-
-          font-weight:950;
-
-          color:#0f172a;
-        }
-
-        .section-heading p {
-          max-width:620px;
-
-          margin:17px auto 0;
-
-          color:#64748b;
-
-          font-size:14px;
-
-          line-height:1.75;
-        }
-
-
-        /* ==================================================
-           BILLING
-        ================================================== */
-
-        .billing-wrapper {
-          display:flex;
-
-          flex-direction:column;
-
-          align-items:center;
-
-          margin:35px 0 38px;
+        .billing-area {
+          display: flex;
+          justify-content: center;
+          padding: 5px 16px 30px;
         }
 
         .billing-switch {
-          display:flex;
-          align-items:center;
-
-          padding:5px;
-
-          border-radius:16px;
-
-          background:white;
-
-          border:1px solid #dbe4f0;
-
-          box-shadow:
-            0 8px 25px
-            rgba(15,23,42,.06);
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 4px;
+          border-radius: 14px;
+          background: #e8eef7;
+          border: 1px solid #dbe3ef;
         }
 
-        .billing-switch button {
-          min-height:44px;
-
-          padding:0 19px;
-
-          border:0;
-
-          border-radius:12px;
-
-          background:transparent;
-
-          color:#64748b;
-
-          font-size:12px;
-
-          font-weight:900;
-
-          cursor:pointer;
-
-          transition:.2s ease;
+        .billing-option {
+          min-height: 39px;
+          padding: 0 15px;
+          border: 0;
+          border-radius: 10px;
+          background: transparent;
+          color: #64748b;
+          font-size: 11px;
+          font-weight: 850;
+          cursor: pointer;
         }
 
-        .billing-switch button.billing-active {
-          background:#0f172a;
-
-          color:white;
-
-          box-shadow:
-            0 5px 15px
-            rgba(15,23,42,.16);
-        }
-
-        .billing-save {
-          margin-left:7px;
-
-          padding:4px 6px;
-
-          border-radius:6px;
-
-          background:#dcfce7;
-
-          color:#15803d;
-
-          font-size:8px;
-
-          font-weight:950;
-        }
-
-        .billing-caption {
-          margin:10px 0 0;
-
-          color:#94a3b8;
-
-          font-size:11px;
-
-          font-weight:650;
-        }
-
-
-        /* ==================================================
-           STACKED PLANS
-        ================================================== */
-
-        .plans-list {
-          width:min(760px, 100%);
-
-          margin:0 auto;
-
-          display:flex;
-
-          flex-direction:column;
-
-          gap:24px;
-        }
-
-
-        /* ==================================================
-           PLAN CARD
-        ================================================== */
-
-        .plan-card {
-          position:relative;
-
-          width:100%;
-
-          display:block;
-
-          border-radius:26px;
-
-          background:#ffffff;
-
-          border:1px solid #dbe4f0;
-
-          box-shadow:
-            0 16px 40px
-            rgba(15,23,42,.075);
-
-          overflow:hidden;
-
-          transition:
-            transform .25s ease,
-            box-shadow .25s ease,
-            border-color .25s ease;
-
-          opacity:1;
-
-          visibility:visible;
-        }
-
-        .plan-card::before {
-          content:"";
-
-          position:absolute;
-
-          top:0;
-          left:0;
-          right:0;
-
-          height:5px;
-
-          background:
-            linear-gradient(
-              90deg,
-              #2563eb,
-              #38bdf8
-            );
-        }
-
-        .plan-card:hover {
-          transform:translateY(-4px);
-
-          border-color:#bfdbfe;
-
-          box-shadow:
-            0 24px 55px
-            rgba(37,99,235,.12);
-        }
-
-        .plan-card-popular {
-          border:
-            2px solid #2563eb;
-
-          box-shadow:
-            0 25px 65px
-            rgba(37,99,235,.17);
-        }
-
-        .plan-card-popular::before {
-          height:7px;
-        }
-
-
-        /* ==================================================
-           POPULAR BADGE
-        ================================================== */
-
-        .popular-badge {
-          position:absolute;
-
-          top:20px;
-          right:22px;
-
-          z-index:5;
-
-          display:flex;
-
-          align-items:center;
-
-          gap:5px;
-
-          padding:7px 11px;
-
-          border-radius:999px;
-
-          background:
-            linear-gradient(
-              135deg,
-              #2563eb,
-              #1d4ed8
-            );
-
-          color:white;
-
-          font-size:9px;
-
-          font-weight:950;
-
-          letter-spacing:.06em;
-
-          box-shadow:
-            0 8px 20px
-            rgba(37,99,235,.25);
-        }
-
-
-        /* ==================================================
-           PLAN CONTENT
-        ================================================== */
-
-        .plan-content {
-          position:relative;
-
-          z-index:2;
-
-          padding:34px;
-        }
-
-        .plan-icon {
-          width:56px;
-          height:56px;
-
-          display:flex;
-
-          align-items:center;
-
-          justify-content:center;
-
-          margin-bottom:20px;
-
-          border-radius:18px;
-
-          background:
-            linear-gradient(
-              135deg,
-              #eff6ff,
-              #dbeafe
-            );
-
-          border:1px solid #dbeafe;
-
-          color:#2563eb;
-
-          font-size:25px;
-
-          box-shadow:
-            0 8px 20px
-            rgba(37,99,235,.08);
-        }
-
-        .plan-eyebrow {
-          margin-bottom:8px;
-
-          color:#2563eb;
-
-          font-size:9px;
-
-          font-weight:950;
-
-          letter-spacing:.12em;
-        }
-
-        .plan-content h2 {
-          margin:0;
-
-          color:#0f172a;
-
-          font-size:30px;
-
-          line-height:1.1;
-
-          letter-spacing:-.045em;
-
-          font-weight:950;
-        }
-
-
-        /* ==================================================
-           BLUE PREMIUM PLAN DESCRIPTION CARD
-        ================================================== */
-
-        .plan-description-card {
-          position:relative;
-
-          width:100%;
-
-          margin-top:16px;
-
-          padding:17px 18px;
-
-          box-sizing:border-box;
-
-          border-radius:17px;
-
-          background:
-            linear-gradient(
-              135deg,
-              #2563eb 0%,
-              #1d4ed8 55%,
-              #1e40af 100%
-            );
-
-          border:1px solid
-            rgba(96,165,250,.55);
-
-          box-shadow:
-            0 12px 28px
-            rgba(37,99,235,.20);
-
-          overflow:hidden;
-        }
-
-        .plan-description-card::before {
-          content:"";
-
-          position:absolute;
-
-          width:130px;
-          height:130px;
-
-          right:-60px;
-          top:-70px;
-
-          border-radius:50%;
-
-          background:
-            rgba(125,211,252,.16);
-
-          pointer-events:none;
-        }
-
-        .plan-description-card::after {
-          content:"";
-
-          position:absolute;
-
-          left:-35px;
-          bottom:-65px;
-
-          width:110px;
-          height:110px;
-
-          border-radius:50%;
-
-          background:
-            rgba(255,255,255,.06);
-
-          pointer-events:none;
-        }
-
-        .description-card-top {
-          position:relative;
-
-          z-index:2;
-
-          display:flex;
-
-          align-items:center;
-
-          gap:8px;
-
-          margin-bottom:8px;
-        }
-
-        .description-card-icon {
-          width:23px;
-          height:23px;
-
-          flex:0 0 auto;
-
-          display:flex;
-
-          align-items:center;
-
-          justify-content:center;
-
-          border-radius:7px;
-
-          background:
-            rgba(255,255,255,.16);
-
-          color:#ffffff;
-
-          font-size:10px;
-
-          font-weight:950;
-
-          border:1px solid
-            rgba(255,255,255,.16);
-        }
-
-        .description-card-label {
-          color:#bfdbfe;
-
-          font-size:8px;
-
-          line-height:1;
-
-          font-weight:950;
-
-          letter-spacing:.12em;
-        }
-
-        .plan-description {
-          position:relative;
-
-          z-index:2;
-
-          margin:0;
-
-          color:#ffffff;
-
-          font-size:13px;
-
-          line-height:1.65;
-
-          font-weight:650;
-        }
-
-
-        /* ==================================================
-           PRICE
-        ================================================== */
-
-        .price-area {
-          margin-top:27px;
-        }
-
-        .price-line {
-          display:flex;
-
-          align-items:baseline;
-
-          flex-wrap:wrap;
-
-          gap:5px;
-        }
-
-        .price {
-          color:#0f172a;
-
-          font-size:46px;
-
-          line-height:1;
-
-          letter-spacing:-.06em;
-
-          font-weight:950;
-        }
-
-        .price-period {
-          color:#64748b;
-
-          font-size:13px;
-
-          font-weight:750;
-        }
-
-        .annual-note {
-          margin-top:8px;
-
-          color:#64748b;
-
-          font-size:11px;
+        .billing-option.active {
+          background: #ffffff;
+          color: #1d4ed8;
+          box-shadow: 0 3px 10px rgba(15, 23, 42, 0.08);
         }
 
         .save-badge {
-          display:inline-block;
-
-          margin-top:10px;
-
-          padding:6px 9px;
-
-          border-radius:7px;
-
-          background:#dcfce7;
-
-          color:#15803d;
-
-          font-size:9px;
-
-          font-weight:950;
-
-          letter-spacing:.05em;
+          margin-left: 5px;
+          color: #16a34a;
+          font-size: 9px;
+          font-weight: 950;
         }
 
+        /* =====================================================
+           PLAN GRID
+        ===================================================== */
 
-        /* ==================================================
-           LISTING LIMIT
-        ================================================== */
-
-        .listing-limit {
-          margin-top:23px;
-
-          display:flex;
-
-          align-items:center;
-
-          gap:9px;
-
-          padding:14px 16px;
-
-          border-radius:14px;
-
-          background:#eff6ff;
-
-          border:1px solid #dbeafe;
-
-          color:#1e40af;
-
-          font-size:13px;
-
-          font-weight:850;
+        .plans {
+          width: min(900px, calc(100% - 32px));
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 18px;
         }
 
-        .listing-icon {
-          width:25px;
-          height:25px;
-
-          flex:0 0 auto;
-
-          display:flex;
-
-          align-items:center;
-
-          justify-content:center;
-
-          border-radius:7px;
-
-          background:#2563eb;
-
-          color:white;
-
-          font-size:11px;
+        .plan-card {
+          position: relative;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 22px;
+          padding: 22px;
+          box-shadow:
+            0 12px 32px rgba(15, 23, 42, 0.06);
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
         }
 
-
-        /* ==================================================
-           DIVIDER
-        ================================================== */
-
-        .card-divider {
-          height:1px;
-
-          margin:27px 0;
-
-          background:#e8eef5;
+        .plan-card.popular {
+          border: 1px solid #60a5fa;
+          box-shadow:
+            0 16px 40px rgba(37, 99, 235, 0.15);
         }
 
+        .popular-ribbon {
+          position: absolute;
+          top: 0;
+          right: 0;
+          padding: 8px 13px;
+          border-bottom-left-radius: 13px;
+          background: #2563eb;
+          color: #ffffff;
+          font-size: 8px;
+          font-weight: 950;
+          letter-spacing: 0.08em;
+        }
 
-        /* ==================================================
+        .plan-eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          color: #2563eb;
+          font-size: 8px;
+          font-weight: 950;
+          letter-spacing: 0.11em;
+        }
+
+        .plan-icon {
+          font-size: 11px;
+        }
+
+        .plan-name {
+          margin: 8px 0 0;
+          color: #0f172a;
+          font-size: 24px;
+          line-height: 1.1;
+          font-weight: 950;
+          letter-spacing: -0.025em;
+        }
+
+        /* =====================================================
+           BLUE PLAN DESCRIPTION CARD
+        ===================================================== */
+
+        .plan-description-card {
+          width: 100%;
+          margin-top: 15px;
+          padding: 17px 17px 18px;
+          border-radius: 17px;
+
+          background: linear-gradient(
+            135deg,
+            #2563eb 0%,
+            #1d4ed8 55%,
+            #1e40af 100%
+          );
+
+          border: 1px solid rgba(255, 255, 255, 0.18);
+
+          box-shadow:
+            0 10px 25px rgba(37, 99, 235, 0.20),
+            inset 0 1px 0 rgba(255, 255, 255, 0.12);
+
+          box-sizing: border-box;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .plan-description-card::before {
+          content: "";
+          position: absolute;
+          top: -45px;
+          right: -45px;
+          width: 120px;
+          height: 120px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.10);
+          pointer-events: none;
+        }
+
+        .description-card-top {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+        }
+
+        .description-card-icon {
+          width: 24px;
+          height: 24px;
+          flex: 0 0 auto;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.16);
+          color: #ffffff;
+          font-size: 11px;
+          font-weight: 950;
+          border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .description-card-label {
+          color: #ffffff;
+          font-size: 8px;
+          line-height: 1;
+          font-weight: 950;
+          letter-spacing: 0.12em;
+        }
+
+        .plan-description {
+          position: relative;
+          z-index: 1;
+          margin: 0;
+          color: #ffffff;
+          font-size: 13px;
+          line-height: 1.65;
+          font-weight: 600;
+        }
+
+        /* =====================================================
+           PRICE
+        ===================================================== */
+
+        .price-area {
+          margin-top: 19px;
+        }
+
+        .price {
+          color: #0f172a;
+          font-size: 32px;
+          line-height: 1;
+          font-weight: 950;
+          letter-spacing: -0.04em;
+        }
+
+        .price-period {
+          margin-left: 5px;
+          color: #64748b;
+          font-size: 11px;
+          font-weight: 750;
+        }
+
+        .annual-note {
+          margin-top: 7px;
+          color: #16a34a;
+          font-size: 10px;
+          font-weight: 850;
+        }
+
+        .listing-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          width: fit-content;
+          margin-top: 14px;
+          padding: 8px 10px;
+          border-radius: 10px;
+          background: #f1f5f9;
+          color: #334155;
+          font-size: 10px;
+          font-weight: 800;
+        }
+
+        .listing-badge-icon {
+          color: #2563eb;
+          font-size: 12px;
+        }
+
+        /* =====================================================
            FEATURES
-        ================================================== */
-
-        .features {
-          display:flex;
-
-          flex-direction:column;
-
-          gap:13px;
-        }
+        ===================================================== */
 
         .features-heading {
-          margin-bottom:2px;
-
-          color:#0f172a;
-
-          font-size:12px;
-
-          font-weight:950;
+          margin: 20px 0 11px;
+          color: #0f172a;
+          font-size: 10px;
+          font-weight: 950;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
         }
 
-        .feature-row {
-          display:flex;
-
-          align-items:center;
-
-          gap:11px;
-
-          color:#334155;
-
-          font-size:13px;
-
-          line-height:1.45;
+        .features {
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          display: flex;
+          flex-direction: column;
+          gap: 9px;
         }
 
-        .feature-check {
-          width:23px;
-          height:23px;
-
-          flex:0 0 auto;
-
-          display:flex;
-
-          align-items:center;
-
-          justify-content:center;
-
-          border-radius:50%;
-
-          background:#dcfce7;
-
-          color:#16a34a;
+        .feature {
+          display: flex;
+          align-items: flex-start;
+          gap: 9px;
+          color: #475569;
+          font-size: 11px;
+          line-height: 1.4;
+          font-weight: 650;
         }
 
-
-        /* ==================================================
-           ACTION
-        ================================================== */
-
-        .plan-action {
-          margin-top:30px;
+        .check {
+          width: 18px;
+          height: 18px;
+          flex: 0 0 auto;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 6px;
+          background: #eff6ff;
+          color: #2563eb;
+          font-size: 10px;
+          font-weight: 950;
         }
+
+        /* =====================================================
+           PLAN BUTTON
+        ===================================================== */
 
         .plan-button {
-          width:100%;
+          width: 100%;
+          min-height: 46px;
+          margin-top: 22px;
+          border: 0;
+          border-radius: 12px;
+          background: linear-gradient(
+            135deg,
+            #2563eb,
+            #1d4ed8
+          );
+          color: #ffffff;
+          font-size: 12px;
+          font-weight: 900;
+          cursor: pointer;
+          box-shadow:
+            0 8px 18px rgba(37, 99, 235, 0.20);
+          transition: 0.2s ease;
+        }
 
-          min-height:56px;
-
-          border-radius:15px;
-
-          display:flex;
-
-          align-items:center;
-
-          justify-content:center;
-
-          gap:9px;
-
-          font-size:14px;
-
-          font-weight:950;
-
-          cursor:pointer;
-
-          transition:.2s ease;
+        .plan-button:hover {
+          transform: translateY(-1px);
+          box-shadow:
+            0 11px 23px rgba(37, 99, 235, 0.25);
         }
 
         .plan-button:disabled {
-          cursor:not-allowed;
-
-          opacity:.7;
+          opacity: 0.65;
+          cursor: not-allowed;
+          transform: none;
         }
 
-        .plan-button-primary {
-          border:0;
-
-          color:white;
-
-          background:
-            linear-gradient(
-              135deg,
-              #2563eb,
-              #1d4ed8
-            );
-
-          box-shadow:
-            0 10px 24px
-            rgba(37,99,235,.22);
+        .payfast-note {
+          margin-top: 11px;
+          text-align: center;
+          color: #94a3b8;
+          font-size: 9px;
+          font-weight: 700;
         }
 
-        .plan-button-primary:hover {
-          transform:translateY(-2px);
-
-          box-shadow:
-            0 15px 30px
-            rgba(37,99,235,.28);
+        .payfast-note span {
+          color: #2563eb;
+          font-weight: 850;
         }
 
-        .plan-button-secondary {
-          border:2px solid #bfdbfe;
+        /* =====================================================
+           ERROR
+        ===================================================== */
 
-          color:#1d4ed8;
-
-          background:white;
+        .error-box {
+          width: min(900px, calc(100% - 32px));
+          margin: 0 auto 20px;
+          padding: 12px 15px;
+          border-radius: 12px;
+          background: #fef2f2;
+          border: 1px solid #fecaca;
+          color: #b91c1c;
+          font-size: 11px;
+          line-height: 1.5;
+          font-weight: 700;
         }
 
-        .plan-button-secondary:hover {
-          background:#eff6ff;
+        /* =====================================================
+           FOOTER TRUST
+        ===================================================== */
 
-          border-color:#93c5fd;
+        .trust {
+          width: min(700px, calc(100% - 32px));
+          margin: 38px auto 0;
+          padding: 20px;
+          text-align: center;
+          border-radius: 18px;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          box-shadow: 0 10px 28px rgba(15, 23, 42, 0.04);
         }
 
-        .button-spinner {
-          width:15px;
-          height:15px;
-
-          border-radius:50%;
-
-          border:2px solid currentColor;
-
-          border-right-color:transparent;
-
-          animation:
-            spin .7s linear infinite;
+        .trust-title {
+          margin: 0;
+          color: #0f172a;
+          font-size: 12px;
+          font-weight: 900;
         }
 
-        @keyframes spin {
-          to {
-            transform:rotate(360deg);
-          }
+        .trust-text {
+          margin: 6px 0 0;
+          color: #64748b;
+          font-size: 10px;
+          line-height: 1.5;
+          font-weight: 650;
         }
 
-        .secure-note {
-          margin-top:13px;
-
-          display:flex;
-
-          align-items:center;
-
-          justify-content:center;
-
-          gap:6px;
-
-          color:#94a3b8;
-
-          font-size:10px;
-
-          font-weight:700;
+        .trust-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          margin-top: 11px;
+          padding: 7px 10px;
+          border-radius: 999px;
+          background: #eff6ff;
+          color: #2563eb;
+          font-size: 9px;
+          font-weight: 850;
         }
 
-
-        /* ==================================================
-           PAYMENT TRUST
-        ================================================== */
-
-        .payment-trust {
-          width:min(760px,100%);
-
-          margin:32px auto 0;
-
-          padding:18px 20px;
-
-          display:flex;
-
-          align-items:center;
-
-          gap:13px;
-
-          border-radius:18px;
-
-          background:white;
-
-          border:1px solid #e2e8f0;
-        }
-
-        .trust-lock {
-          width:40px;
-          height:40px;
-
-          flex:0 0 auto;
-
-          display:flex;
-
-          align-items:center;
-
-          justify-content:center;
-
-          border-radius:12px;
-
-          background:#eff6ff;
-
-          color:#2563eb;
-        }
-
-        .payment-trust > div:nth-child(2) {
-          flex:1;
-
-          display:flex;
-
-          flex-direction:column;
-
-          gap:3px;
-        }
-
-        .payment-trust strong {
-          font-size:12px;
-
-          color:#0f172a;
-        }
-
-        .payment-trust span {
-          color:#64748b;
-
-          font-size:10px;
-        }
-
-        .payfast-label {
-          color:#0f172a !important;
-
-          font-size:10px !important;
-
-          font-weight:950;
-
-          letter-spacing:.08em;
-        }
-
-
-        /* ==================================================
-           HOW IT WORKS
-        ================================================== */
-
-        .how-section {
-          margin-top:90px;
-        }
-
-        .how-heading {
-          text-align:center;
-        }
-
-        .how-heading > span {
-          color:#2563eb;
-
-          font-size:10px;
-
-          font-weight:950;
-
-          letter-spacing:.12em;
-        }
-
-        .how-heading h2 {
-          margin:10px 0 0;
-
-          color:#0f172a;
-
-          font-size:30px;
-
-          letter-spacing:-.04em;
-
-          font-weight:950;
-        }
-
-        .steps {
-          margin-top:30px;
-
-          display:flex;
-
-          flex-direction:column;
-
-          gap:14px;
-        }
-
-        .step {
-          display:flex;
-
-          align-items:flex-start;
-
-          gap:17px;
-
-          padding:20px;
-
-          background:white;
-
-          border:1px solid #e2e8f0;
-
-          border-radius:18px;
-        }
-
-        .step-number {
-          width:42px;
-          height:42px;
-
-          flex:0 0 auto;
-
-          display:flex;
-
-          align-items:center;
-
-          justify-content:center;
-
-          border-radius:12px;
-
-          background:#eff6ff;
-
-          color:#2563eb;
-
-          font-size:10px;
-
-          font-weight:950;
-        }
-
-        .step h3 {
-          margin:1px 0 0;
-
-          font-size:14px;
-
-          font-weight:900;
-
-          color:#0f172a;
-        }
-
-        .step p {
-          margin:6px 0 0;
-
-          color:#64748b;
-
-          font-size:12px;
-
-          line-height:1.6;
-        }
-
-
-        /* ==================================================
-           VALUE
-        ================================================== */
-
-        .value-section {
-          margin-top:70px;
-
-          padding:34px;
-
-          display:flex;
-
-          align-items:center;
-
-          justify-content:space-between;
-
-          gap:35px;
-
-          border-radius:24px;
-
-          background:
-            linear-gradient(
-              135deg,
-              #0b2c63,
-              #1558c0
-            );
-
-          color:white;
-
-          overflow:hidden;
-
-          position:relative;
-        }
-
-        .value-section::after {
-          content:"";
-
-          position:absolute;
-
-          width:250px;
-          height:250px;
-
-          right:-120px;
-          bottom:-150px;
-
-          border-radius:50%;
-
-          background:
-            rgba(125,211,252,.14);
-        }
-
-        .value-content {
-          position:relative;
-
-          z-index:2;
-
-          max-width:500px;
-        }
-
-        .value-kicker {
-          color:#7dd3fc;
-
-          font-size:9px;
-
-          font-weight:950;
-
-          letter-spacing:.12em;
-        }
-
-        .value-content h2 {
-          margin:10px 0 0;
-
-          font-size:30px;
-
-          line-height:1.1;
-
-          letter-spacing:-.045em;
-
-          font-weight:950;
-        }
-
-        .value-content p {
-          margin:13px 0 0;
-
-          color:#cbdaf2;
-
-          font-size:13px;
-
-          line-height:1.7;
-        }
-
-        .value-points {
-          position:relative;
-
-          z-index:2;
-
-          min-width:210px;
-
-          display:flex;
-
-          flex-direction:column;
-
-          gap:13px;
-        }
-
-        .value-points div {
-          display:flex;
-
-          align-items:center;
-
-          gap:12px;
-        }
-
-        .value-points span {
-          color:#7dd3fc;
-
-          font-size:9px;
-
-          font-weight:950;
-        }
-
-        .value-points strong {
-          color:white;
-
-          font-size:12px;
-
-          font-weight:800;
-        }
-
-
-        /* ==================================================
-           FOOTER
-        ================================================== */
-
-        .pricing-footer {
-          background:#071a3a;
-
-          color:white;
-        }
-
-        .footer-inner {
-          width:min(1180px, calc(100% - 32px));
-
-          min-height:100px;
-
-          margin:0 auto;
-
-          display:flex;
-
-          align-items:center;
-
-          justify-content:space-between;
-
-          gap:20px;
-        }
-
-        .footer-brand {
-          display:flex;
-
-          align-items:center;
-
-          gap:10px;
-        }
-
-        .footer-brand > div {
-          display:flex;
-
-          flex-direction:column;
-
-          gap:3px;
-        }
-
-        .footer-brand strong {
-          font-size:13px;
-        }
-
-        .footer-brand span:not(.brand-mark) {
-          color:#94a3b8;
-
-          font-size:10px;
-        }
-
-        .footer-copy {
-          color:#64748b;
-
-          font-size:10px;
-        }
-
-
-        /* ==================================================
-           TABLET
-        ================================================== */
-
-        @media (max-width:700px) {
-
-          .nav-inner {
-            min-height:64px;
-          }
-
-          .nav-links {
-            gap:0;
-          }
-
-          .nav-links button {
-            padding:8px 8px;
-
-            font-size:11px;
-          }
-
-          .hero-content {
-            padding:
-              70px 0
-              65px;
-          }
-
-          .hero-content h1 {
-            font-size:40px;
-          }
-
-          .hero-content > p {
-            font-size:14px;
-          }
-
-          .hero-trust {
-            flex-direction:column;
-
-            align-items:center;
-
-            gap:9px;
-          }
-
-          .active-banner {
-            align-items:flex-start;
-
-            flex-wrap:wrap;
-          }
-
-          .active-banner button {
-            margin-left:55px;
-          }
-
-          .pricing-section {
-            padding:
-              65px 14px
-              75px;
-          }
-
-          .plan-content {
-            padding:
-              27px 21px;
-          }
-
-          .plan-content h2 {
-            font-size:27px;
-          }
-
-          .price {
-            font-size:42px;
-          }
-
-          .value-section {
-            flex-direction:column;
-
-            align-items:flex-start;
-
-            padding:
-              27px 22px;
-          }
-
-          .value-points {
-            width:100%;
-          }
-
-          .footer-inner {
-            flex-direction:column;
-
-            align-items:flex-start;
-
-            padding:25px 0;
-          }
-
-        }
-
-
-        /* ==================================================
-           PHONE
-        ================================================== */
-
-        @media (max-width:480px) {
-
-          .nav-inner {
-            width:
-              calc(100% - 22px);
-          }
-
-          .brand-text {
-            font-size:17px;
+        /* =====================================================
+           MOBILE
+        ===================================================== */
+
+        @media (max-width: 700px) {
+          .header-inner {
+            width: min(100% - 22px, 1120px);
+            min-height: 64px;
           }
 
           .brand-mark {
-            width:34px;
-            height:34px;
-
-            border-radius:10px;
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
           }
 
-          .nav-links button {
-            padding:
-              7px 6px;
-
-            font-size:10px;
+          .brand-name {
+            font-size: 13px;
           }
 
-          .hero-content {
-            width:
-              calc(100% - 28px);
-
-            padding:
-              60px 0
-              58px;
+          .brand-subtitle {
+            font-size: 9px;
           }
 
-          .hero-content h1 {
-            font-size:
-              clamp(34px, 10vw, 40px);
+          .dashboard-button {
+            min-height: 37px;
+            padding: 0 11px;
+            font-size: 10px;
           }
 
-          .hero-content > p {
-            font-size:13px;
-
-            line-height:1.65;
+          .hero {
+            width: calc(100% - 26px);
+            padding-top: 34px;
           }
 
-          .hero-badge {
-            font-size:8px;
+          .hero-title {
+            font-size: 32px;
           }
 
-          .active-banner-wrap,
-          .error-wrap {
-            width:
-              calc(100% - 24px);
+          .hero-text {
+            font-size: 13px;
           }
 
           .active-banner {
-            padding:15px;
+            width: calc(100% - 26px);
+            align-items: flex-start;
+            flex-direction: column;
           }
 
-          .active-banner button {
-            margin-left:55px;
+          .active-button {
+            width: 100%;
+            justify-content: center;
           }
 
-          .section-heading h2 {
-            font-size:31px;
+          .billing-area {
+            padding-bottom: 23px;
           }
 
-          .billing-switch {
-            width:100%;
+          .billing-option {
+            padding: 0 12px;
+            font-size: 10px;
           }
 
-          .billing-switch button {
-            flex:1;
-
-            padding:0 8px;
-          }
-
-          .billing-save {
-            display:none;
-          }
-
-          .plans-list {
-            width:100%;
-
-            gap:18px;
+          .plans {
+            width: calc(100% - 26px);
+            grid-template-columns: 1fr;
+            gap: 15px;
           }
 
           .plan-card {
-            border-radius:22px;
+            padding: 19px;
+            border-radius: 20px;
           }
 
-          .plan-content {
-            padding:
-              27px 18px;
+          .plan-name {
+            font-size: 23px;
           }
-
-          .popular-badge {
-            top:16px;
-
-            right:15px;
-
-            font-size:7px;
-
-            padding:
-              6px 8px;
-          }
-
-          .plan-icon {
-            width:50px;
-            height:50px;
-
-            margin-bottom:17px;
-
-            border-radius:15px;
-          }
-
-          .plan-content h2 {
-            font-size:26px;
-
-            padding-right:90px;
-          }
-
-          /* BLUE DESCRIPTION CARD ON MOBILE */
 
           .plan-description-card {
-            margin-top:14px;
-
-            padding:
-              14px 14px;
-
-            border-radius:15px;
-
-            box-shadow:
-              0 10px 22px
-              rgba(37,99,235,.18);
-          }
-
-          .description-card-icon {
-            width:20px;
-            height:20px;
-
-            border-radius:6px;
-
-            font-size:9px;
-          }
-
-          .description-card-label {
-            font-size:7px;
+            padding: 16px;
+            border-radius: 16px;
           }
 
           .plan-description {
-            font-size:12px;
-
-            line-height:1.6;
+            font-size: 12.5px;
           }
 
           .price {
-            font-size:39px;
+            font-size: 30px;
           }
-
-          .listing-limit {
-            font-size:12px;
-          }
-
-          .feature-row {
-            font-size:12px;
-          }
-
-          .payment-trust {
-            padding:15px;
-          }
-
-          .payfast-label {
-            display:none;
-          }
-
-          .how-section {
-            margin-top:65px;
-          }
-
-          .how-heading h2 {
-            font-size:27px;
-          }
-
-          .value-content h2 {
-            font-size:27px;
-          }
-
-          .footer-copy {
-            line-height:1.5;
-          }
-
         }
 
+        @media (max-width: 380px) {
+          .brand-subtitle {
+            display: none;
+          }
+
+          .hero-title {
+            font-size: 29px;
+          }
+
+          .billing-option {
+            padding: 0 9px;
+          }
+
+          .save-badge {
+            display: none;
+          }
+
+          .plan-card {
+            padding: 17px;
+          }
+        }
       `}</style>
+
+      <main className="page">
+        {/* ====================================================
+            HEADER
+        ==================================================== */}
+
+        <header className="header">
+          <div className="header-inner">
+            <div className="brand">
+              <div className="brand-mark">G</div>
+
+              <div className="brand-copy">
+                <p className="brand-name">GradLink SA</p>
+                <p className="brand-subtitle">
+                  Graduate Recruitment Platform
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="dashboard-button"
+              onClick={() => router.push("/company-dashboard")}
+            >
+              Dashboard
+              <span className="arrow">→</span>
+            </button>
+          </div>
+        </header>
+
+        {/* ====================================================
+            HERO
+        ==================================================== */}
+
+        <section className="hero">
+          <div className="hero-badge">
+            ✦ COMPANY RECRUITMENT PLANS
+          </div>
+
+          <h1 className="hero-title">
+            Find the right graduates.
+            <br />
+            <span>Build your team.</span>
+          </h1>
+
+          <p className="hero-text">
+            Choose the GradLink SA plan that fits your hiring needs.
+            Access qualified graduate talent, powerful applicant
+            management tools and smarter recruitment features.
+          </p>
+        </section>
+
+        {/* ====================================================
+            ACTIVE SUBSCRIPTION
+        ==================================================== */}
+
+        {isActive && (
+          <section className="active-banner">
+            <div className="active-copy">
+              <div className="active-label">
+                ACTIVE SUBSCRIPTION
+              </div>
+
+              <div className="active-title">
+                Your{" "}
+                {subscription?.plan
+                  ? String(subscription.plan)
+                      .charAt(0)
+                      .toUpperCase() +
+                    String(subscription.plan).slice(1)
+                  : "company"}{" "}
+                plan is active.
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="active-button"
+              onClick={() =>
+                router.push("/company-dashboard")
+              }
+            >
+              Go to Dashboard
+              <span>→</span>
+            </button>
+          </section>
+        )}
+
+        {/* ====================================================
+            ERROR
+        ==================================================== */}
+
+        {error && <div className="error-box">{error}</div>}
+
+        {/* ====================================================
+            BILLING TOGGLE
+        ==================================================== */}
+
+        <div className="billing-area">
+          <div className="billing-switch">
+            <button
+              type="button"
+              className={`billing-option ${
+                billing === "monthly" ? "active" : ""
+              }`}
+              onClick={() => setBilling("monthly")}
+            >
+              Monthly
+            </button>
+
+            <button
+              type="button"
+              className={`billing-option ${
+                billing === "annual" ? "active" : ""
+              }`}
+              onClick={() => setBilling("annual")}
+            >
+              Annual
+              <span className="save-badge">
+                SAVE 2 MONTHS
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* ====================================================
+            PLAN CARDS
+        ==================================================== */}
+
+        <section className="plans">
+          {Object.values(PLANS).map((plan) => {
+            const price = getPlanPrice(plan);
+            const period = getBillingLabel(plan);
+
+            return (
+              <article
+                key={plan.key}
+                className={`plan-card ${
+                  plan.popular ? "popular" : ""
+                }`}
+              >
+                {plan.popular && (
+                  <div className="popular-ribbon">
+                    MOST POPULAR
+                  </div>
+                )}
+
+                <div className="plan-eyebrow">
+                  <span className="plan-icon">
+                    {plan.key === "enterprise"
+                      ? "◆"
+                      : plan.key === "listing"
+                      ? "◎"
+                      : "✦"}
+                  </span>
+
+                  {plan.eyebrow}
+                </div>
+
+                <h2 className="plan-name">{plan.name}</h2>
+
+                {/* =================================================
+                    BLUE DESCRIPTION CARD
+                ================================================= */}
+
+                <div className="plan-description-card">
+                  <div className="description-card-top">
+                    <span className="description-card-icon">
+                      ✦
+                    </span>
+
+                    <span className="description-card-label">
+                      PLAN OVERVIEW
+                    </span>
+                  </div>
+
+                  <p className="plan-description">
+                    {plan.description}
+                  </p>
+                </div>
+
+                {/* =================================================
+                    PRICE
+                ================================================= */}
+
+                <div className="price-area">
+                  <span className="price">
+                    R{formatPrice(price)}
+                  </span>
+
+                  <span className="price-period">
+                    / {period}
+                  </span>
+
+                  {plan.key !== "listing" &&
+                    billing === "annual" && (
+                      <div className="annual-note">
+                        SAVE 2 MONTHS WITH ANNUAL BILLING
+                      </div>
+                    )}
+                </div>
+
+                <div className="listing-badge">
+                  <span className="listing-badge-icon">
+                    ▣
+                  </span>
+
+                  {plan.listingLabel}
+                </div>
+
+                {/* =================================================
+                    FEATURES
+                ================================================= */}
+
+                <div className="features-heading">
+                  What's included
+                </div>
+
+                <ul className="features">
+                  {plan.features.map((feature, index) => (
+                    <li
+                      className="feature"
+                      key={`${plan.key}-${index}`}
+                    >
+                      <span className="check">✓</span>
+
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* =================================================
+                    CTA
+                ================================================= */}
+
+                <button
+                  type="button"
+                  className="plan-button"
+                  disabled={processingPlan === plan.key}
+                  onClick={() => choosePlan(plan)}
+                >
+                  {processingPlan === plan.key
+                    ? "Preparing Payment..."
+                    : plan.key === "listing"
+                    ? "Choose Listing"
+                    : "Choose Plan"}
+                </button>
+
+                <div className="payfast-note">
+                  Secure payment via{" "}
+                  <span>PayFast</span>
+                </div>
+              </article>
+            );
+          })}
+        </section>
+
+        {/* ====================================================
+            TRUST AREA
+        ==================================================== */}
+
+        <section className="trust">
+          <p className="trust-title">
+            Secure company payments
+          </p>
+
+          <p className="trust-text">
+            Complete your subscription securely through PayFast.
+            Your company plan becomes active after successful
+            payment verification.
+          </p>
+
+          <div className="trust-pill">
+            🔒 Secure payment via PayFast
+          </div>
+        </section>
+      </main>
     </>
   );
 }
