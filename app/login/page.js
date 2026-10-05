@@ -92,8 +92,6 @@ export default function LoginPage() {
 
       // ==========================================
       // STEP 2: CHECK COMPANY BY EMAIL
-      // This fixes companies created before
-      // user_id was correctly saved.
       // ==========================================
 
       let companyByEmail = null;
@@ -124,7 +122,6 @@ export default function LoginPage() {
       // ==========================================
 
       if (companyByEmail) {
-        // Try to repair/save the correct user_id
         const { error: updateCompanyError } =
           await supabase
             .from("companies")
@@ -216,6 +213,7 @@ export default function LoginPage() {
         justifyContent: "center",
         alignItems: "center",
         padding: "20px",
+        boxSizing: "border-box",
       }}
     >
       <div
@@ -225,7 +223,9 @@ export default function LoginPage() {
           background: "#ffffff",
           padding: "35px 25px",
           borderRadius: "18px",
-          boxShadow: "0 10px 35px rgba(0,0,0,0.08)",
+          boxShadow:
+            "0 10px 35px rgba(0,0,0,0.08)",
+          boxSizing: "border-box",
         }}
       >
         <h1
@@ -250,6 +250,8 @@ export default function LoginPage() {
         </p>
 
         <form onSubmit={handleLogin}>
+          {/* EMAIL */}
+
           <label
             style={{
               display: "block",
@@ -269,6 +271,7 @@ export default function LoginPage() {
             placeholder="Enter your email"
             required
             disabled={loading}
+            autoComplete="email"
             style={{
               width: "100%",
               padding: "14px",
@@ -279,6 +282,8 @@ export default function LoginPage() {
               boxSizing: "border-box",
             }}
           />
+
+          {/* PASSWORD */}
 
           <label
             style={{
@@ -299,6 +304,7 @@ export default function LoginPage() {
             placeholder="Enter your password"
             required
             disabled={loading}
+            autoComplete="current-password"
             style={{
               width: "100%",
               padding: "14px",
@@ -310,6 +316,8 @@ export default function LoginPage() {
             }}
           />
 
+          {/* FORGOT PASSWORD */}
+
           <div
             style={{
               textAlign: "right",
@@ -317,16 +325,19 @@ export default function LoginPage() {
             }}
           >
             <Link
-              href="/reset-password"
+              href="/forgot-password"
               style={{
                 color: "#0057b8",
                 textDecoration: "none",
                 fontSize: "14px",
+                fontWeight: "600",
               }}
             >
               Forgot password?
             </Link>
           </div>
+
+          {/* ERROR */}
 
           {error && (
             <p
@@ -336,11 +347,14 @@ export default function LoginPage() {
                 padding: "12px",
                 borderRadius: "8px",
                 marginBottom: "15px",
+                lineHeight: "1.5",
               }}
             >
               {error}
             </p>
           )}
+
+          {/* MESSAGE */}
 
           {message && (
             <p
@@ -350,11 +364,14 @@ export default function LoginPage() {
                 padding: "12px",
                 borderRadius: "8px",
                 marginBottom: "15px",
+                lineHeight: "1.5",
               }}
             >
               {message}
             </p>
           )}
+
+          {/* LOGIN BUTTON */}
 
           <button
             type="submit"
@@ -381,6 +398,8 @@ export default function LoginPage() {
           </button>
         </form>
 
+        {/* SIGN UP */}
+
         <p
           style={{
             textAlign: "center",
@@ -400,6 +419,8 @@ export default function LoginPage() {
             Sign up
           </Link>
         </p>
+
+        {/* HOME */}
 
         <div
           style={{
