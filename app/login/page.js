@@ -10,9 +10,19 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+
+  const [showForgotPassword, setShowForgotPassword] =
+    useState(false);
+
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
+  const [resetError, setResetError] = useState("");
 
   async function handleLogin(e) {
     e.preventDefault();
@@ -22,10 +32,6 @@ export default function LoginPage() {
     setMessage("");
 
     try {
-      // ==========================================
-      // LOGIN USER
-      // ==========================================
-
       const { data, error: loginError } =
         await supabase.auth.signInWithPassword({
           email: email.trim(),
@@ -46,19 +52,19 @@ export default function LoginPage() {
         return;
       }
 
-      setMessage("Login successful! Redirecting...");
-
-      // ==========================================
-      // CLEAR OLD PROFILE TYPE
-      // ==========================================
+      setMessage(
+        "Login successful! Redirecting..."
+      );
 
       localStorage.removeItem("gradlink_profile");
 
-      const cleanEmail = user.email?.trim().toLowerCase();
+      const cleanEmail = user.email
+        ?.trim()
+        .toLowerCase();
 
-      // ==========================================
-      // STEP 1: CHECK COMPANY BY USER ID
-      // ==========================================
+      // ========================================================
+      // CHECK COMPANY BY USER ID
+      // ========================================================
 
       const {
         data: companyByUserId,
@@ -76,10 +82,6 @@ export default function LoginPage() {
         );
       }
 
-      // ==========================================
-      // COMPANY FOUND BY USER ID
-      // ==========================================
-
       if (companyByUserId) {
         localStorage.setItem(
           "gradlink_profile",
@@ -90,9 +92,9 @@ export default function LoginPage() {
         return;
       }
 
-      // ==========================================
-      // STEP 2: CHECK COMPANY BY EMAIL
-      // ==========================================
+      // ========================================================
+      // CHECK COMPANY BY EMAIL
+      // ========================================================
 
       let companyByEmail = null;
 
@@ -115,11 +117,6 @@ export default function LoginPage() {
           companyByEmail = data;
         }
       }
-
-      // ==========================================
-      // COMPANY FOUND BY EMAIL
-      // LINK IT TO CURRENT USER
-      // ==========================================
 
       if (companyByEmail) {
         const { error: updateCompanyError } =
@@ -146,9 +143,9 @@ export default function LoginPage() {
         return;
       }
 
-      // ==========================================
-      // STEP 3: CHECK GRADUATE BY USER ID
-      // ==========================================
+      // ========================================================
+      // CHECK GRADUATE
+      // ========================================================
 
       const {
         data: graduate,
@@ -173,10 +170,6 @@ export default function LoginPage() {
         return;
       }
 
-      // ==========================================
-      // GRADUATE FOUND
-      // ==========================================
-
       if (graduate) {
         localStorage.setItem(
           "gradlink_profile",
@@ -187,9 +180,9 @@ export default function LoginPage() {
         return;
       }
 
-      // ==========================================
-      // NEW USER WITH NO PROFILE
-      // ==========================================
+      // ========================================================
+      // NEW USER
+      // ========================================================
 
       router.replace("/choose-profile");
 
@@ -204,11 +197,77 @@ export default function LoginPage() {
     }
   }
 
+  // ============================================================
+  // FORGOT PASSWORD
+  // ============================================================
+
+  async function handleForgotPassword(e) {
+    e.preventDefault();
+
+    setResetLoading(true);
+    setResetError("");
+    setResetMessage("");
+
+    const cleanEmail = resetEmail
+      .trim()
+      .toLowerCase();
+
+    if (!cleanEmail) {
+      setResetError(
+        "Please enter your email address."
+      );
+
+      setResetLoading(false);
+      return;
+    }
+
+    try {
+      const { error: resetError } =
+        await supabase.auth.resetPasswordForEmail(
+          cleanEmail,
+          {
+            redirectTo:
+              `${window.location.origin}/reset-password`,
+          }
+        );
+
+      if (resetError) {
+        console.error(
+          "Password reset error:",
+          resetError
+        );
+
+        setResetError(resetError.message);
+        setResetLoading(false);
+        return;
+      }
+
+      setResetMessage(
+        "Password reset email sent successfully. Please check your email and tap the reset link."
+      );
+
+      setResetEmail("");
+
+    } catch (err) {
+      console.error(
+        "Forgot password error:",
+        err
+      );
+
+      setResetError(
+        "Something went wrong while sending the reset email. Please try again."
+      );
+    }
+
+    setResetLoading(false);
+  }
+
   return (
     <main
       style={{
         minHeight: "100vh",
-        background: "#f5f9ff",
+        background:
+          "linear-gradient(135deg, #f4f8ff 0%, #eef5ff 50%, #ffffff 100%)",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
@@ -222,41 +281,79 @@ export default function LoginPage() {
           maxWidth: "450px",
           background: "#ffffff",
           padding: "35px 25px",
-          borderRadius: "18px",
+          borderRadius: "20px",
           boxShadow:
-            "0 10px 35px rgba(0,0,0,0.08)",
+            "0 15px 45px rgba(0,55,120,0.12)",
+          border: "1px solid #e5edf7",
           boxSizing: "border-box",
         }}
       >
-        <h1
-          style={{
-            textAlign: "center",
-            color: "#0057b8",
-            fontSize: "32px",
-            marginBottom: "8px",
-          }}
-        >
-          GradLink SA
-        </h1>
+        {/* =====================================================
+            HEADER
+        ====================================================== */}
 
-        <p
+        <div
           style={{
             textAlign: "center",
-            color: "#6b7280",
             marginBottom: "30px",
           }}
         >
-          Login to your account
-        </p>
+          <div
+            style={{
+              width: "64px",
+              height: "64px",
+              margin: "0 auto 15px",
+              borderRadius: "18px",
+              background:
+                "linear-gradient(135deg, #0057b8, #0b78e3)",
+              color: "#ffffff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "28px",
+              fontWeight: "800",
+              boxShadow:
+                "0 8px 20px rgba(0,87,184,0.22)",
+            }}
+          >
+            G
+          </div>
+
+          <h1
+            style={{
+              margin: "0 0 8px",
+              color: "#063b73",
+              fontSize: "30px",
+              fontWeight: "800",
+            }}
+          >
+            GradLink SA
+          </h1>
+
+          <p
+            style={{
+              margin: 0,
+              color: "#667085",
+              fontSize: "15px",
+            }}
+          >
+            Login to your account
+          </p>
+        </div>
+
+        {/* =====================================================
+            LOGIN FORM
+        ====================================================== */}
 
         <form onSubmit={handleLogin}>
-          {/* EMAIL */}
 
           <label
             style={{
               display: "block",
-              fontWeight: "600",
+              fontWeight: "700",
+              color: "#344054",
               marginBottom: "8px",
+              fontSize: "14px",
             }}
           >
             Email
@@ -275,21 +372,23 @@ export default function LoginPage() {
             style={{
               width: "100%",
               padding: "14px",
-              border: "1px solid #d1d5db",
+              border: "1px solid #d0d5dd",
               borderRadius: "10px",
               marginBottom: "18px",
               fontSize: "16px",
               boxSizing: "border-box",
+              outline: "none",
+              background: "#ffffff",
             }}
           />
-
-          {/* PASSWORD */}
 
           <label
             style={{
               display: "block",
-              fontWeight: "600",
+              fontWeight: "700",
+              color: "#344054",
               marginBottom: "8px",
+              fontSize: "14px",
             }}
           >
             Password
@@ -308,15 +407,17 @@ export default function LoginPage() {
             style={{
               width: "100%",
               padding: "14px",
-              border: "1px solid #d1d5db",
+              border: "1px solid #d0d5dd",
               borderRadius: "10px",
               marginBottom: "10px",
               fontSize: "16px",
               boxSizing: "border-box",
+              outline: "none",
+              background: "#ffffff",
             }}
           />
 
-          {/* FORGOT PASSWORD */}
+          {/* FORGOT PASSWORD BUTTON */}
 
           <div
             style={{
@@ -324,54 +425,68 @@ export default function LoginPage() {
               marginBottom: "20px",
             }}
           >
-            <Link
-              href="/forgot-password"
+            <button
+              type="button"
+              onClick={() => {
+                setShowForgotPassword(
+                  !showForgotPassword
+                );
+                setResetError("");
+                setResetMessage("");
+
+                if (!resetEmail) {
+                  setResetEmail(email);
+                }
+              }}
               style={{
+                background: "none",
+                border: "none",
+                padding: 0,
                 color: "#0057b8",
-                textDecoration: "none",
                 fontSize: "14px",
                 fontWeight: "600",
+                cursor: "pointer",
               }}
             >
               Forgot password?
-            </Link>
+            </button>
           </div>
 
-          {/* ERROR */}
-
           {error && (
-            <p
+            <div
               style={{
-                background: "#fee2e2",
-                color: "#b91c1c",
+                background: "#fff1f1",
+                border:
+                  "1px solid #ffd1d1",
+                color: "#b42318",
                 padding: "12px",
-                borderRadius: "8px",
+                borderRadius: "10px",
                 marginBottom: "15px",
+                fontSize: "14px",
                 lineHeight: "1.5",
               }}
             >
               {error}
-            </p>
+            </div>
           )}
 
-          {/* MESSAGE */}
-
           {message && (
-            <p
+            <div
               style={{
-                background: "#dcfce7",
-                color: "#166534",
+                background: "#ecfdf3",
+                border:
+                  "1px solid #b7ebc6",
+                color: "#18794e",
                 padding: "12px",
-                borderRadius: "8px",
+                borderRadius: "10px",
                 marginBottom: "15px",
+                fontSize: "14px",
                 lineHeight: "1.5",
               }}
             >
               {message}
-            </p>
+            </div>
           )}
-
-          {/* LOGIN BUTTON */}
 
           <button
             type="submit"
@@ -379,17 +494,20 @@ export default function LoginPage() {
             style={{
               width: "100%",
               background: loading
-                ? "#93c5fd"
+                ? "#93bce5"
                 : "#0057b8",
               color: "#ffffff",
               border: "none",
-              padding: "14px",
+              padding: "15px",
               borderRadius: "10px",
               fontSize: "16px",
               fontWeight: "700",
               cursor: loading
                 ? "not-allowed"
                 : "pointer",
+              boxShadow: loading
+                ? "none"
+                : "0 6px 18px rgba(0,87,184,0.22)",
             }}
           >
             {loading
@@ -397,14 +515,208 @@ export default function LoginPage() {
               : "Login"}
           </button>
         </form>
+        
+                {/* =====================================================
+            FORGOT PASSWORD PANEL
+        ====================================================== */}
 
-        {/* SIGN UP */}
+        {showForgotPassword && (
+          <div
+            style={{
+              marginTop: "22px",
+              padding: "20px",
+              background:
+                "linear-gradient(135deg, #f7fbff, #eef6ff)",
+              border:
+                "1px solid #d7e7f8",
+              borderRadius: "15px",
+              boxShadow:
+                "0 6px 20px rgba(0,87,184,0.07)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                marginBottom: "12px",
+              }}
+            >
+              <div
+                style={{
+                  width: "42px",
+                  height: "42px",
+                  borderRadius: "12px",
+                  background: "#dceeff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "20px",
+                }}
+              >
+                🔐
+              </div>
+
+              <div>
+                <h2
+                  style={{
+                    margin: 0,
+                    color: "#063b73",
+                    fontSize: "18px",
+                    fontWeight: "800",
+                  }}
+                >
+                  Reset your password
+                </h2>
+
+                <p
+                  style={{
+                    margin: "4px 0 0",
+                    color: "#667085",
+                    fontSize: "13px",
+                  }}
+                >
+                  We'll send you a secure reset link.
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleForgotPassword}>
+
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: "700",
+                  color: "#344054",
+                  marginBottom: "8px",
+                  fontSize: "14px",
+                }}
+              >
+                Email address
+              </label>
+
+              <input
+                type="email"
+                value={resetEmail}
+                onChange={(e) =>
+                  setResetEmail(e.target.value)
+                }
+                placeholder="Enter your account email"
+                required
+                disabled={resetLoading}
+                autoComplete="email"
+                style={{
+                  width: "100%",
+                  padding: "14px",
+                  border:
+                    "1px solid #cbd9e8",
+                  borderRadius: "10px",
+                  marginBottom: "14px",
+                  fontSize: "16px",
+                  boxSizing: "border-box",
+                  outline: "none",
+                  background: "#ffffff",
+                }}
+              />
+
+              {resetError && (
+                <div
+                  style={{
+                    background: "#fff1f1",
+                    border:
+                      "1px solid #ffd1d1",
+                    color: "#b42318",
+                    padding: "12px",
+                    borderRadius: "10px",
+                    marginBottom: "14px",
+                    fontSize: "13px",
+                    lineHeight: "1.5",
+                  }}
+                >
+                  {resetError}
+                </div>
+              )}
+
+              {resetMessage && (
+                <div
+                  style={{
+                    background: "#ecfdf3",
+                    border:
+                      "1px solid #b7ebc6",
+                    color: "#18794e",
+                    padding: "12px",
+                    borderRadius: "10px",
+                    marginBottom: "14px",
+                    fontSize: "13px",
+                    lineHeight: "1.5",
+                  }}
+                >
+                  {resetMessage}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={resetLoading}
+                style={{
+                  width: "100%",
+                  background: resetLoading
+                    ? "#93bce5"
+                    : "#0057b8",
+                  color: "#ffffff",
+                  border: "none",
+                  padding: "14px",
+                  borderRadius: "10px",
+                  fontSize: "15px",
+                  fontWeight: "700",
+                  cursor: resetLoading
+                    ? "not-allowed"
+                    : "pointer",
+                  boxShadow: resetLoading
+                    ? "none"
+                    : "0 5px 15px rgba(0,87,184,0.18)",
+                }}
+              >
+                {resetLoading
+                  ? "Sending..."
+                  : "Send Reset Link"}
+              </button>
+            </form>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowForgotPassword(false);
+                setResetError("");
+                setResetMessage("");
+              }}
+              style={{
+                width: "100%",
+                marginTop: "10px",
+                padding: "11px",
+                background: "transparent",
+                color: "#667085",
+                border: "none",
+                fontSize: "14px",
+                fontWeight: "600",
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {/* =====================================================
+            SIGN UP
+        ====================================================== */}
 
         <p
           style={{
             textAlign: "center",
             marginTop: "25px",
-            color: "#6b7280",
+            color: "#667085",
+            fontSize: "14px",
           }}
         >
           Don't have an account?{" "}
@@ -420,18 +732,23 @@ export default function LoginPage() {
           </Link>
         </p>
 
-        {/* HOME */}
+        {/* =====================================================
+            BACK TO HOME
+        ====================================================== */}
 
         <div
           style={{
             textAlign: "center",
             marginTop: "20px",
+            paddingTop: "18px",
+            borderTop:
+              "1px solid #eef2f6",
           }}
         >
           <Link
             href="/"
             style={{
-              color: "#6b7280",
+              color: "#667085",
               textDecoration: "none",
               fontSize: "14px",
             }}
