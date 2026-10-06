@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
@@ -12,185 +12,300 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [resetLoading, setResetLoading] = useState(false);
-
+  const [checkingSession, setCheckingSession] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const [showForgotPassword, setShowForgotPassword] =
-    useState(false);
+  // ============================================================
+  // CHECK EXISTING SUPABASE SESSION
+  // ============================================================
 
-  const [resetEmail, setResetEmail] = useState("");
-  const [resetMessage, setResetMessage] = useState("");
-  const [resetError, setResetError] = useState("");
+  useEffect(() => {
+    let mounted = true;
 
-  async function handleLogin(e) {
-    e.preventDefault();
+    async function checkSession() {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-    setLoading(true);
-    setError("");
-    setMessage("");
+        if (!mounted) return;
 
+        if (session?.user) {
+          await routeAuthenticatedUser(session.user);
+          return;
+        }
+      } catch (err) {
+        console.error("Session check error:", err);
+      }
+
+      if (mounted) {
+        setCheckingSession(false);
+      }
+    }
+
+    checkSession();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // ============================================================
+  // ROUTE AUTHENTICATED USER
+  // ============================================================
+
+  async function routeAuthenticatedUser(user) {
     try {
-      const { data, error: loginError } =
-        await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
+      const userId = user.id;
+      const userEmail = (user.email || "").trim().toLowerCase();
 
-      if (loginError) {
-        setError(loginError.message);
-        setLoading(false);
-        return;
-      }
+      console.log("Authenticated user:", userId);
+      console.log("Authenticated email:", userEmail);
 
-      const user = data?.user;
+      // ----------------------------------------------------------
+      // FIRST: LOOK FOR COMPANY BY AUTH USER ID
+      // ----------------------------------------------------------
 
-      if (!user) {
-        setError("Could not find your account.");
-        setLoading(false);
-        return;
-      }
+      const { data: companyByUserId, error: companyUserError } =
+        await supabase
+          .from("companies")
+          .select("*")
+          .eq("user_id", userId)
+          .limit(1)
+          .maybeSingle();
 
-      setMessage(
-        "Login successful! Redirecting..."
-      );
-
-      localStorage.removeItem("gradlink_profile");
-
-      const cleanEmail = user.email
-        ?.trim()
-        .toLowerCase();
-
-      // ========================================================
-      // CHECK COMPANY BY USER ID
-      // ========================================================
-
-      const {
-        data: companyByUserId,
-        error: companyUserIdError,
-      } = await supabase
-        .from("companies")
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (companyUserIdError) {
-        console.error(
-          "Company user_id check error:",
-          companyUserIdError
+      if (companyUserError) {
+        console.warn(
+          "Company user_id lookup warning:",
+          companyUserError.message
         );
       }
 
       if (companyByUserId) {
-        localStorage.setItem(
-          "gradlink_profile",
-          "company"
-        );
+        localStorage.setItem("gradlink_profile", "company");
+
+        console.log("Company identified by user_id");
 
         router.replace("/company-dashboard");
         return;
       }
 
-      // ========================================================
-      // CHECK COMPANY BY EMAIL
-      // ========================================================
+      // ----------------------------------------------------------
+      // SECOND: LOOK FOR COMPANY BY EMAIL
+      // ----------------------------------------------------------
+      //
+      // This helps repair older company records that may not have
+      // the correct Supabase auth user_id attached.
+      //
 
-      let companyByEmail = null;
-
-      if (cleanEmail) {
-        const {
-          data,
-          error: companyEmailError,
-        } = await supabase
-          .from("companies")
-          .select("*")
-          .ilike("email", cleanEmail)
-          .maybeSingle();
-
-        if (companyEmailError) {
-          console.error(
-            "Company email check error:",
-            companyEmailError
-          );
-        } else {
-          companyByEmail = data;
-        }
-      }
-
-      if (companyByEmail) {
-        const { error: updateCompanyError } =
+      if (userEmail) {
+        const { data: companyByEmail, error: companyEmailError } =
           await supabase
             .from("companies")
-            .update({
-              user_id: user.id,
-            })
-            .eq("id", companyByEmail.id);
+            .select("*")
+            .ilike("email", userEmail)
+            .limit(1)
+            .maybeSingle();
 
-        if (updateCompanyError) {
-          console.error(
-            "Could not update company user_id:",
-            updateCompanyError
+        if (companyEmailError) {
+          console.warn(
+            "Company email lookup warning:",
+            companyEmailError.message
           );
         }
 
-        localStorage.setItem(
-          "gradlink_profile",
-          "company"
-        );
+        if (companyByEmail) {
+          console.log("Company identified by email");
 
-        router.replace("/company-dashboard");
-        return;
+          // Try to repair the old company record.
+          // If RLS prevents this update, we still continue
+          // because authentication has already succeeded.
+          if (!companyByEmail.user_id) {
+            const { error: repairError } = await supabase
+              .from("companies")
+              .update({
+                user_id: userId,
+              })
+              .eq("id", companyByEmail.id);
+
+            if (repairError) {
+              console.warn(
+                "Could not repair company user_id:",
+                repairError.message
+              );
+            }
+          }
+
+          localStorage.setItem("gradlink_profile", "company");
+
+          router.replace("/company-dashboard");
+          return;
+        }
       }
 
-      // ========================================================
-      // CHECK GRADUATE
-      // ========================================================
+      // ----------------------------------------------------------
+      // THIRD: LOOK FOR GRADUATE BY AUTH USER ID
+      // ----------------------------------------------------------
 
-      const {
-        data: graduate,
-        error: graduateError,
-      } = await supabase
-        .from("graduates")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      const { data: graduateByUserId, error: graduateUserError } =
+        await supabase
+          .from("graduates")
+          .select("*")
+          .eq("user_id", userId)
+          .limit(1)
+          .maybeSingle();
 
-      if (graduateError) {
-        console.error(
-          "Graduate check error:",
-          graduateError
+      if (graduateUserError) {
+        console.warn(
+          "Graduate user_id lookup warning:",
+          graduateUserError.message
         );
-
-        setError(
-          "Could not check your account type. Please try again."
-        );
-
-        setLoading(false);
-        return;
       }
 
-      if (graduate) {
-        localStorage.setItem(
-          "gradlink_profile",
-          "graduate"
-        );
+      if (graduateByUserId) {
+        localStorage.setItem("gradlink_profile", "graduate");
+
+        console.log("Graduate identified by user_id");
 
         router.replace("/graduate");
         return;
       }
 
-      // ========================================================
-      // NEW USER
-      // ========================================================
+      // ----------------------------------------------------------
+      // FOURTH: LOOK FOR GRADUATE BY EMAIL
+      // ----------------------------------------------------------
+
+      if (userEmail) {
+        const { data: graduateByEmail, error: graduateEmailError } =
+          await supabase
+            .from("graduates")
+            .select("*")
+            .ilike("email", userEmail)
+            .limit(1)
+            .maybeSingle();
+
+        if (graduateEmailError) {
+          console.warn(
+            "Graduate email lookup warning:",
+            graduateEmailError.message
+          );
+        }
+
+        if (graduateByEmail) {
+          console.log("Graduate identified by email");
+
+          // Try to repair older records.
+          if (!graduateByEmail.user_id) {
+            const { error: repairError } = await supabase
+              .from("graduates")
+              .update({
+                user_id: userId,
+              })
+              .eq("id", graduateByEmail.id);
+
+            if (repairError) {
+              console.warn(
+                "Could not repair graduate user_id:",
+                repairError.message
+              );
+            }
+          }
+
+          localStorage.setItem("gradlink_profile", "graduate");
+
+          router.replace("/graduate");
+          return;
+        }
+      }
+
+      // ----------------------------------------------------------
+      // NO PROFILE FOUND
+      // ----------------------------------------------------------
+      //
+      // Authentication succeeded, but there is no matching
+      // GradLink profile yet.
+      //
+
+      console.log("Authenticated user has no GradLink profile");
+
+      localStorage.removeItem("gradlink_profile");
 
       router.replace("/choose-profile");
-
     } catch (err) {
-      console.error("Login error:", err);
+      console.error("Profile routing error:", err);
+
+      // IMPORTANT:
+      // Do NOT tell the user their password is wrong.
+      // They have already successfully authenticated.
+      //
+      // Send them to profile selection instead.
+      localStorage.removeItem("gradlink_profile");
+
+      router.replace("/choose-profile");
+    }
+  }
+
+  // ============================================================
+  // LOGIN
+  // ============================================================
+
+  async function handleLogin(event) {
+    event.preventDefault();
+
+    setError("");
+    setMessage("");
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail || !password) {
+      setError("Please enter your email address and password.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // --------------------------------------------------------
+      // AUTHENTICATE DIRECTLY WITH SUPABASE
+      // --------------------------------------------------------
+
+      const { data, error: loginError } =
+        await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password,
+        });
+
+      if (loginError) {
+        console.error("Supabase login error:", loginError);
+
+        setError(loginError.message || "Unable to sign in.");
+        setLoading(false);
+        return;
+      }
+
+      if (!data?.user) {
+        setError("Login was not completed. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      console.log("Supabase login successful");
+
+      // --------------------------------------------------------
+      // DO NOT TRUST LOCAL STORAGE FOR AUTHENTICATION
+      // --------------------------------------------------------
+      //
+      // The old phone's localStorage is irrelevant here.
+      // The authenticated Supabase user is the source of truth.
+      //
+
+      await routeAuthenticatedUser(data.user);
+    } catch (err) {
+      console.error("Unexpected login error:", err);
 
       setError(
-        "Something went wrong while logging in. Please try again."
+        "Something went wrong while signing in. Please check your connection and try again."
       );
 
       setLoading(false);
@@ -201,562 +316,498 @@ export default function LoginPage() {
   // FORGOT PASSWORD
   // ============================================================
 
-  async function handleForgotPassword(e) {
-    e.preventDefault();
+  function handleForgotPassword() {
+    setError("");
+    setMessage("");
 
-    setResetLoading(true);
-    setResetError("");
-    setResetMessage("");
-
-    const cleanEmail = resetEmail
-      .trim()
-      .toLowerCase();
-
-    if (!cleanEmail) {
-      setResetError(
-        "Please enter your email address."
-      );
-
-      setResetLoading(false);
-      return;
-    }
-
-    try {
-      const { error: resetError } =
-        await supabase.auth.resetPasswordForEmail(
-          cleanEmail,
-          {
-            redirectTo:
-              `${window.location.origin}/reset-password`,
-          }
-        );
-
-      if (resetError) {
-        console.error(
-          "Password reset error:",
-          resetError
-        );
-
-        setResetError(resetError.message);
-        setResetLoading(false);
-        return;
-      }
-
-      setResetMessage(
-        "Password reset email sent successfully. Please check your email and tap the reset link."
-      );
-
-      setResetEmail("");
-
-    } catch (err) {
-      console.error(
-        "Forgot password error:",
-        err
-      );
-
-      setResetError(
-        "Something went wrong while sending the reset email. Please try again."
-      );
-    }
-
-    setResetLoading(false);
+    router.push(
+      `/forgot-password${
+        email.trim()
+          ? `?email=${encodeURIComponent(email.trim())}`
+          : ""
+      }`
+    );
   }
 
-  return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background:
-          "linear-gradient(135deg, #f4f8ff 0%, #eef5ff 50%, #ffffff 100%)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        padding: "20px",
-        boxSizing: "border-box",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "450px",
-          background: "#ffffff",
-          padding: "35px 25px",
-          borderRadius: "20px",
-          boxShadow:
-            "0 15px 45px rgba(0,55,120,0.12)",
-          border: "1px solid #e5edf7",
-          boxSizing: "border-box",
-        }}
-      >
-        {/* =====================================================
-            HEADER
-        ====================================================== */}
+  // ============================================================
+  // LOADING SCREEN
+  // ============================================================
 
-        <div
-          style={{
-            textAlign: "center",
-            marginBottom: "30px",
-          }}
-        >
-          <div
-            style={{
-              width: "64px",
-              height: "64px",
-              margin: "0 auto 15px",
-              borderRadius: "18px",
-              background:
-                "linear-gradient(135deg, #0057b8, #0b78e3)",
-              color: "#ffffff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "28px",
-              fontWeight: "800",
-              boxShadow:
-                "0 8px 20px rgba(0,87,184,0.22)",
-            }}
-          >
-            G
-          </div>
+  if (checkingSession) {
+    return (
+      <main style={styles.page}>
+        <div style={styles.backgroundGlowOne}></div>
+        <div style={styles.backgroundGlowTwo}></div>
 
-          <h1
-            style={{
-              margin: "0 0 8px",
-              color: "#063b73",
-              fontSize: "30px",
-              fontWeight: "800",
-            }}
-          >
-            GradLink SA
-          </h1>
+        <section style={styles.loadingCard}>
+          <div style={styles.logoMark}>G</div>
 
-          <p
-            style={{
-              margin: 0,
-              color: "#667085",
-              fontSize: "15px",
-            }}
-          >
-            Login to your account
+          <h1 style={styles.loadingTitle}>GradLink SA</h1>
+
+          <p style={styles.loadingText}>
+            Checking your account...
           </p>
+
+          <div style={styles.spinner}></div>
+        </section>
+      </main>
+    );
+  }
+
+  // ============================================================
+  // LOGIN PAGE
+  // ============================================================
+
+  return (
+    <main style={styles.page}>
+      <div style={styles.backgroundGlowOne}></div>
+      <div style={styles.backgroundGlowTwo}></div>
+
+      <div style={styles.container}>
+        {/* BRAND */}
+        <div style={styles.brandSection}>
+          <div style={styles.logoMark}>G</div>
+
+          <div>
+            <div style={styles.brandName}>GradLink SA</div>
+            <div style={styles.brandTagline}>
+              Connecting talent with opportunity
+            </div>
+          </div>
         </div>
 
-        {/* =====================================================
-            LOGIN FORM
-        ====================================================== */}
+        {/* LOGIN CARD */}
+        <section style={styles.card}>
+          <div style={styles.cardHeader}>
+            <div style={styles.eyebrow}>WELCOME BACK</div>
 
-        <form onSubmit={handleLogin}>
+            <h1 style={styles.title}>Sign in to GradLink SA</h1>
 
-          <label
-            style={{
-              display: "block",
-              fontWeight: "700",
-              color: "#344054",
-              marginBottom: "8px",
-              fontSize: "14px",
-            }}
-          >
-            Email
-          </label>
-
-          <input
-            type="email"
-            value={email}
-            onChange={(e) =>
-              setEmail(e.target.value)
-            }
-            placeholder="Enter your email"
-            required
-            disabled={loading}
-            autoComplete="email"
-            style={{
-              width: "100%",
-              padding: "14px",
-              border: "1px solid #d0d5dd",
-              borderRadius: "10px",
-              marginBottom: "18px",
-              fontSize: "16px",
-              boxSizing: "border-box",
-              outline: "none",
-              background: "#ffffff",
-            }}
-          />
-
-          <label
-            style={{
-              display: "block",
-              fontWeight: "700",
-              color: "#344054",
-              marginBottom: "8px",
-              fontSize: "14px",
-            }}
-          >
-            Password
-          </label>
-
-          <input
-            type="password"
-            value={password}
-            onChange={(e) =>
-              setPassword(e.target.value)
-            }
-            placeholder="Enter your password"
-            required
-            disabled={loading}
-            autoComplete="current-password"
-            style={{
-              width: "100%",
-              padding: "14px",
-              border: "1px solid #d0d5dd",
-              borderRadius: "10px",
-              marginBottom: "10px",
-              fontSize: "16px",
-              boxSizing: "border-box",
-              outline: "none",
-              background: "#ffffff",
-            }}
-          />
-
-          {/* FORGOT PASSWORD BUTTON */}
-
-          <div
-            style={{
-              textAlign: "right",
-              marginBottom: "20px",
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                setShowForgotPassword(
-                  !showForgotPassword
-                );
-                setResetError("");
-                setResetMessage("");
-
-                if (!resetEmail) {
-                  setResetEmail(email);
-                }
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                padding: 0,
-                color: "#0057b8",
-                fontSize: "14px",
-                fontWeight: "600",
-                cursor: "pointer",
-              }}
-            >
-              Forgot password?
-            </button>
+            <p style={styles.subtitle}>
+              Access your graduate or company account.
+            </p>
           </div>
 
           {error && (
-            <div
-              style={{
-                background: "#fff1f1",
-                border:
-                  "1px solid #ffd1d1",
-                color: "#b42318",
-                padding: "12px",
-                borderRadius: "10px",
-                marginBottom: "15px",
-                fontSize: "14px",
-                lineHeight: "1.5",
-              }}
-            >
-              {error}
+            <div style={styles.errorBox}>
+              <div style={styles.errorIcon}>!</div>
+
+              <div>
+                <strong style={styles.errorTitle}>Unable to sign in</strong>
+
+                <p style={styles.errorText}>{error}</p>
+              </div>
             </div>
           )}
 
           {message && (
-            <div
-              style={{
-                background: "#ecfdf3",
-                border:
-                  "1px solid #b7ebc6",
-                color: "#18794e",
-                padding: "12px",
-                borderRadius: "10px",
-                marginBottom: "15px",
-                fontSize: "14px",
-                lineHeight: "1.5",
-              }}
-            >
+            <div style={styles.successBox}>
               {message}
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: "100%",
-              background: loading
-                ? "#93bce5"
-                : "#0057b8",
-              color: "#ffffff",
-              border: "none",
-              padding: "15px",
-              borderRadius: "10px",
-              fontSize: "16px",
-              fontWeight: "700",
-              cursor: loading
-                ? "not-allowed"
-                : "pointer",
-              boxShadow: loading
-                ? "none"
-                : "0 6px 18px rgba(0,87,184,0.22)",
-            }}
-          >
-            {loading
-              ? "Logging in..."
-              : "Login"}
-          </button>
-        </form>
-        
-                {/* =====================================================
-            FORGOT PASSWORD PANEL
-        ====================================================== */}
-
-        {showForgotPassword && (
-          <div
-            style={{
-              marginTop: "22px",
-              padding: "20px",
-              background:
-                "linear-gradient(135deg, #f7fbff, #eef6ff)",
-              border:
-                "1px solid #d7e7f8",
-              borderRadius: "15px",
-              boxShadow:
-                "0 6px 20px rgba(0,87,184,0.07)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-                marginBottom: "12px",
-              }}
-            >
-              <div
-                style={{
-                  width: "42px",
-                  height: "42px",
-                  borderRadius: "12px",
-                  background: "#dceeff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "20px",
-                }}
-              >
-                🔐
-              </div>
-
-              <div>
-                <h2
-                  style={{
-                    margin: 0,
-                    color: "#063b73",
-                    fontSize: "18px",
-                    fontWeight: "800",
-                  }}
-                >
-                  Reset your password
-                </h2>
-
-                <p
-                  style={{
-                    margin: "4px 0 0",
-                    color: "#667085",
-                    fontSize: "13px",
-                  }}
-                >
-                  We'll send you a secure reset link.
-                </p>
-              </div>
-            </div>
-
-            <form onSubmit={handleForgotPassword}>
-
-              <label
-                style={{
-                  display: "block",
-                  fontWeight: "700",
-                  color: "#344054",
-                  marginBottom: "8px",
-                  fontSize: "14px",
-                }}
-              >
-                Email address
-              </label>
+          <form onSubmit={handleLogin}>
+            {/* EMAIL */}
+            <div style={styles.field}>
+              <label style={styles.label}>Email address</label>
 
               <input
                 type="email"
-                value={resetEmail}
-                onChange={(e) =>
-                  setResetEmail(e.target.value)
-                }
-                placeholder="Enter your account email"
-                required
-                disabled={resetLoading}
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@example.com"
                 autoComplete="email"
-                style={{
-                  width: "100%",
-                  padding: "14px",
-                  border:
-                    "1px solid #cbd9e8",
-                  borderRadius: "10px",
-                  marginBottom: "14px",
-                  fontSize: "16px",
-                  boxSizing: "border-box",
-                  outline: "none",
-                  background: "#ffffff",
-                }}
+                autoCapitalize="none"
+                spellCheck="false"
+                disabled={loading}
+                style={styles.input}
               />
+            </div>
 
-              {resetError && (
-                <div
-                  style={{
-                    background: "#fff1f1",
-                    border:
-                      "1px solid #ffd1d1",
-                    color: "#b42318",
-                    padding: "12px",
-                    borderRadius: "10px",
-                    marginBottom: "14px",
-                    fontSize: "13px",
-                    lineHeight: "1.5",
-                  }}
+            {/* PASSWORD */}
+            <div style={styles.field}>
+              <div style={styles.passwordLabelRow}>
+                <label style={styles.label}>Password</label>
+
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={loading}
+                  style={styles.forgotButton}
                 >
-                  {resetError}
-                </div>
-              )}
+                  Forgot password?
+                </button>
+              </div>
 
-              {resetMessage && (
-                <div
-                  style={{
-                    background: "#ecfdf3",
-                    border:
-                      "1px solid #b7ebc6",
-                    color: "#18794e",
-                    padding: "12px",
-                    borderRadius: "10px",
-                    marginBottom: "14px",
-                    fontSize: "13px",
-                    lineHeight: "1.5",
-                  }}
-                >
-                  {resetMessage}
-                </div>
-              )}
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                disabled={loading}
+                style={styles.input}
+              />
+            </div>
 
-              <button
-                type="submit"
-                disabled={resetLoading}
-                style={{
-                  width: "100%",
-                  background: resetLoading
-                    ? "#93bce5"
-                    : "#0057b8",
-                  color: "#ffffff",
-                  border: "none",
-                  padding: "14px",
-                  borderRadius: "10px",
-                  fontSize: "15px",
-                  fontWeight: "700",
-                  cursor: resetLoading
-                    ? "not-allowed"
-                    : "pointer",
-                  boxShadow: resetLoading
-                    ? "none"
-                    : "0 5px 15px rgba(0,87,184,0.18)",
-                }}
-              >
-                {resetLoading
-                  ? "Sending..."
-                  : "Send Reset Link"}
-              </button>
-            </form>
-
+            {/* LOGIN BUTTON */}
             <button
-              type="button"
-              onClick={() => {
-                setShowForgotPassword(false);
-                setResetError("");
-                setResetMessage("");
-              }}
+              type="submit"
+              disabled={loading}
               style={{
-                width: "100%",
-                marginTop: "10px",
-                padding: "11px",
-                background: "transparent",
-                color: "#667085",
-                border: "none",
-                fontSize: "14px",
-                fontWeight: "600",
-                cursor: "pointer",
+                ...styles.loginButton,
+                ...(loading ? styles.loginButtonDisabled : {}),
               }}
             >
-              Cancel
+              {loading ? (
+                <>
+                  <span style={styles.buttonSpinner}></span>
+                  Signing in...
+                </>
+              ) : (
+                "Sign In"
+              )}
             </button>
+          </form>
+
+          {/* SIGN UP */}
+          <div style={styles.signupSection}>
+            <span style={styles.signupText}>
+              Don't have an account?
+            </span>
+
+            <Link href="/signup" style={styles.signupLink}>
+              Create an account
+            </Link>
           </div>
-        )}
+        </section>
 
-        {/* =====================================================
-            SIGN UP
-        ====================================================== */}
-
-        <p
-          style={{
-            textAlign: "center",
-            marginTop: "25px",
-            color: "#667085",
-            fontSize: "14px",
-          }}
-        >
-          Don't have an account?{" "}
-          <Link
-            href="/signup"
-            style={{
-              color: "#0057b8",
-              fontWeight: "700",
-              textDecoration: "none",
-            }}
-          >
-            Sign up
-          </Link>
-        </p>
-
-        {/* =====================================================
-            BACK TO HOME
-        ====================================================== */}
-
-        <div
-          style={{
-            textAlign: "center",
-            marginTop: "20px",
-            paddingTop: "18px",
-            borderTop:
-              "1px solid #eef2f6",
-          }}
-        >
-          <Link
-            href="/"
-            style={{
-              color: "#667085",
-              textDecoration: "none",
-              fontSize: "14px",
-            }}
-          >
-            ← Back to GradLink SA
-          </Link>
+        {/* TRUST MESSAGE */}
+        <div style={styles.bottomText}>
+          <span style={styles.lockIcon}>🔒</span>
+          Secure authentication powered by Supabase
         </div>
       </div>
     </main>
   );
 }
+
+// ================================================================
+// STYLES
+// ================================================================
+
+const styles = {
+  page: {
+    minHeight: "100vh",
+    width: "100%",
+    background:
+      "linear-gradient(145deg, #f7fbff 0%, #eef6ff 48%, #ffffff 100%)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: "28px 18px",
+    position: "relative",
+    overflow: "hidden",
+    boxSizing: "border-box",
+    fontFamily:
+      '-apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif',
+  },
+
+  backgroundGlowOne: {
+    position: "absolute",
+    width: "380px",
+    height: "380px",
+    borderRadius: "50%",
+    background: "rgba(37, 99, 235, 0.08)",
+    top: "-180px",
+    right: "-150px",
+    pointerEvents: "none",
+  },
+
+  backgroundGlowTwo: {
+    position: "absolute",
+    width: "320px",
+    height: "320px",
+    borderRadius: "50%",
+    background: "rgba(14, 165, 233, 0.06)",
+    bottom: "-160px",
+    left: "-140px",
+    pointerEvents: "none",
+  },
+
+  container: {
+    width: "100%",
+    maxWidth: "470px",
+    position: "relative",
+    zIndex: 2,
+  },
+
+  brandSection: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "12px",
+    marginBottom: "24px",
+  },
+
+  logoMark: {
+    width: "48px",
+    height: "48px",
+    borderRadius: "15px",
+    background:
+      "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+    color: "#ffffff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "24px",
+    fontWeight: "900",
+    boxShadow: "0 12px 25px rgba(37, 99, 235, 0.24)",
+    flexShrink: 0,
+  },
+
+  brandName: {
+    fontSize: "21px",
+    fontWeight: "850",
+    color: "#0f172a",
+    lineHeight: "1.1",
+  },
+
+  brandTagline: {
+    fontSize: "12px",
+    color: "#64748b",
+    marginTop: "4px",
+  },
+
+  card: {
+    background: "rgba(255, 255, 255, 0.96)",
+    border: "1px solid rgba(226, 232, 240, 0.95)",
+    borderRadius: "24px",
+    padding: "30px 26px",
+    boxShadow:
+      "0 25px 70px rgba(15, 23, 42, 0.10), 0 4px 15px rgba(15, 23, 42, 0.04)",
+    boxSizing: "border-box",
+  },
+
+  cardHeader: {
+    marginBottom: "25px",
+  },
+
+  eyebrow: {
+    display: "inline-block",
+    fontSize: "11px",
+    fontWeight: "850",
+    letterSpacing: "1.4px",
+    color: "#2563eb",
+    marginBottom: "8px",
+  },
+
+  title: {
+    margin: 0,
+    color: "#0f172a",
+    fontSize: "28px",
+    lineHeight: "1.15",
+    fontWeight: "850",
+    letterSpacing: "-0.6px",
+  },
+
+  subtitle: {
+    margin: "9px 0 0",
+    color: "#64748b",
+    fontSize: "14px",
+    lineHeight: "1.55",
+  },
+
+  field: {
+    marginBottom: "18px",
+  },
+
+  passwordLabelRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    marginBottom: "8px",
+  },
+
+  label: {
+    display: "block",
+    fontSize: "13px",
+    fontWeight: "750",
+    color: "#334155",
+  },
+
+  forgotButton: {
+    border: "none",
+    background: "transparent",
+    color: "#2563eb",
+    fontSize: "12px",
+    fontWeight: "750",
+    cursor: "pointer",
+    padding: "2px 0",
+  },
+
+  input: {
+    width: "100%",
+    height: "52px",
+    borderRadius: "13px",
+    border: "1px solid #dbe3ee",
+    background: "#ffffff",
+    padding: "0 15px",
+    fontSize: "15px",
+    color: "#0f172a",
+    outline: "none",
+    boxSizing: "border-box",
+  },
+
+  loginButton: {
+    width: "100%",
+    minHeight: "53px",
+    border: "none",
+    borderRadius: "14px",
+    background:
+      "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+    color: "#ffffff",
+    fontSize: "15px",
+    fontWeight: "800",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "9px",
+    boxShadow: "0 12px 25px rgba(37, 99, 235, 0.22)",
+    marginTop: "6px",
+  },
+
+  loginButtonDisabled: {
+    opacity: 0.72,
+    cursor: "not-allowed",
+  },
+
+  buttonSpinner: {
+    width: "16px",
+    height: "16px",
+    border: "2px solid rgba(255,255,255,0.45)",
+    borderTopColor: "#ffffff",
+    borderRadius: "50%",
+    display: "inline-block",
+    animation: "spin 0.8s linear infinite",
+  },
+
+  errorBox: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "11px",
+    background: "#fff5f5",
+    border: "1px solid #fecaca",
+    borderRadius: "13px",
+    padding: "13px",
+    marginBottom: "18px",
+  },
+
+  errorIcon: {
+    width: "23px",
+    height: "23px",
+    borderRadius: "50%",
+    background: "#dc2626",
+    color: "#ffffff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "13px",
+    fontWeight: "900",
+    flexShrink: 0,
+  },
+
+  errorTitle: {
+    display: "block",
+    color: "#991b1b",
+    fontSize: "13px",
+    marginBottom: "2px",
+  },
+
+  errorText: {
+    margin: 0,
+    color: "#b91c1c",
+    fontSize: "12px",
+    lineHeight: "1.45",
+  },
+
+  successBox: {
+    background: "#f0fdf4",
+    border: "1px solid #bbf7d0",
+    color: "#166534",
+    borderRadius: "13px",
+    padding: "12px 13px",
+    fontSize: "13px",
+    marginBottom: "18px",
+  },
+
+  signupSection: {
+    marginTop: "24px",
+    paddingTop: "21px",
+    borderTop: "1px solid #eef2f7",
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: "5px",
+    fontSize: "13px",
+  },
+
+  signupText: {
+    color: "#64748b",
+  },
+
+  signupLink: {
+    color: "#2563eb",
+    fontWeight: "800",
+    textDecoration: "none",
+  },
+
+  bottomText: {
+    textAlign: "center",
+    marginTop: "18px",
+    color: "#94a3b8",
+    fontSize: "11px",
+  },
+
+  lockIcon: {
+    marginRight: "5px",
+  },
+
+  loadingCard: {
+    width: "100%",
+    maxWidth: "360px",
+    background: "#ffffff",
+    border: "1px solid #e2e8f0",
+    borderRadius: "24px",
+    padding: "35px 25px",
+    boxShadow: "0 25px 70px rgba(15, 23, 42, 0.10)",
+    textAlign: "center",
+    position: "relative",
+    zIndex: 2,
+  },
+
+  loadingTitle: {
+    margin: "16px 0 5px",
+    color: "#0f172a",
+    fontSize: "21px",
+    fontWeight: "850",
+  },
+
+  loadingText: {
+    margin: 0,
+    color: "#64748b",
+    fontSize: "13px",
+  },
+
+  spinner: {
+    width: "25px",
+    height: "25px",
+    border: "3px solid #dbeafe",
+    borderTopColor: "#2563eb",
+    borderRadius: "50%",
+    margin: "20px auto 0",
+    animation: "spin 0.8s linear infinite",
+  },
+};
