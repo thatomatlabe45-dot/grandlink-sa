@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { supabase } from "../../lib/supabase";
 
 export default function ForgotPasswordPage() {
@@ -249,8 +248,11 @@ const styles = {
     width: "40px",
     height: "40px",
     borderRadius: "11px",
+
+    /* Small visual change to trigger a new deployment */
     background:
-      "linear-gradient(135deg, #2563eb, #1d4ed8)",
+      "linear-gradient(135deg, #1d4ed8, #1e40af)",
+
     color: "#ffffff",
     display: "flex",
     alignItems: "center",
