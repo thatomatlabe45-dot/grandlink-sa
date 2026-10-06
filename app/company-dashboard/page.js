@@ -88,7 +88,6 @@ function qualificationMatches(
   const requiredLevel =
     getQualificationLevel(required);
 
-  // Higher qualifications satisfy lower requirements.
   if (applicantLevel > 0 && requiredLevel > 0) {
     return applicantLevel >= requiredLevel;
   }
@@ -572,8 +571,6 @@ export default function CompanyDashboard() {
           match_reasons:
             match.reasons,
 
-          // Keep application CV first,
-          // then graduate CV.
           cv_url:
             application.cv_url ||
             application.cv ||
@@ -844,6 +841,28 @@ export default function CompanyDashboard() {
               Company Profile
             </Link>
 
+            {/* =================================================
+                ACCOUNT & SECURITY
+            ================================================= */}
+
+            <Link
+              href="/change-password"
+              style={securityNavButton}
+            >
+              <span
+                style={{
+                  fontSize: "15px",
+                  lineHeight: 1,
+                }}
+              >
+                🔐
+              </span>
+
+              <span>
+                Account & Security
+              </span>
+            </Link>
+
             <Link
               href="/internships"
               style={primaryNavButton}
@@ -948,9 +967,7 @@ export default function CompanyDashboard() {
           }}
         >
           <div style={statCard}>
-            <div style={statIcon}>
-              💼
-            </div>
+            <div style={statIcon}>💼</div>
 
             <div style={statNumber}>
               {activeInternships}
@@ -962,9 +979,7 @@ export default function CompanyDashboard() {
           </div>
 
           <div style={statCard}>
-            <div style={statIcon}>
-              📋
-            </div>
+            <div style={statIcon}>📋</div>
 
             <div style={statNumber}>
               {applications.length}
@@ -976,9 +991,7 @@ export default function CompanyDashboard() {
           </div>
 
           <div style={statCard}>
-            <div style={statIcon}>
-              ⭐
-            </div>
+            <div style={statIcon}>⭐</div>
 
             <div style={statNumber}>
               {shortlistedCount}
@@ -990,9 +1003,7 @@ export default function CompanyDashboard() {
           </div>
 
           <div style={statCard}>
-            <div style={statIcon}>
-              👥
-            </div>
+            <div style={statIcon}>👥</div>
 
             <div style={statNumber}>
               {candidateCount}
@@ -1154,8 +1165,6 @@ export default function CompanyDashboard() {
                         padding: "22px",
                         boxShadow:
                           "0 8px 25px rgba(0,0,0,.05)",
-                        transition:
-                          "transform .2s ease,box-shadow .2s ease",
                       }}
                     >
                       <div
@@ -1335,7 +1344,7 @@ export default function CompanyDashboard() {
           )}
         </section>
 
-                {/* ====================================================
+        {/* ====================================================
             RECENT APPLICATIONS
         ==================================================== */}
 
@@ -1829,6 +1838,18 @@ export default function CompanyDashboard() {
             </Link>
 
             <Link
+              href="/change-password"
+              style={{
+                color: "#0057B8",
+                textDecoration:
+                  "none",
+                fontWeight: "700",
+              }}
+            >
+              🔐 Account & Security
+            </Link>
+
+            <Link
               href="/internships"
               style={{
                 color: "#6d7885",
@@ -1906,6 +1927,29 @@ const navButton = {
   fontSize: "13px",
   boxShadow:
     "0 3px 10px rgba(0,0,0,.04)",
+};
+
+// ============================================================
+// ACCOUNT & SECURITY NAVIGATION BUTTON
+// ============================================================
+
+const securityNavButton = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "7px",
+  minHeight: "42px",
+  padding: "0 15px",
+  boxSizing: "border-box",
+  borderRadius: "10px",
+  border: "1px solid #bfdbfe",
+  background: "#eff6ff",
+  color: "#0057B8",
+  textDecoration: "none",
+  fontWeight: "800",
+  fontSize: "13px",
+  boxShadow:
+    "0 3px 10px rgba(37,99,235,.08)",
 };
 
 const primaryNavButton = {
