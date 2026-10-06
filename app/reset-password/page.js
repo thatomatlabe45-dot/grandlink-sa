@@ -10,171 +10,144 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const [checking, setChecking] = useState(true);
-  const [ready, setReady] = useState(false);
-
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const [ready, setReady] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     let mounted = true;
 
     async function prepareRecovery() {
       try {
-        /*
-         * Supabase processes the recovery link and establishes
-         * the recovery session automatically.
-         *
-         * We listen for PASSWORD_RECOVERY and also check
-         * the current session.
-         */
-
         const {
-          data: { subscription },
-        } = supabase.auth.onAuthStateChange(
-          async (event, session) => {
-            if (!mounted) return;
+          data: { session },
+        } = await supabase.auth.getSession();
 
-            if (event === "PASSWORD_RECOVERY" && session) {
-              setReady(true);
-              setChecking(false);
-            }
+        if (session) {
+          if (mounted) {
+            setReady(true);
+            setLoading(false);
           }
-        );
-
-        /*
-         * Give Supabase a moment to process the recovery URL.
-         */
-
-        await new Promise((resolve) =>
-          setTimeout(resolve, 800)
-        );
-
-        if (!mounted) {
-          subscription.unsubscribe();
           return;
         }
 
-        const {
-          data: { session },
-          error: sessionError,
-        } = await supabase.auth.getSession();
+        const { data: authListener } =
+          supabase.auth.onAuthStateChange(
+            async (event, sessionData) => {
+              if (!mounted) return;
 
-        if (sessionError) {
-          console.error(
-            "Recovery session error:",
-            sessionError
+              if (
+                event === "PASSWORD_RECOVERY" &&
+                sessionData
+              ) {
+                setReady(true);
+                setLoading(false);
+              }
+            }
           );
-        }
 
-        if (session) {
-          setReady(true);
-        } else {
-          setError(
-            "This password reset link is invalid or has expired. Please request a new password reset email."
-          );
-        }
+        setTimeout(async () => {
+          if (!mounted) return;
 
-        setChecking(false);
+          const {
+            data: { session: currentSession },
+          } = await supabase.auth.getSession();
 
-        /*
-         * Keep the listener active while the page is open.
-         * It is cleaned up when leaving the page.
-         */
+          if (currentSession) {
+            setReady(true);
+            setLoading(false);
+          } else {
+            setError(
+              "This password reset link is invalid or has expired. Please request a new password reset link."
+            );
+            setLoading(false);
+          }
+        }, 1200);
 
         return () => {
-          subscription.unsubscribe();
+          authListener?.subscription?.unsubscribe();
         };
       } catch (err) {
         console.error(
-          "Password recovery error:",
+          "Password recovery session error:",
           err
         );
 
-        if (!mounted) return;
-
-        setError(
-          "We could not verify your password reset link. Please request a new one."
-        );
-
-        setChecking(false);
+        if (mounted) {
+          setError(
+            "We could not verify your password reset session. Please request a new reset link."
+          );
+          setLoading(false);
+        }
       }
     }
 
-    prepareRecovery();
+    let cleanup;
+
+    prepareRecovery().then((cleanupFunction) => {
+      cleanup = cleanupFunction;
+    });
 
     return () => {
       mounted = false;
+
+      if (cleanup) {
+        cleanup();
+      }
     };
   }, []);
+
+  function validatePassword(value) {
+    if (value.length < 8) {
+      return "Password must be at least 8 characters.";
+    }
+
+    if (!/[A-Za-z]/.test(value)) {
+      return "Password must contain at least one letter.";
+    }
+
+    if (!/[0-9]/.test(value)) {
+      return "Password must contain at least one number.";
+    }
+
+    return "";
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
 
     setError("");
-    setSuccess("");
+    setMessage("");
 
-    if (!ready) {
-      setError(
-        "Your password reset session is not ready. Please open the reset link from your email again."
-      );
-      return;
-    }
+    const passwordError = validatePassword(password);
 
-    if (password.length < 8) {
-      setError(
-        "Your password must be at least 8 characters."
-      );
-      return;
-    }
-
-    if (!/[A-Za-z]/.test(password)) {
-      setError(
-        "Your password must contain at least one letter."
-      );
-      return;
-    }
-
-    if (!/[0-9]/.test(password)) {
-      setError(
-        "Your password must contain at least one number."
-      );
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
 
     if (password !== confirmPassword) {
-      setError(
-        "Your passwords do not match."
-      );
+      setError("Your passwords do not match.");
       return;
     }
 
     setSaving(true);
 
     try {
-      /*
-       * Verify that the recovery session still exists
-       * immediately before updating the password.
-       */
-
       const {
         data: { session },
-        error: sessionError,
       } = await supabase.auth.getSession();
 
-      if (sessionError || !session) {
+      if (!session) {
         setError(
           "Your password reset session has expired. Please request a new reset link."
         );
-
         setSaving(false);
         return;
       }
-
-      /*
-       * Update the authenticated user's password.
-       */
 
       const { error: updateError } =
         await supabase.auth.updateUser({
@@ -187,29 +160,17 @@ export default function ResetPasswordPage() {
           updateError
         );
 
-        setError(
-          updateError.message ||
-            "Unable to update your password."
-        );
-
+        setError(updateError.message);
         setSaving(false);
         return;
       }
 
-      /*
-       * Password successfully changed.
-       */
-
-      setSuccess(
-        "Your password has been updated successfully."
+      setMessage(
+        "Your password has been saved successfully."
       );
 
       setPassword("");
       setConfirmPassword("");
-
-      /*
-       * Give the success message a moment to appear.
-       */
 
       setTimeout(() => {
         router.replace("/login");
@@ -223,9 +184,45 @@ export default function ResetPasswordPage() {
       setError(
         "Something went wrong while updating your password. Please try again."
       );
-
+    } finally {
       setSaving(false);
     }
+  }
+
+  if (loading) {
+    return (
+      <main style={styles.page}>
+        <div style={styles.glow}></div>
+
+        <div style={styles.container}>
+          <Brand />
+
+          <div style={styles.card}>
+            <div style={styles.icon}>
+              🔐
+            </div>
+
+            <h1 style={styles.title}>
+              Verifying reset link
+            </h1>
+
+            <p style={styles.subtitle}>
+              Please wait while we securely
+              verify your password reset session.
+            </p>
+
+            <div style={styles.loaderBox}>
+              <div style={styles.loader}></div>
+            </div>
+          </div>
+
+          <p style={styles.security}>
+            🔒 Secure password recovery by
+            GradLink SA.
+          </p>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -233,25 +230,7 @@ export default function ResetPasswordPage() {
       <div style={styles.glow}></div>
 
       <div style={styles.container}>
-        {/* ==================================================
-            BRAND
-        ================================================== */}
-
-        <div style={styles.brand}>
-          <div style={styles.logo}>
-            G
-          </div>
-
-          <div style={styles.brandText}>
-            Grad
-            <span>Link</span>{" "}
-            <small>SA</small>
-          </div>
-        </div>
-
-        {/* ==================================================
-            CARD
-        ================================================== */}
+        <Brand />
 
         <div style={styles.card}>
           <div style={styles.icon}>
@@ -259,7 +238,7 @@ export default function ResetPasswordPage() {
           </div>
 
           <h1 style={styles.title}>
-            Reset your password
+            Set a new password
           </h1>
 
           <p style={styles.subtitle}>
@@ -267,144 +246,60 @@ export default function ResetPasswordPage() {
             your GradLink SA account.
           </p>
 
-          {/* ==================================================
-              CHECKING
-          ================================================== */}
+          {error && (
+            <div style={styles.errorBox}>
+              <div style={styles.errorIcon}>
+                !
+              </div>
 
-          {checking ? (
-            <div style={styles.statusBox}>
-              <div style={styles.spinner}></div>
-
-              <div>
+              <div style={styles.messageArea}>
                 <strong>
-                  Verifying reset link
+                  Password reset unavailable
                 </strong>
 
-                <p>
-                  Please wait while we securely
-                  verify your password reset
-                  session.
+                <p style={styles.message}>
+                  {error}
                 </p>
               </div>
             </div>
-          ) : !ready ? (
-            <div>
-              <div style={styles.errorBox}>
-                <div style={styles.errorIcon}>
-                  !
-                </div>
+          )}
 
-                <div>
-                  <strong>
-                    Reset link unavailable
-                  </strong>
-
-                  <p>
-                    {error}
-                  </p>
-                </div>
+          {message && (
+            <div style={styles.successBox}>
+              <div style={styles.successIcon}>
+                ✓
               </div>
 
-              <button
-                type="button"
-                onClick={() =>
-                  router.replace("/login")
-                }
-                style={styles.primaryButton}
-              >
-                Back to Login
-              </button>
+              <div style={styles.messageArea}>
+                <strong>
+                  Password saved
+                </strong>
+
+                <p style={styles.message}>
+                  {message}
+                </p>
+              </div>
             </div>
-          ) : (
+          )}
+
+          {ready && !message && (
             <form onSubmit={handleSubmit}>
-              {/* ==================================================
-                  ERROR
-              ================================================== */}
-
-              {error && (
-                <div style={styles.errorBox}>
-                  <div style={styles.errorIcon}>
-                    !
-                  </div>
-
-                  <div>
-                    <strong>
-                      Password update failed
-                    </strong>
-
-                    <p>{error}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* ==================================================
-                  SUCCESS
-              ================================================== */}
-
-              {success && (
-                <div style={styles.successBox}>
-                  <div style={styles.successIcon}>
-                    ✓
-                  </div>
-
-                  <div>
-                    <strong>
-                      Password updated
-                    </strong>
-
-                    <p>{success}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* ==================================================
-                  NEW PASSWORD
-              ================================================== */}
-
-              <label style={styles.label}>
-                New password
-              </label>
-
-              <input
-                type="password"
+              <PasswordField
+                label="New password"
                 value={password}
-                onChange={(e) =>
-                  setPassword(e.target.value)
-                }
+                onChange={setPassword}
                 placeholder="Enter your new password"
-                autoComplete="new-password"
-                required
-                style={styles.input}
               />
 
-              {/* ==================================================
-                  CONFIRM PASSWORD
-              ================================================== */}
-
-              <label style={styles.label}>
-                Confirm new password
-              </label>
-
-              <input
-                type="password"
+              <PasswordField
+                label="Confirm new password"
                 value={confirmPassword}
-                onChange={(e) =>
-                  setConfirmPassword(
-                    e.target.value
-                  )
-                }
+                onChange={setConfirmPassword}
                 placeholder="Confirm your new password"
-                autoComplete="new-password"
-                required
-                style={styles.input}
               />
-
-              {/* ==================================================
-                  REQUIREMENTS
-              ================================================== */}
 
               <div style={styles.requirements}>
-                <div style={styles.requirementsTitle}>
+                <div style={styles.requirementTitle}>
                   Password requirements
                 </div>
 
@@ -414,9 +309,7 @@ export default function ResetPasswordPage() {
                 />
 
                 <Requirement
-                  valid={/[A-Za-z]/.test(
-                    password
-                  )}
+                  valid={/[A-Za-z]/.test(password)}
                   text="At least one letter"
                 />
 
@@ -428,22 +321,18 @@ export default function ResetPasswordPage() {
                 <Requirement
                   valid={
                     password.length > 0 &&
-                    password ===
-                      confirmPassword
+                    confirmPassword.length > 0 &&
+                    password === confirmPassword
                   }
                   text="Passwords match"
                 />
               </div>
 
-              {/* ==================================================
-                  BUTTON
-              ================================================== */}
-
               <button
                 type="submit"
                 disabled={saving}
                 style={{
-                  ...styles.primaryButton,
+                  ...styles.button,
                   opacity: saving ? 0.7 : 1,
                   cursor: saving
                     ? "not-allowed"
@@ -451,39 +340,76 @@ export default function ResetPasswordPage() {
                 }}
               >
                 {saving
-                  ? "Updating password..."
-                  : "Update Password"}
+                  ? "Saving password..."
+                  : "Save New Password"}
               </button>
             </form>
           )}
 
-          {/* ==================================================
-              FOOTER LINK
-          ================================================== */}
-
           <button
             type="button"
-            onClick={() =>
-              router.replace("/login")
-            }
+            onClick={() => router.replace("/login")}
             style={styles.backButton}
           >
             ← Back to Login
           </button>
         </div>
 
-        <p style={styles.securityText}>
-          🔒 Your password is securely managed
-          by GradLink SA authentication.
+        <p style={styles.security}>
+          🔒 Your password is securely handled
+          by GradLink SA.
         </p>
       </div>
     </main>
   );
 }
 
-// ============================================================
-// REQUIREMENT
-// ============================================================
+function Brand() {
+  return (
+    <div style={styles.brand}>
+      <div style={styles.logo}>
+        G
+      </div>
+
+      <div style={styles.brandText}>
+        Grad
+        <span style={styles.blue}>
+          Link
+        </span>{" "}
+        <small style={styles.sa}>
+          SA
+        </small>
+      </div>
+    </div>
+  );
+}
+
+function PasswordField({
+  label,
+  value,
+  onChange,
+  placeholder,
+}) {
+  return (
+    <div style={styles.field}>
+      <label style={styles.label}>
+        {label}
+      </label>
+
+      <input
+        type="password"
+        value={value}
+        onChange={(e) =>
+          onChange(e.target.value)
+        }
+        placeholder={placeholder}
+        autoComplete="new-password"
+        required
+        style={styles.input}
+      />
+    </div>
+  );
+}
 
 function Requirement({ valid, text }) {
   return (
@@ -496,7 +422,7 @@ function Requirement({ valid, text }) {
             : "#f1f5f9",
           color: valid
             ? "#15803d"
-            : "#64748b",
+            : "#94a3b8",
         }}
       >
         {valid ? "✓" : "•"}
@@ -504,9 +430,8 @@ function Requirement({ valid, text }) {
 
       <span
         style={{
-          ...styles.requirementText,
           color: valid
-            ? "#15803d"
+            ? "#166534"
             : "#64748b",
         }}
       >
@@ -516,20 +441,16 @@ function Requirement({ valid, text }) {
   );
 }
 
-// ============================================================
-// STYLES
-// ============================================================
-
 const styles = {
   page: {
     minHeight: "100vh",
-    background:
-      "linear-gradient(135deg, #f5f9ff 0%, #eef5ff 50%, #ffffff 100%)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     padding: "24px 16px",
     boxSizing: "border-box",
+    background:
+      "linear-gradient(135deg, #f5f9ff 0%, #eef5ff 50%, #ffffff 100%)",
     position: "relative",
     overflow: "hidden",
   },
@@ -538,7 +459,7 @@ const styles = {
     position: "absolute",
     width: "500px",
     height: "500px",
-    top: "-250px",
+    top: "-260px",
     right: "-220px",
     borderRadius: "50%",
     background:
@@ -566,7 +487,7 @@ const styles = {
     height: "40px",
     borderRadius: "11px",
     background:
-      "linear-gradient(135deg, #2563eb, #1d4ed8)",
+      "linear-gradient(135deg, #1d4ed8, #1e40af)",
     color: "#ffffff",
     display: "flex",
     alignItems: "center",
@@ -583,8 +504,13 @@ const styles = {
     fontWeight: "800",
   },
 
-  brandTextSpan: {
+  blue: {
     color: "#2563eb",
+  },
+
+  sa: {
+    color: "#64748b",
+    fontSize: "12px",
   },
 
   card: {
@@ -619,8 +545,7 @@ const styles = {
   },
 
   subtitle: {
-    margin:
-      "10px auto 26px",
+    margin: "10px auto 26px",
     textAlign: "center",
     color: "#64748b",
     fontSize: "14px",
@@ -628,34 +553,78 @@ const styles = {
     maxWidth: "350px",
   },
 
-  statusBox: {
+  field: {
+    marginBottom: "17px",
+  },
+
+  label: {
+    display: "block",
+    marginBottom: "8px",
+    color: "#334155",
+    fontSize: "13px",
+    fontWeight: "750",
+  },
+
+  input: {
+    width: "100%",
+    height: "51px",
+    boxSizing: "border-box",
+    padding: "0 14px",
+    border: "1px solid #cbd5e1",
+    borderRadius: "11px",
+    background: "#ffffff",
+    color: "#0f172a",
+    fontSize: "15px",
+    outline: "none",
+  },
+
+  requirements: {
+    background: "#f8fafc",
+    border: "1px solid #e2e8f0",
+    borderRadius: "13px",
+    padding: "14px",
+    marginBottom: "20px",
+  },
+
+  requirementTitle: {
+    color: "#334155",
+    fontSize: "12px",
+    fontWeight: "800",
+    marginBottom: "9px",
+  },
+
+  requirement: {
     display: "flex",
     alignItems: "center",
-    gap: "14px",
-    background: "#eff6ff",
-    border: "1px solid #dbeafe",
-    borderRadius: "13px",
-    padding: "15px",
-    color: "#1e3a8a",
-    fontSize: "14px",
-  },
-
-  statusBox p: {
-    margin: "4px 0 0",
-    color: "#64748b",
+    gap: "8px",
     fontSize: "12px",
-    lineHeight: 1.5,
+    marginTop: "7px",
   },
 
-  spinner: {
-    width: "25px",
-    height: "25px",
-    minWidth: "25px",
+  requirementIcon: {
+    width: "19px",
+    height: "19px",
+    minWidth: "19px",
     borderRadius: "50%",
-    border: "3px solid #bfdbfe",
-    borderTopColor: "#2563eb",
-    animation:
-      "spin 1s linear infinite",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "11px",
+    fontWeight: "900",
+  },
+
+  button: {
+    width: "100%",
+    height: "52px",
+    border: "none",
+    borderRadius: "12px",
+    background:
+      "linear-gradient(135deg, #2563eb, #1d4ed8)",
+    color: "#ffffff",
+    fontSize: "15px",
+    fontWeight: "800",
+    boxShadow:
+      "0 9px 22px rgba(37,99,235,0.22)",
   },
 
   errorBox: {
@@ -710,84 +679,33 @@ const styles = {
     fontWeight: "900",
   },
 
-  label: {
-    display: "block",
-    marginBottom: "7px",
-    color: "#334155",
-    fontSize: "13px",
-    fontWeight: "750",
+  messageArea: {
+    flex: 1,
   },
 
-  input: {
-    width: "100%",
-    height: "50px",
-    boxSizing: "border-box",
-    padding: "0 14px",
-    marginBottom: "17px",
-    border: "1px solid #cbd5e1",
-    borderRadius: "11px",
-    background: "#ffffff",
-    color: "#0f172a",
-    fontSize: "15px",
-    outline: "none",
+  message: {
+    margin: "4px 0 0",
+    lineHeight: 1.5,
   },
 
-  requirements: {
-    background: "#f8fafc",
-    border: "1px solid #e2e8f0",
-    borderRadius: "13px",
-    padding: "14px",
-    marginBottom: "20px",
-  },
-
-  requirementsTitle: {
-    color: "#334155",
-    fontSize: "12px",
-    fontWeight: "800",
-    marginBottom: "9px",
-  },
-
-  requirement: {
+  loaderBox: {
     display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    marginBottom: "6px",
-  },
-
-  requirementIcon: {
-    width: "19px",
-    height: "19px",
-    minWidth: "19px",
-    borderRadius: "50%",
-    display: "flex",
-    alignItems: "center",
     justifyContent: "center",
-    fontSize: "11px",
-    fontWeight: "800",
+    padding: "10px 0 5px",
   },
 
-  requirementText: {
-    fontSize: "12px",
-  },
-
-  primaryButton: {
-    width: "100%",
-    height: "51px",
-    border: "none",
-    borderRadius: "12px",
-    background:
-      "linear-gradient(135deg, #2563eb, #1d4ed8)",
-    color: "#ffffff",
-    fontSize: "15px",
-    fontWeight: "800",
-    boxShadow:
-      "0 9px 22px rgba(37,99,235,0.22)",
+  loader: {
+    width: "30px",
+    height: "30px",
+    borderRadius: "50%",
+    border: "3px solid #dbeafe",
+    borderTopColor: "#2563eb",
   },
 
   backButton: {
     display: "block",
     width: "100%",
-    marginTop: "19px",
+    marginTop: "20px",
     border: "none",
     background: "transparent",
     color: "#2563eb",
@@ -796,10 +714,10 @@ const styles = {
     cursor: "pointer",
   },
 
-  securityText: {
+  security: {
     textAlign: "center",
     color: "#94a3b8",
     fontSize: "12px",
-    margin: "18px 0 0",
+    marginTop: "18px",
   },
 };
