@@ -2,127 +2,150 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { supabase } from "../../lib/supabase";
 
-export default function ChangePasswordPage() {
+export default function ResetPasswordPage() {
   const router = useRouter();
 
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
+  const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNew, setShowNew] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [ready, setReady] = useState(false);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
-  // ==========================================================
-  // CHECK AUTHENTICATED USER
-  // ==========================================================
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    checkUser();
+    let mounted = true;
+
+    async function prepareRecovery() {
+      try {
+        /*
+         * Supabase processes the recovery link and establishes
+         * the recovery session automatically.
+         *
+         * We listen for PASSWORD_RECOVERY and also check
+         * the current session.
+         */
+
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange(
+          async (event, session) => {
+            if (!mounted) return;
+
+            if (event === "PASSWORD_RECOVERY" && session) {
+              setReady(true);
+              setChecking(false);
+            }
+          }
+        );
+
+        /*
+         * Give Supabase a moment to process the recovery URL.
+         */
+
+        await new Promise((resolve) =>
+          setTimeout(resolve, 800)
+        );
+
+        if (!mounted) {
+          subscription.unsubscribe();
+          return;
+        }
+
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
+
+        if (sessionError) {
+          console.error(
+            "Recovery session error:",
+            sessionError
+          );
+        }
+
+        if (session) {
+          setReady(true);
+        } else {
+          setError(
+            "This password reset link is invalid or has expired. Please request a new password reset email."
+          );
+        }
+
+        setChecking(false);
+
+        /*
+         * Keep the listener active while the page is open.
+         * It is cleaned up when leaving the page.
+         */
+
+        return () => {
+          subscription.unsubscribe();
+        };
+      } catch (err) {
+        console.error(
+          "Password recovery error:",
+          err
+        );
+
+        if (!mounted) return;
+
+        setError(
+          "We could not verify your password reset link. Please request a new one."
+        );
+
+        setChecking(false);
+      }
+    }
+
+    prepareRecovery();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  async function checkUser() {
-    try {
-      const {
-        data: { user: currentUser },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError || !currentUser) {
-        router.replace("/login");
-        return;
-      }
-
-      setUser(currentUser);
-    } catch (err) {
-      console.error(
-        "Account security user check error:",
-        err
-      );
-
-      router.replace("/login");
-      return;
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // ==========================================================
-  // CHANGE PASSWORD
-  // ==========================================================
-
-  async function handleChangePassword(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
 
     setError("");
     setSuccess("");
 
-    // --------------------------------------------------------
-    // BASIC VALIDATION
-    // --------------------------------------------------------
-
-    if (!currentPassword) {
+    if (!ready) {
       setError(
-        "Please enter your current password."
+        "Your password reset session is not ready. Please open the reset link from your email again."
       );
       return;
     }
 
-    if (!newPassword) {
+    if (password.length < 8) {
       setError(
-        "Please enter a new password."
+        "Your password must be at least 8 characters."
       );
       return;
     }
 
-    if (newPassword.length < 8) {
+    if (!/[A-Za-z]/.test(password)) {
       setError(
-        "Your new password must be at least 8 characters."
+        "Your password must contain at least one letter."
       );
       return;
     }
 
-    if (!/[A-Za-z]/.test(newPassword)) {
+    if (!/[0-9]/.test(password)) {
       setError(
-        "Your new password must contain at least one letter."
+        "Your password must contain at least one number."
       );
       return;
     }
 
-    if (!/[0-9]/.test(newPassword)) {
+    if (password !== confirmPassword) {
       setError(
-        "Your new password must contain at least one number."
-      );
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setError(
-        "The new passwords do not match."
-      );
-      return;
-    }
-
-    if (currentPassword === newPassword) {
-      setError(
-        "Your new password must be different from your current password."
-      );
-      return;
-    }
-
-    if (!user?.email) {
-      setError(
-        "Your account email could not be found. Please log in again."
+        "Your passwords do not match."
       );
       return;
     }
@@ -130,49 +153,32 @@ export default function ChangePasswordPage() {
     setSaving(true);
 
     try {
-      // ------------------------------------------------------
-      // VERIFY CURRENT PASSWORD
-      // ------------------------------------------------------
+      /*
+       * Verify that the recovery session still exists
+       * immediately before updating the password.
+       */
 
       const {
-        data: verifyData,
-        error: verifyError,
-      } =
-        await supabase.auth.signInWithPassword({
-          email: user.email,
-          password: currentPassword,
-        });
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
 
-      if (verifyError) {
-        console.error(
-          "Current password verification error:",
-          verifyError
-        );
-
+      if (sessionError || !session) {
         setError(
-          "Your current password is incorrect."
+          "Your password reset session has expired. Please request a new reset link."
         );
 
         setSaving(false);
         return;
       }
 
-      if (!verifyData?.user) {
-        setError(
-          "We could not verify your current password. Please try again."
-        );
-
-        setSaving(false);
-        return;
-      }
-
-      // ------------------------------------------------------
-      // UPDATE PASSWORD
-      // ------------------------------------------------------
+      /*
+       * Update the authenticated user's password.
+       */
 
       const { error: updateError } =
         await supabase.auth.updateUser({
-          password: newPassword,
+          password,
         });
 
       if (updateError) {
@@ -183,401 +189,303 @@ export default function ChangePasswordPage() {
 
         setError(
           updateError.message ||
-            "Unable to change your password."
+            "Unable to update your password."
         );
 
         setSaving(false);
         return;
       }
 
-      // ------------------------------------------------------
-      // SUCCESS
-      // ------------------------------------------------------
-
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
+      /*
+       * Password successfully changed.
+       */
 
       setSuccess(
-        "Your password has been changed successfully."
+        "Your password has been updated successfully."
       );
+
+      setPassword("");
+      setConfirmPassword("");
+
+      /*
+       * Give the success message a moment to appear.
+       */
+
+      setTimeout(() => {
+        router.replace("/login");
+      }, 1800);
     } catch (err) {
       console.error(
-        "Change password error:",
+        "Reset password error:",
         err
       );
 
       setError(
-        err?.message ||
-          "Something went wrong. Please try again."
+        "Something went wrong while updating your password. Please try again."
       );
-    } finally {
+
       setSaving(false);
     }
   }
 
-  // ==========================================================
-  // LOADING
-  // ==========================================================
-
-  if (loading) {
-    return (
-      <main style={styles.loadingPage}>
-        <div style={styles.spinner}></div>
-
-        <p style={styles.loadingText}>
-          Loading account security...
-        </p>
-      </main>
-    );
-  }
-
-  // ==========================================================
-  // PAGE
-  // ==========================================================
-
   return (
     <main style={styles.page}>
-      <div style={styles.backgroundGlow}></div>
+      <div style={styles.glow}></div>
 
-      {/* ======================================================
-          HEADER
-      ====================================================== */}
+      <div style={styles.container}>
+        {/* ==================================================
+            BRAND
+        ================================================== */}
 
-      <header style={styles.header}>
-        <div style={styles.headerInner}>
-          <Link
-            href="/company-dashboard"
-            style={styles.logo}
-          >
-            <span style={styles.logoMark}>
-              G
-            </span>
+        <div style={styles.brand}>
+          <div style={styles.logo}>
+            G
+          </div>
 
-            <span>
-              Grad
-              <span style={styles.logoBlue}>
-                Link
-              </span>{" "}
-              <span style={styles.logoSA}>
-                SA
-              </span>
-            </span>
-          </Link>
-
-          <Link
-            href="/company-dashboard"
-            style={styles.backButton}
-          >
-            ← Dashboard
-          </Link>
+          <div style={styles.brandText}>
+            Grad
+            <span>Link</span>{" "}
+            <small>SA</small>
+          </div>
         </div>
-      </header>
 
-      {/* ======================================================
-          CONTENT
-      ====================================================== */}
+        {/* ==================================================
+            CARD
+        ================================================== */}
 
-      <section style={styles.content}>
-        {/* ====================================================
-            INTRO
-        ==================================================== */}
-
-        <div style={styles.intro}>
-          <div style={styles.securityIcon}>
+        <div style={styles.card}>
+          <div style={styles.icon}>
             🔐
           </div>
 
-          <div>
-            <div style={styles.eyebrow}>
-              ACCOUNT & SECURITY
-            </div>
+          <h1 style={styles.title}>
+            Reset your password
+          </h1>
 
-            <h1 style={styles.title}>
-              Protect your account
-            </h1>
+          <p style={styles.subtitle}>
+            Create a new secure password for
+            your GradLink SA account.
+          </p>
 
-            <p style={styles.subtitle}>
-              Change your GradLink SA company
-              account password securely from
-              one place.
-            </p>
-          </div>
-        </div>
+          {/* ==================================================
+              CHECKING
+          ================================================== */}
 
-        {/* ====================================================
-            SECURITY CARD
-        ==================================================== */}
+          {checking ? (
+            <div style={styles.statusBox}>
+              <div style={styles.spinner}></div>
 
-        <div style={styles.securityCard}>
-          <div style={styles.cardHeader}>
-            <div>
-              <h2 style={styles.cardTitle}>
-                Change Password
-              </h2>
-
-              <p style={styles.cardSubtitle}>
-                Signed in as{" "}
+              <div>
                 <strong>
-                  {user?.email ||
-                    "your account"}
+                  Verifying reset link
                 </strong>
-              </p>
+
+                <p>
+                  Please wait while we securely
+                  verify your password reset
+                  session.
+                </p>
+              </div>
             </div>
+          ) : !ready ? (
+            <div>
+              <div style={styles.errorBox}>
+                <div style={styles.errorIcon}>
+                  !
+                </div>
 
-            <div style={styles.lockBadge}>
-              🔒
-            </div>
-          </div>
+                <div>
+                  <strong>
+                    Reset link unavailable
+                  </strong>
 
-          {/* ==================================================
-              ERROR
-          ================================================== */}
-
-          {error && (
-            <div style={styles.errorBox}>
-              <span style={styles.errorIcon}>
-                !
-              </span>
-
-              <p style={styles.messageText}>
-                {error}
-              </p>
-            </div>
-          )}
-
-          {/* ==================================================
-              SUCCESS
-          ================================================== */}
-
-          {success && (
-            <div style={styles.successBox}>
-              <span style={styles.successIcon}>
-                ✓
-              </span>
-
-              <p style={styles.messageText}>
-                {success}
-              </p>
-            </div>
-          )}
-
-          {/* ==================================================
-              FORM
-          ================================================== */}
-
-          <form onSubmit={handleChangePassword}>
-            {/* CURRENT PASSWORD */}
-
-            <PasswordField
-              label="Current Password"
-              value={currentPassword}
-              onChange={setCurrentPassword}
-              show={showCurrent}
-              setShow={setShowCurrent}
-              placeholder="Enter your current password"
-              autoComplete="current-password"
-            />
-
-            {/* NEW PASSWORD */}
-
-            <PasswordField
-              label="New Password"
-              value={newPassword}
-              onChange={setNewPassword}
-              show={showNew}
-              setShow={setShowNew}
-              placeholder="Enter your new password"
-              autoComplete="new-password"
-            />
-
-            {/* CONFIRM PASSWORD */}
-
-            <PasswordField
-              label="Confirm New Password"
-              value={confirmPassword}
-              onChange={setConfirmPassword}
-              show={showConfirm}
-              setShow={setShowConfirm}
-              placeholder="Confirm your new password"
-              autoComplete="new-password"
-            />
-
-            {/* =================================================
-                PASSWORD REQUIREMENTS
-            ================================================= */}
-
-            <div style={styles.requirements}>
-              <div
-                style={
-                  styles.requirementsTitle
-                }
-              >
-                Password requirements
+                  <p>
+                    {error}
+                  </p>
+                </div>
               </div>
 
-              <Requirement
-                valid={
-                  newPassword.length >= 8
+              <button
+                type="button"
+                onClick={() =>
+                  router.replace("/login")
                 }
-                text="At least 8 characters"
-              />
-
-              <Requirement
-                valid={
-                  /[A-Za-z]/.test(
-                    newPassword
-                  )
-                }
-                text="At least one letter"
-              />
-
-              <Requirement
-                valid={
-                  /[0-9]/.test(
-                    newPassword
-                  )
-                }
-                text="At least one number"
-              />
-
-              <Requirement
-                valid={
-                  newPassword.length > 0 &&
-                  newPassword ===
-                    confirmPassword
-                }
-                text="Passwords match"
-              />
+                style={styles.primaryButton}
+              >
+                Back to Login
+              </button>
             </div>
+          ) : (
+            <form onSubmit={handleSubmit}>
+              {/* ==================================================
+                  ERROR
+              ================================================== */}
 
-            {/* =================================================
-                UPDATE BUTTON
-            ================================================= */}
+              {error && (
+                <div style={styles.errorBox}>
+                  <div style={styles.errorIcon}>
+                    !
+                  </div>
 
-            <button
-              type="submit"
-              disabled={saving}
-              style={{
-                ...styles.saveButton,
-                opacity: saving ? 0.7 : 1,
-                cursor: saving
-                  ? "not-allowed"
-                  : "pointer",
-              }}
-            >
-              {saving
-                ? "Updating Password..."
-                : "Update Password"}
-            </button>
-          </form>
+                  <div>
+                    <strong>
+                      Password update failed
+                    </strong>
+
+                    <p>{error}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* ==================================================
+                  SUCCESS
+              ================================================== */}
+
+              {success && (
+                <div style={styles.successBox}>
+                  <div style={styles.successIcon}>
+                    ✓
+                  </div>
+
+                  <div>
+                    <strong>
+                      Password updated
+                    </strong>
+
+                    <p>{success}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* ==================================================
+                  NEW PASSWORD
+              ================================================== */}
+
+              <label style={styles.label}>
+                New password
+              </label>
+
+              <input
+                type="password"
+                value={password}
+                onChange={(e) =>
+                  setPassword(e.target.value)
+                }
+                placeholder="Enter your new password"
+                autoComplete="new-password"
+                required
+                style={styles.input}
+              />
+
+              {/* ==================================================
+                  CONFIRM PASSWORD
+              ================================================== */}
+
+              <label style={styles.label}>
+                Confirm new password
+              </label>
+
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) =>
+                  setConfirmPassword(
+                    e.target.value
+                  )
+                }
+                placeholder="Confirm your new password"
+                autoComplete="new-password"
+                required
+                style={styles.input}
+              />
+
+              {/* ==================================================
+                  REQUIREMENTS
+              ================================================== */}
+
+              <div style={styles.requirements}>
+                <div style={styles.requirementsTitle}>
+                  Password requirements
+                </div>
+
+                <Requirement
+                  valid={password.length >= 8}
+                  text="At least 8 characters"
+                />
+
+                <Requirement
+                  valid={/[A-Za-z]/.test(
+                    password
+                  )}
+                  text="At least one letter"
+                />
+
+                <Requirement
+                  valid={/[0-9]/.test(password)}
+                  text="At least one number"
+                />
+
+                <Requirement
+                  valid={
+                    password.length > 0 &&
+                    password ===
+                      confirmPassword
+                  }
+                  text="Passwords match"
+                />
+              </div>
+
+              {/* ==================================================
+                  BUTTON
+              ================================================== */}
+
+              <button
+                type="submit"
+                disabled={saving}
+                style={{
+                  ...styles.primaryButton,
+                  opacity: saving ? 0.7 : 1,
+                  cursor: saving
+                    ? "not-allowed"
+                    : "pointer",
+                }}
+              >
+                {saving
+                  ? "Updating password..."
+                  : "Update Password"}
+              </button>
+            </form>
+          )}
+
+          {/* ==================================================
+              FOOTER LINK
+          ================================================== */}
+
+          <button
+            type="button"
+            onClick={() =>
+              router.replace("/login")
+            }
+            style={styles.backButton}
+          >
+            ← Back to Login
+          </button>
         </div>
 
-        {/* ====================================================
-            SECURITY INFORMATION
-        ==================================================== */}
-
-        <div style={styles.infoCard}>
-          <div style={styles.infoIcon}>
-            🛡️
-          </div>
-
-          <div>
-            <h3 style={styles.infoTitle}>
-              Keep your account secure
-            </h3>
-
-            <p style={styles.infoText}>
-              Use a password that you do not
-              use on other websites. Never
-              share your GradLink SA password
-              with anyone.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ======================================================
-          FOOTER
-      ====================================================== */}
-
-      <footer style={styles.footer}>
-        <p>
-          © {new Date().getFullYear()} GradLink
-          SA. All rights reserved.
+        <p style={styles.securityText}>
+          🔒 Your password is securely managed
+          by GradLink SA authentication.
         </p>
-      </footer>
+      </div>
     </main>
   );
 }
 
 // ============================================================
-// PASSWORD FIELD
+// REQUIREMENT
 // ============================================================
 
-function PasswordField({
-  label,
-  value,
-  onChange,
-  show,
-  setShow,
-  placeholder,
-  autoComplete,
-}) {
-  return (
-    <div style={styles.field}>
-      <label style={styles.label}>
-        {label}
-      </label>
-
-      <div style={styles.passwordWrapper}>
-        <input
-          type={
-            show
-              ? "text"
-              : "password"
-          }
-          value={value}
-          onChange={(e) =>
-            onChange(e.target.value)
-          }
-          placeholder={placeholder}
-          autoComplete={autoComplete}
-          style={styles.input}
-        />
-
-        <button
-          type="button"
-          onClick={() =>
-            setShow(!show)
-          }
-          style={styles.eyeButton}
-          aria-label={
-            show
-              ? "Hide password"
-              : "Show password"
-          }
-          title={
-            show
-              ? "Hide password"
-              : "Show password"
-          }
-        >
-          {show ? "🙈" : "👁️"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// PASSWORD REQUIREMENT
-// ============================================================
-
-function Requirement({
-  valid,
-  text,
-}) {
+function Requirement({ valid, text }) {
   return (
     <div style={styles.requirement}>
       <span
@@ -616,204 +524,152 @@ const styles = {
   page: {
     minHeight: "100vh",
     background:
-      "linear-gradient(180deg, #f8fbff 0%, #eef5ff 52%, #ffffff 100%)",
-    color: "#0f172a",
+      "linear-gradient(135deg, #f5f9ff 0%, #eef5ff 50%, #ffffff 100%)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "24px 16px",
+    boxSizing: "border-box",
     position: "relative",
     overflow: "hidden",
   },
 
-  backgroundGlow: {
+  glow: {
     position: "absolute",
-    top: "-180px",
-    right: "-160px",
-    width: "420px",
-    height: "420px",
+    width: "500px",
+    height: "500px",
+    top: "-250px",
+    right: "-220px",
     borderRadius: "50%",
     background:
-      "radial-gradient(circle, rgba(37,99,235,0.13), rgba(37,99,235,0) 70%)",
+      "radial-gradient(circle, rgba(37,99,235,0.14), rgba(37,99,235,0) 70%)",
     pointerEvents: "none",
   },
 
-  header: {
+  container: {
+    width: "100%",
+    maxWidth: "450px",
     position: "relative",
-    zIndex: 2,
-    background:
-      "rgba(255,255,255,0.94)",
-    borderBottom:
-      "1px solid #e2e8f0",
-    backdropFilter:
-      "blur(14px)",
+    zIndex: 1,
   },
 
-  headerInner: {
-    maxWidth: "1120px",
-    margin: "0 auto",
-    padding: "16px 20px",
+  brand: {
     display: "flex",
     alignItems: "center",
-    justifyContent:
-      "space-between",
-    gap: "14px",
+    justifyContent: "center",
+    gap: "10px",
+    marginBottom: "22px",
   },
 
   logo: {
-    display: "flex",
-    alignItems: "center",
-    gap: "9px",
-    textDecoration: "none",
-    color: "#0f172a",
-    fontWeight: "800",
-    fontSize: "19px",
-  },
-
-  logoMark: {
-    width: "35px",
-    height: "35px",
-    borderRadius: "10px",
+    width: "40px",
+    height: "40px",
+    borderRadius: "11px",
     background:
       "linear-gradient(135deg, #2563eb, #1d4ed8)",
-    color: "#fff",
+    color: "#ffffff",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    fontSize: "20px",
     fontWeight: "900",
     boxShadow:
-      "0 7px 18px rgba(37,99,235,0.25)",
+      "0 8px 22px rgba(37,99,235,0.25)",
   },
 
-  logoBlue: {
-    color: "#2563eb",
-  },
-
-  logoSA: {
-    color: "#64748b",
-    fontSize: "12px",
-    marginLeft: "2px",
-  },
-
-  backButton: {
-    textDecoration: "none",
-    color: "#2563eb",
-    fontWeight: "700",
-    fontSize: "14px",
-    padding: "10px 13px",
-    border:
-      "1px solid #dbeafe",
-    borderRadius: "10px",
-    background: "#eff6ff",
-    whiteSpace: "nowrap",
-  },
-
-  content: {
-    position: "relative",
-    zIndex: 1,
-    maxWidth: "850px",
-    margin: "0 auto",
-    padding:
-      "48px 20px 70px",
-  },
-
-  intro: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "18px",
-    marginBottom: "28px",
-  },
-
-  securityIcon: {
-    width: "54px",
-    height: "54px",
-    minWidth: "54px",
-    borderRadius: "16px",
-    background: "#dbeafe",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "25px",
-    boxShadow:
-      "0 8px 24px rgba(37,99,235,0.10)",
-  },
-
-  eyebrow: {
-    color: "#2563eb",
-    fontWeight: "800",
-    letterSpacing: "1.4px",
-    fontSize: "11px",
-    marginBottom: "7px",
-  },
-
-  title: {
-    margin: 0,
-    fontSize:
-      "clamp(30px, 5vw, 43px)",
-    lineHeight: 1.1,
-    letterSpacing: "-1px",
-  },
-
-  subtitle: {
-    margin: "10px 0 0",
-    color: "#64748b",
-    fontSize: "15px",
-    lineHeight: 1.65,
-    maxWidth: "650px",
-  },
-
-  securityCard: {
-    background: "#ffffff",
-    border:
-      "1px solid #dbe5f0",
-    borderRadius: "22px",
-    padding: "28px",
-    boxShadow:
-      "0 18px 50px rgba(15,23,42,0.08)",
-  },
-
-  cardHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent:
-      "space-between",
-    gap: "15px",
-    marginBottom: "24px",
-  },
-
-  cardTitle: {
-    margin: 0,
+  brandText: {
+    color: "#0f172a",
     fontSize: "21px",
     fontWeight: "800",
   },
 
-  cardSubtitle: {
-    margin: "6px 0 0",
-    color: "#64748b",
-    fontSize: "13px",
-    wordBreak:
-      "break-word",
+  brandTextSpan: {
+    color: "#2563eb",
   },
 
-  lockBadge: {
-    width: "42px",
-    height: "42px",
-    borderRadius: "12px",
-    background: "#eff6ff",
+  card: {
+    background: "#ffffff",
+    border: "1px solid #dbe5f0",
+    borderRadius: "22px",
+    padding: "30px 24px",
+    boxShadow:
+      "0 20px 55px rgba(15,23,42,0.10)",
+    boxSizing: "border-box",
+  },
+
+  icon: {
+    width: "60px",
+    height: "60px",
+    margin: "0 auto 17px",
+    borderRadius: "17px",
+    background: "#dbeafe",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: "19px",
+    fontSize: "27px",
+  },
+
+  title: {
+    margin: 0,
+    textAlign: "center",
+    color: "#0f172a",
+    fontSize: "28px",
+    fontWeight: "850",
+    letterSpacing: "-0.6px",
+  },
+
+  subtitle: {
+    margin:
+      "10px auto 26px",
+    textAlign: "center",
+    color: "#64748b",
+    fontSize: "14px",
+    lineHeight: 1.6,
+    maxWidth: "350px",
+  },
+
+  statusBox: {
+    display: "flex",
+    alignItems: "center",
+    gap: "14px",
+    background: "#eff6ff",
+    border: "1px solid #dbeafe",
+    borderRadius: "13px",
+    padding: "15px",
+    color: "#1e3a8a",
+    fontSize: "14px",
+  },
+
+  statusBox p: {
+    margin: "4px 0 0",
+    color: "#64748b",
+    fontSize: "12px",
+    lineHeight: 1.5,
+  },
+
+  spinner: {
+    width: "25px",
+    height: "25px",
+    minWidth: "25px",
+    borderRadius: "50%",
+    border: "3px solid #bfdbfe",
+    borderTopColor: "#2563eb",
+    animation:
+      "spin 1s linear infinite",
   },
 
   errorBox: {
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: "10px",
     background: "#fef2f2",
-    border:
-      "1px solid #fecaca",
-    color: "#b91c1c",
+    border: "1px solid #fecaca",
     borderRadius: "12px",
-    padding: "12px 14px",
+    padding: "13px",
     marginBottom: "18px",
-    fontSize: "14px",
+    color: "#991b1b",
+    fontSize: "13px",
+    lineHeight: 1.5,
   },
 
   errorIcon: {
@@ -830,16 +686,16 @@ const styles = {
 
   successBox: {
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: "10px",
     background: "#f0fdf4",
-    border:
-      "1px solid #bbf7d0",
-    color: "#15803d",
+    border: "1px solid #bbf7d0",
     borderRadius: "12px",
-    padding: "12px 14px",
+    padding: "13px",
     marginBottom: "18px",
-    fontSize: "14px",
+    color: "#166534",
+    fontSize: "13px",
+    lineHeight: 1.5,
   },
 
   successIcon: {
@@ -854,92 +710,59 @@ const styles = {
     fontWeight: "900",
   },
 
-  messageText: {
-    margin: 0,
-    lineHeight: 1.5,
-  },
-
-  field: {
-    marginBottom: "18px",
-  },
-
   label: {
     display: "block",
+    marginBottom: "7px",
+    color: "#334155",
     fontSize: "13px",
     fontWeight: "750",
-    color: "#334155",
-    marginBottom: "8px",
-  },
-
-  passwordWrapper: {
-    position: "relative",
-    width: "100%",
   },
 
   input: {
     width: "100%",
-    boxSizing: "border-box",
     height: "50px",
-    padding:
-      "0 52px 0 14px",
-    borderRadius: "12px",
-    border:
-      "1px solid #cbd5e1",
+    boxSizing: "border-box",
+    padding: "0 14px",
+    marginBottom: "17px",
+    border: "1px solid #cbd5e1",
+    borderRadius: "11px",
     background: "#ffffff",
     color: "#0f172a",
     fontSize: "15px",
     outline: "none",
   },
 
-  eyeButton: {
-    position: "absolute",
-    right: "5px",
-    top: "5px",
-    width: "40px",
-    height: "40px",
-    border: "none",
-    borderRadius: "9px",
-    background: "#f8fafc",
-    cursor: "pointer",
-    fontSize: "17px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 0,
-  },
-
   requirements: {
     background: "#f8fafc",
-    border:
-      "1px solid #e2e8f0",
-    borderRadius: "14px",
-    padding: "15px",
-    marginTop: "4px",
-    marginBottom: "22px",
+    border: "1px solid #e2e8f0",
+    borderRadius: "13px",
+    padding: "14px",
+    marginBottom: "20px",
   },
 
   requirementsTitle: {
+    color: "#334155",
     fontSize: "12px",
     fontWeight: "800",
-    color: "#334155",
-    marginBottom: "10px",
+    marginBottom: "9px",
   },
 
   requirement: {
     display: "flex",
     alignItems: "center",
-    gap: "9px",
-    marginBottom: "7px",
+    gap: "8px",
+    marginBottom: "6px",
   },
 
   requirementIcon: {
-    width: "20px",
-    height: "20px",
+    width: "19px",
+    height: "19px",
+    minWidth: "19px",
     borderRadius: "50%",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: "12px",
+    fontSize: "11px",
     fontWeight: "800",
   },
 
@@ -947,85 +770,36 @@ const styles = {
     fontSize: "12px",
   },
 
-  saveButton: {
+  primaryButton: {
     width: "100%",
-    height: "52px",
+    height: "51px",
     border: "none",
-    borderRadius: "13px",
+    borderRadius: "12px",
     background:
       "linear-gradient(135deg, #2563eb, #1d4ed8)",
     color: "#ffffff",
     fontSize: "15px",
     fontWeight: "800",
     boxShadow:
-      "0 10px 24px rgba(37,99,235,0.22)",
+      "0 9px 22px rgba(37,99,235,0.22)",
   },
 
-  infoCard: {
-    marginTop: "18px",
-    display: "flex",
-    gap: "13px",
-    alignItems: "flex-start",
-    background: "#eff6ff",
-    border:
-      "1px solid #dbeafe",
-    borderRadius: "16px",
-    padding: "18px",
-  },
-
-  infoIcon: {
-    fontSize: "20px",
-  },
-
-  infoTitle: {
-    margin: "0 0 5px",
+  backButton: {
+    display: "block",
+    width: "100%",
+    marginTop: "19px",
+    border: "none",
+    background: "transparent",
+    color: "#2563eb",
     fontSize: "14px",
-    fontWeight: "800",
-    color: "#1e3a8a",
+    fontWeight: "700",
+    cursor: "pointer",
   },
 
-  infoText: {
-    margin: 0,
-    color: "#475569",
-    fontSize: "13px",
-    lineHeight: 1.6,
-  },
-
-  footer: {
-    position: "relative",
-    zIndex: 1,
-    borderTop:
-      "1px solid #e2e8f0",
-    padding: "22px 20px",
+  securityText: {
     textAlign: "center",
     color: "#94a3b8",
     fontSize: "12px",
-  },
-
-  loadingPage: {
-    minHeight: "100vh",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#f8fbff",
-  },
-
-  spinner: {
-    width: "34px",
-    height: "34px",
-    borderRadius: "50%",
-    border:
-      "3px solid #dbeafe",
-    borderTopColor:
-      "#2563eb",
-    animation:
-      "spin 1s linear infinite",
-  },
-
-  loadingText: {
-    color: "#64748b",
-    fontSize: "14px",
-    marginTop: "12px",
+    margin: "18px 0 0",
   },
 };
