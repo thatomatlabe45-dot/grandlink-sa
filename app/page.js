@@ -9,106 +9,64 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    async function loadInternships() {
+      try {
+        const { data, error } = await supabase
+          .from("internships")
+          .select(
+            "id, title, company_name, province, qualification, field_of_study, skills"
+          )
+          .order("created_at", { ascending: false })
+          .limit(6);
+
+        if (!error && data) {
+          setInternships(data);
+        }
+      } catch (error) {
+        console.error("Error loading internships:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
     loadInternships();
   }, []);
 
-  async function loadInternships() {
-    try {
-      const { data, error } = await supabase
-        .from("internships")
-        .select(
-          "id, title, company_name, province, qualification, field_of_study, skills"
-        )
-        .order("created_at", {
-          ascending: false,
-        })
-        .limit(6);
+  function getCompanyInitial(name) {
+    if (!name) return "C";
 
-      if (error) {
-        console.error(
-          "Homepage internships error:",
-          error
-        );
-        setInternships([]);
-        return;
-      }
-
-      setInternships(data || []);
-    } catch (error) {
-      console.error(
-        "Homepage loading error:",
-        error
-      );
-      setInternships([]);
-    } finally {
-      setLoading(false);
-    }
+    return name
+      .trim()
+      .charAt(0)
+      .toUpperCase();
   }
 
   return (
-    <main style={styles.page}>
+    <main className="home-page">
 
       {/* =====================================================
-          NAVIGATION
+          HEADER
       ===================================================== */}
+      <header className="home-header">
+        <div className="container header-inner">
 
-      <header style={styles.header}>
-        <div style={styles.navContainer}>
-
-          <Link
-            href="/"
-            style={styles.brand}
-          >
-            <div style={styles.logo}>
-              G
-            </div>
-
-            <div style={styles.brandText}>
-              Grad
-              <span style={styles.brandBlue}>
-                Link
-              </span>{" "}
-              <span style={styles.brandSA}>
-                SA
-              </span>
-            </div>
+          <Link href="/" className="logo">
+            <span className="logo-mark">G</span>
+            <span>GradLink <strong>SA</strong></span>
           </Link>
 
-          <nav style={styles.desktopNav}>
-            <Link
-              href="/internships"
-              style={styles.navLink}
-            >
-              Internships
-            </Link>
-
-            <Link
-              href="/jobs"
-              style={styles.navLink}
-            >
-              Jobs
-            </Link>
-
-            <Link
-              href="/company"
-              style={styles.navLink}
-            >
-              For Companies
-            </Link>
+          <nav className="desktop-nav">
+            <Link href="/internships">Internships</Link>
+            <Link href="/jobs">Jobs</Link>
+            <Link href="/company">For Companies</Link>
           </nav>
 
-          <div style={styles.navActions}>
-            <Link
-              href="/login"
-              style={styles.loginButton}
-            >
+          <div className="header-actions">
+            <Link href="/login" className="login-link">
               Login
             </Link>
 
-            <Link
-              href="/signup"
-              style={styles.signupButton}
-            >
+            <Link href="/signup" className="header-signup">
               Get Started
             </Link>
           </div>
@@ -116,214 +74,122 @@ export default function HomePage() {
         </div>
       </header>
 
+
       {/* =====================================================
           HERO
       ===================================================== */}
+      <section className="hero-section">
+        <div className="container hero-grid">
 
-      <section style={styles.hero}>
-        <div style={styles.heroContainer}>
+          <div className="hero-content">
 
-          <div style={styles.heroContent}>
-
-            <div style={styles.eyebrow}>
-              <span style={styles.eyebrowDot}></span>
-              BUILT FOR SOUTH AFRICAN GRADUATES
+            <div className="eyebrow">
+              <span className="eyebrow-dot"></span>
+              South Africa's graduate opportunity platform
             </div>
 
-            <h1 style={styles.heroTitle}>
+            <h1>
               Start your career.
-              <br />
-              <span style={styles.heroBlue}>
-                Find your opportunity.
-              </span>
+              <span>Find your opportunity.</span>
             </h1>
 
-            <p style={styles.heroText}>
-              GradLink SA connects ambitious graduates
-              with internships and jobs from companies
-              looking for their next generation of talent.
+            <p className="hero-description">
+              Discover internships, graduate opportunities and jobs from
+              companies looking for the next generation of South African
+              talent.
             </p>
 
-            <div style={styles.heroButtons}>
-
-              <Link
-                href="/internships"
-                style={styles.primaryButton}
-              >
-                Find Internships
-                <span style={styles.buttonArrow}>
-                  →
-                </span>
+            <div className="hero-buttons">
+              <Link href="/internships" className="primary-button">
+                Find an Internship
+                <span>→</span>
               </Link>
 
-              <Link
-                href="/jobs"
-                style={styles.secondaryButton}
-              >
+              <Link href="/jobs" className="secondary-button">
                 Explore Jobs
               </Link>
-
             </div>
 
-            <div style={styles.heroTrust}>
-
-              <div style={styles.trustItem}>
-                <span style={styles.trustIcon}>
-                  ✓
-                </span>
-                Free for graduates
+            <div className="hero-trust">
+              <div className="trust-item">
+                <span className="trust-icon">✓</span>
+                Built for graduates
               </div>
 
-              <div style={styles.trustItem}>
-                <span style={styles.trustIcon}>
-                  ✓
-                </span>
+              <div className="trust-item">
+                <span className="trust-icon">✓</span>
                 South African opportunities
               </div>
 
+              <div className="trust-item">
+                <span className="trust-icon">✓</span>
+                Easy to use
+              </div>
             </div>
 
           </div>
 
-          <div style={styles.heroVisual}>
 
-            <div style={styles.imageCard}>
-              <img
-                src="https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=1000&q=85"
-                alt="Young professionals working together"
-                style={styles.heroImage}
-              />
-
-              <div style={styles.imageOverlay}></div>
-
-              <div style={styles.opportunityBadge}>
-                <div style={styles.badgeIcon}>
-                  ✓
-                </div>
-
-                <div>
-                  <strong style={styles.badgeTitle}>
-                    Career opportunities
-                  </strong>
-
-                  <div style={styles.badgeText}>
-                    Built for your next step
-                  </div>
-                </div>
-              </div>
-
-              <div style={styles.imageCaption}>
-                <div style={styles.captionSmall}>
-                  YOUR CAREER STARTS HERE
-                </div>
-
-                <div style={styles.captionTitle}>
-                  Connect. Apply. Grow.
-                </div>
-              </div>
-
-            </div>
-
-            <div style={styles.floatingStat}>
-              <div style={styles.statCircle}>
-                ★
-              </div>
-
-              <div>
-                <strong style={styles.statTitle}>
-                  Graduate talent
-                </strong>
-
-                <div style={styles.statText}>
-                  Meet your next opportunity
-                </div>
-              </div>
-            </div>
-
+          {/* HERO IMAGE */}
+          <div className="hero-image-wrap">
+            <img
+              src="https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=1200&q=85"
+              alt="Young professionals working together"
+              className="hero-image"
+            />
           </div>
 
         </div>
       </section>
+
 
       {/* =====================================================
           QUICK LINKS
       ===================================================== */}
+      <section className="quick-section">
+        <div className="container">
 
-      <section style={styles.quickSection}>
-        <div style={styles.sectionContainer}>
+          <div className="quick-grid">
 
-          <div style={styles.quickGrid}>
-
-            <Link
-              href="/internships"
-              style={styles.quickItem}
-            >
-              <div style={styles.quickIcon}>
+            <Link href="/internships" className="quick-item">
+              <div className="quick-icon blue">
                 🎓
               </div>
 
               <div>
-                <strong style={styles.quickTitle}>
-                  Find Internships
-                </strong>
-
-                <p style={styles.quickText}>
-                  Discover opportunities to gain
-                  valuable experience.
-                </p>
+                <h3>Find Internships</h3>
+                <p>Build experience and start your career.</p>
               </div>
 
-              <span style={styles.quickArrow}>
-                →
-              </span>
+              <span className="quick-arrow">→</span>
             </Link>
 
-            <Link
-              href="/jobs"
-              style={styles.quickItem}
-            >
-              <div style={styles.quickIcon}>
+
+            <Link href="/jobs" className="quick-item">
+              <div className="quick-icon navy">
                 💼
               </div>
 
               <div>
-                <strong style={styles.quickTitle}>
-                  Find Jobs
-                </strong>
-
-                <p style={styles.quickText}>
-                  Take the next step toward your
-                  professional career.
-                </p>
+                <h3>Find Jobs</h3>
+                <p>Discover opportunities that match your skills.</p>
               </div>
 
-              <span style={styles.quickArrow}>
-                →
-              </span>
+              <span className="quick-arrow">→</span>
             </Link>
 
-            <Link
-              href="/company"
-              style={styles.quickItem}
-            >
-              <div style={styles.quickIcon}>
+
+            <Link href="/company" className="quick-item">
+              <div className="quick-icon light">
                 🏢
               </div>
 
               <div>
-                <strong style={styles.quickTitle}>
-                  Hire Graduate Talent
-                </strong>
-
-                <p style={styles.quickText}>
-                  Connect your company with
-                  promising graduates.
-                </p>
+                <h3>Hire Graduates</h3>
+                <p>Connect with South Africa's emerging talent.</p>
               </div>
 
-              <span style={styles.quickArrow}>
-                →
-              </span>
+              <span className="quick-arrow">→</span>
             </Link>
 
           </div>
@@ -331,124 +197,103 @@ export default function HomePage() {
         </div>
       </section>
 
+
       {/* =====================================================
           FEATURED INTERNSHIPS
       ===================================================== */}
+      <section className="featured-section">
+        <div className="container">
 
-      <section style={styles.internshipSection}>
-        <div style={styles.sectionContainer}>
-
-          <div style={styles.sectionHeader}>
-
+          <div className="section-heading">
             <div>
-              <div style={styles.sectionEyebrow}>
+              <span className="section-eyebrow">
                 OPPORTUNITIES
-              </div>
+              </span>
 
-              <h2 style={styles.sectionTitle}>
-                Latest internships
+              <h2>
+                Latest internship opportunities
               </h2>
 
-              <p style={styles.sectionText}>
-                Explore opportunities from companies
-                looking for South Africa's next generation
-                of talent.
+              <p>
+                Find opportunities designed to help you gain experience,
+                develop your skills and take the next step in your career.
               </p>
             </div>
 
-            <Link
-              href="/internships"
-              style={styles.viewAll}
-            >
+            <Link href="/internships" className="view-all">
               View all internships →
             </Link>
-
           </div>
 
+
           {loading ? (
-            <div style={styles.loadingBox}>
-              <div style={styles.loadingSpinner}></div>
-              <p>Loading opportunities...</p>
+            <div className="loading-box">
+              Loading opportunities...
             </div>
           ) : internships.length === 0 ? (
-            <div style={styles.emptyBox}>
-              <div style={styles.emptyIcon}>
-                🎓
-              </div>
-
-              <h3 style={styles.emptyTitle}>
-                New opportunities are coming
-              </h3>
-
-              <p style={styles.emptyText}>
-                Check the internships page for the
-                latest graduate opportunities.
+            <div className="empty-box">
+              <div className="empty-icon">🎓</div>
+              <h3>New opportunities coming soon</h3>
+              <p>
+                Check back soon for internship opportunities from
+                companies across South Africa.
               </p>
-
-              <Link
-                href="/internships"
-                style={styles.primarySmall}
-              >
-                Browse Internships
-              </Link>
             </div>
           ) : (
-            <div style={styles.internshipGrid}>
+            <div className="internship-grid">
 
               {internships.map((internship) => (
                 <Link
-                  key={internship.id}
                   href={`/jobs/${internship.id}`}
-                  style={styles.internshipCard}
+                  key={internship.id}
+                  className="internship-card"
                 >
 
-                  <div style={styles.cardTop}>
-                    <div style={styles.companyLogo}>
-                      {getCompanyInitial(
-                        internship.company_name
-                      )}
+                  <div className="company-row">
+
+                    <div className="company-avatar">
+                      {getCompanyInitial(internship.company_name)}
                     </div>
 
-                    <span style={styles.internshipLabel}>
-                      INTERNSHIP
-                    </span>
+                    <div className="company-name">
+                      {internship.company_name || "Company"}
+                    </div>
+
                   </div>
 
-                  <h3 style={styles.cardTitle}>
-                    {internship.title ||
-                      "Graduate Internship"}
+
+                  <h3>
+                    {internship.title}
                   </h3>
 
-                  <p style={styles.companyName}>
-                    {internship.company_name ||
-                      "Company"}
-                  </p>
 
-                  <div style={styles.cardDetails}>
+                  <div className="internship-meta">
 
                     {internship.province && (
-                      <span style={styles.detail}>
+                      <span>
                         📍 {internship.province}
                       </span>
                     )}
 
                     {internship.qualification && (
-                      <span style={styles.detail}>
-                        🎓{" "}
-                        {internship.qualification}
+                      <span>
+                        🎓 {internship.qualification}
                       </span>
                     )}
 
                   </div>
 
-                  <div style={styles.cardBottom}>
-                    <span style={styles.viewOpportunity}>
-                      View opportunity
-                    </span>
 
-                    <span style={styles.cardArrow}>
-                      →
-                    </span>
+                  {internship.field_of_study && (
+                    <div className="field-tag">
+                      {internship.field_of_study}
+                    </div>
+                  )}
+
+
+                  <div className="card-bottom">
+                    <span>View opportunity</span>
+                    <span>→</span>
                   </div>
 
                 </Link>
@@ -460,271 +305,270 @@ export default function HomePage() {
         </div>
       </section>
 
+
       {/* =====================================================
-          FOR GRADUATES
+          GRADUATE SECTION
       ===================================================== */}
+      <section className="graduate-section">
+        <div className="container graduate-grid">
 
-      <section style={styles.graduateSection}>
-        <div style={styles.sectionContainer}>
+          <div className="graduate-image-wrap">
+            <img
+              src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1200&q=85"
+              alt="Graduates collaborating"
+              className="section-image"
+              loading="lazy"
+            />
+          </div>
 
-          <div style={styles.graduatePanel}>
 
-            <div style={styles.graduateImageWrap}>
-              <img
-                src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=900&q=85"
-                alt="Students preparing for their careers"
-                style={styles.graduateImage}
-              />
+          <div className="graduate-content">
 
-              <div style={styles.imageShade}></div>
+            <span className="section-eyebrow">
+              FOR GRADUATES
+            </span>
 
-              <div style={styles.photoBadge}>
-                <span style={styles.photoBadgeIcon}>
-                  ✓
-                </span>
+            <h2>
+              Your career starts with the right opportunity.
+            </h2>
 
-                Career ready
+            <p>
+              Whether you are looking for your first internship, graduate
+              programme or full-time position, GradLink SA helps you discover
+              opportunities that match your qualifications and career goals.
+            </p>
+
+
+            <div className="benefit-list">
+
+              <div className="benefit-item">
+                <span className="benefit-check">✓</span>
+                <div>
+                  <strong>Discover opportunities</strong>
+                  <p>
+                    Find internships and jobs from companies across South Africa.
+                  </p>
+                </div>
               </div>
+
+
+              <div className="benefit-item">
+                <span className="benefit-check">✓</span>
+                <div>
+                  <strong>Showcase your skills</strong>
+                  <p>
+                    Create your profile and highlight your qualifications.
+                  </p>
+                </div>
+              </div>
+
+
+              <div className="benefit-item">
+                <span className="benefit-check">✓</span>
+                <div>
+                  <strong>Take the next step</strong>
+                  <p>
+                    Apply for opportunities that can move your career forward.
+                  </p>
+                </div>
+              </div>
+
             </div>
 
-            <div style={styles.graduateContent}>
 
-              <div style={styles.sectionEyebrow}>
-                FOR GRADUATES
-              </div>
-
-              <h2 style={styles.graduateTitle}>
-                Your degree is the beginning,
-                not the destination.
-              </h2>
-
-              <p style={styles.graduateText}>
-                Create your profile, discover
-                opportunities and put your
-                qualifications in front of companies
-                looking for emerging talent.
-              </p>
-
-              <div style={styles.featureList}>
-
-                <div style={styles.feature}>
-                  <span style={styles.featureCheck}>
-                    ✓
-                  </span>
-                  Discover internships and jobs
-                </div>
-
-                <div style={styles.feature}>
-                  <span style={styles.featureCheck}>
-                    ✓
-                  </span>
-                  Build your professional profile
-                </div>
-
-                <div style={styles.feature}>
-                  <span style={styles.featureCheck}>
-                    ✓
-                  </span>
-                  Apply directly to opportunities
-                </div>
-
-              </div>
-
-              <Link
-                href="/signup"
-                style={styles.primaryButton}
-              >
-                Create Graduate Profile
-                <span style={styles.buttonArrow}>
-                  →
-                </span>
-              </Link>
-
-            </div>
+            <Link href="/signup" className="primary-button">
+              Create Your Profile
+              <span>→</span>
+            </Link>
 
           </div>
 
         </div>
       </section>
 
+
       {/* =====================================================
-          FOR COMPANIES
+          COMPANY SECTION
       ===================================================== */}
+      <section className="company-section">
+        <div className="container">
 
-      <section style={styles.companySection}>
-        <div style={styles.sectionContainer}>
+          <div className="company-panel">
 
-          <div style={styles.companyPanel}>
+            <div className="company-panel-content">
 
-            <div style={styles.companyContent}>
-
-              <div style={styles.companyEyebrow}>
+              <span className="section-eyebrow white">
                 FOR COMPANIES
-              </div>
+              </span>
 
-              <h2 style={styles.companyTitle}>
-                Find the graduates
-                <br />
-                <span>
-                  your business needs.
-                </span>
+              <h2>
+                Find the next generation of South African talent.
               </h2>
 
-              <p style={styles.companyText}>
-                Reach qualified graduate talent,
-                manage applications and make smarter
-                hiring decisions with GradLink SA.
+              <p>
+                Reach qualified graduates, post opportunities and discover
+                candidates who can help your business grow.
               </p>
 
-              <div style={styles.companyFeatures}>
 
-                <div style={styles.companyFeature}>
-                  <span>
-                    ◈
-                  </span>
-                  AI applicant matching
+              <div className="company-features">
+
+                <div>
+                  <span>01</span>
+                  <p>Reach qualified graduates</p>
                 </div>
 
-                <div style={styles.companyFeature}>
-                  <span>
-                    ◈
-                  </span>
-                  Applicant management
+                <div>
+                  <span>02</span>
+                  <p>Post internship opportunities</p>
                 </div>
 
-                <div style={styles.companyFeature}>
-                  <span>
-                    ◈
-                  </span>
-                  Document verification
+                <div>
+                  <span>03</span>
+                  <p>Discover emerging talent</p>
                 </div>
 
               </div>
 
-              <Link
-                href="/company"
-                style={styles.whiteButton}
-              >
-                Hire Graduate Talent
-                <span>
-                  →
-                </span>
+
+              <Link href="/company" className="white-button">
+                Explore Company Solutions
+                <span>→</span>
               </Link>
 
             </div>
 
-            <div style={styles.companyVisual}>
+
+            <div className="company-panel-image">
               <img
-                src="https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=1000&q=85"
-                alt="Business team collaborating"
-                style={styles.companyImage}
+                src="https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=1200&q=85"
+                alt="Business team working together"
+                loading="lazy"
               />
-
-              <div style={styles.companyImageOverlay}></div>
-
-              <div style={styles.companyQuote}>
-                <div style={styles.quoteMark}>
-                  “
-                </div>
-
-                <p>
-                  Find ambitious graduates
-                  ready to make an impact.
-                </p>
-              </div>
             </div>
 
           </div>
 
         </div>
       </section>
+
 
       {/* =====================================================
           HOW IT WORKS
       ===================================================== */}
+      <section className="how-section">
+        <div className="container">
 
-      <section style={styles.stepsSection}>
-        <div style={styles.sectionContainer}>
+          <div className="center-heading">
 
-          <div style={styles.centerHeader}>
-            <div style={styles.sectionEyebrow}>
-              HOW IT WORKS
-            </div>
+            <span className="section-eyebrow">
+              SIMPLE PROCESS
+            </span>
 
-            <h2 style={styles.sectionTitle}>
-              Your next opportunity is
-              <br />
-              just a few steps away.
-            </h2>
-          </div>
-
-          <div style={styles.stepsGrid}>
-
-            <Step
-              number="01"
-              icon="👤"
-              title="Create your profile"
-              text="Show employers your qualifications, skills and career interests."
-            />
-
-            <Step
-              number="02"
-              icon="🔎"
-              title="Discover opportunities"
-              text="Explore internships and jobs that match your goals."
-            />
-
-            <Step
-              number="03"
-              icon="🚀"
-              title="Apply and grow"
-              text="Apply to opportunities and take the next step in your career."
-            />
-
-          </div>
-
-        </div>
-      </section>
-
-      {/* =====================================================
-          FINAL CTA
-      ===================================================== */}
-
-      <section style={styles.ctaSection}>
-        <div style={styles.ctaContainer}>
-
-          <div style={styles.ctaGlow}></div>
-
-          <div style={styles.ctaContent}>
-
-            <div style={styles.ctaEyebrow}>
-              YOUR NEXT CHAPTER STARTS HERE
-            </div>
-
-            <h2 style={styles.ctaTitle}>
-              Ready to take the next step?
+            <h2>
+              Your next opportunity is closer than you think.
             </h2>
 
-            <p style={styles.ctaText}>
-              Whether you're looking for your first
-              opportunity or your next great hire,
-              GradLink SA is here to connect you.
+            <p>
+              Getting started with GradLink SA is simple.
             </p>
 
-            <div style={styles.ctaButtons}>
+          </div>
 
-              <Link
-                href="/internships"
-                style={styles.ctaPrimary}
-              >
-                Explore Internships
+
+          <div className="steps-grid">
+
+            <div className="step">
+
+              <div className="step-number">
+                01
+              </div>
+
+              <h3>
+                Create your profile
+              </h3>
+
+              <p>
+                Build a professional profile that showcases your
+                qualifications, skills and experience.
+              </p>
+
+            </div>
+
+
+            <div className="step">
+
+              <div className="step-number">
+                02
+              </div>
+
+              <h3>
+                Discover opportunities
+              </h3>
+
+              <p>
+                Explore internships and jobs that match your career goals.
+              </p>
+
+            </div>
+
+
+            <div className="step">
+
+              <div className="step-number">
+                03
+              </div>
+
+              <h3>
+                Apply and grow
+              </h3>
+
+              <p>
+                Apply for opportunities and take your first step towards
+                your career.
+              </p>
+
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+
+      {/* =====================================================
+          CTA
+      ===================================================== */}
+      <section className="cta-section">
+        <div className="container">
+
+          <div className="cta-box">
+
+            <div>
+              <span className="section-eyebrow white">
+                START TODAY
+              </span>
+
+              <h2>
+                Ready to take the next step?
+              </h2>
+
+              <p>
+                Create your GradLink SA profile and start discovering
+                opportunities today.
+              </p>
+            </div>
+
+
+            <div className="cta-buttons">
+
+              <Link href="/signup" className="white-button">
+                Get Started
+                <span>→</span>
               </Link>
 
-              <Link
-                href="/signup"
-                style={styles.ctaSecondary}
-              >
-                Get Started
+              <Link href="/internships" className="cta-outline-button">
+                Browse Opportunities
               </Link>
 
             </div>
@@ -733,1502 +577,1414 @@ export default function HomePage() {
 
         </div>
       </section>
+
 
       {/* =====================================================
           FOOTER
       ===================================================== */}
+      <footer className="footer">
 
-      <footer style={styles.footer}>
-        <div style={styles.footerContainer}>
+        <div className="container footer-grid">
 
-          <div style={styles.footerBrand}>
+          <div className="footer-brand">
 
-            <Link
-              href="/"
-              style={styles.footerLogoRow}
-            >
-              <div style={styles.footerLogo}>
-                G
-              </div>
-
-              <div style={styles.footerBrandText}>
-                Grad
-                <span>
-                  Link
-                </span>{" "}
-                SA
-              </div>
+            <Link href="/" className="logo footer-logo">
+              <span className="logo-mark">G</span>
+              <span>GradLink <strong>SA</strong></span>
             </Link>
 
-            <p style={styles.footerDescription}>
-              Connecting South African graduates
-              with opportunities to build their careers.
+            <p>
+              Connecting South African graduates with opportunities
+              that can shape their careers.
             </p>
 
+            <span className="footer-email">
+              gradlinksa@tuta.com
+            </span>
+
           </div>
 
-          <div style={styles.footerLinks}>
 
-            <div style={styles.footerColumn}>
-              <h4>
-                Explore
-              </h4>
+          <div className="footer-column">
 
-              <Link href="/internships">
-                Internships
-              </Link>
+            <h4>For Graduates</h4>
 
-              <Link href="/jobs">
-                Jobs
-              </Link>
-            </div>
+            <Link href="/internships">
+              Internships
+            </Link>
 
-            <div style={styles.footerColumn}>
-              <h4>
-                GradLink SA
-              </h4>
+            <Link href="/jobs">
+              Jobs
+            </Link>
 
-              <Link href="/company">
-                For Companies
-              </Link>
+            <Link href="/signup">
+              Create Profile
+            </Link>
 
-              <Link href="/signup">
-                Create Account
-              </Link>
+          </div>
 
-              <Link href="/login">
-                Login
-              </Link>
-            </div>
+
+          <div className="footer-column">
+
+            <h4>For Companies</h4>
+
+            <Link href="/company">
+              Hire Graduates
+            </Link>
+
+            <Link href="/company-pricing">
+              Pricing
+            </Link>
+
+            <Link href="/login">
+              Company Login
+            </Link>
+
+          </div>
+
+
+          <div className="footer-column">
+
+            <h4>GradLink SA</h4>
+
+            <Link href="/">
+              Home
+            </Link>
+
+            <Link href="/login">
+              Login
+            </Link>
+
+            <Link href="/signup">
+              Sign Up
+            </Link>
 
           </div>
 
         </div>
 
-        <div style={styles.footerBottom}>
-          © {new Date().getFullYear()} GradLink SA.
-          All rights reserved.
+
+        <div className="container footer-bottom">
+
+          <span>
+            © {new Date().getFullYear()} GradLink SA. All rights reserved.
+          </span>
+
+          <span>
+            Built for South African talent.
+          </span>
+
         </div>
+
       </footer>
 
-    </main>
-  );
-}
 
-function Step({
-  number,
-  icon,
-  title,
-  text,
-}) {
-  return (
-    <div style={styles.step}>
+      {/* =====================================================
+          RESPONSIVE STYLES
+      ===================================================== */}
+      <style jsx global>{`
 
-      <div style={styles.stepNumber}>
-        {number}
-      </div>
-
-      <div style={styles.stepIcon}>
-        {icon}
-      </div>
-
-      <h3 style={styles.stepTitle}>
-        {title}
-      </h3>
-
-      <p style={styles.stepText}>
-        {text}
-      </p>
-
-    </div>
-  );
-}
-
-function getCompanyInitial(name) {
-  if (!name) return "G";
-
-  const clean = name.trim();
-
-  return clean
-    .charAt(0)
-    .toUpperCase();
-}
-
-const styles = {
-  page: {
-    minHeight: "100vh",
-    background: "#ffffff",
-    color: "#0f172a",
-    overflowX: "hidden",
-  },
-
-  header: {
-    position: "sticky",
-    top: 0,
-    zIndex: 100,
-    background: "rgba(255,255,255,0.96)",
-    backdropFilter: "blur(14px)",
-    borderBottom: "1px solid #e2e8f0",
-  },
-
-  navContainer: {
-    width: "100%",
-    maxWidth: "1180px",
-    margin: "0 auto",
-    minHeight: "72px",
-    padding: "0 20px",
-    boxSizing: "border-box",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "20px",
-  },
-
-  brand: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    textDecoration: "none",
-    flexShrink: 0,
-  },
-
-  logo: {
-    width: "40px",
-    height: "40px",
-    borderRadius: "11px",
-    background:
-      "linear-gradient(135deg, #1d4ed8, #1e40af)",
-    color: "#ffffff",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "20px",
-    fontWeight: "900",
-    boxShadow:
-      "0 7px 18px rgba(37,99,235,0.22)",
-  },
-
-  brandText: {
-    fontSize: "20px",
-    fontWeight: "850",
-    color: "#0f172a",
-  },
-
-  brandBlue: {
-    color: "#2563eb",
-  },
-
-  brandSA: {
-    color: "#64748b",
-    fontSize: "11px",
-    fontWeight: "800",
-  },
-
-  desktopNav: {
-    display: "flex",
-    alignItems: "center",
-    gap: "30px",
-    marginLeft: "auto",
-  },
-
-  navLink: {
-    textDecoration: "none",
-    color: "#475569",
-    fontSize: "14px",
-    fontWeight: "700",
-  },
-
-  navActions: {
-    display: "flex",
-    alignItems: "center",
-    gap: "9px",
-  },
-
-  loginButton: {
-    textDecoration: "none",
-    color: "#1d4ed8",
-    fontSize: "14px",
-    fontWeight: "750",
-    padding: "10px 13px",
-  },
-
-  signupButton: {
-    textDecoration: "none",
-    background:
-      "linear-gradient(135deg, #2563eb, #1d4ed8)",
-    color: "#ffffff",
-    padding: "11px 16px",
-    borderRadius: "10px",
-    fontSize: "13px",
-    fontWeight: "800",
-    boxShadow:
-      "0 7px 18px rgba(37,99,235,0.20)",
-  },
-
-  hero: {
-    background:
-      "linear-gradient(135deg, #f8fbff 0%, #eef5ff 55%, #ffffff 100%)",
-    borderBottom: "1px solid #e5edf7",
-  },
-
-  heroContainer: {
-    width: "100%",
-    maxWidth: "1180px",
-    margin: "0 auto",
-    padding: "75px 20px 85px",
-    boxSizing: "border-box",
-    display: "grid",
-    gridTemplateColumns:
-      "minmax(0, 1fr) minmax(360px, 0.9fr)",
-    gap: "65px",
-    alignItems: "center",
-  },
-
-  heroContent: {
-    minWidth: 0,
-  },
-
-  eyebrow: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "8px",
-    background: "#dbeafe",
-    color: "#1d4ed8",
-    border: "1px solid #bfdbfe",
-    borderRadius: "999px",
-    padding: "8px 12px",
-    fontSize: "10px",
-    fontWeight: "850",
-    letterSpacing: "0.7px",
-  },
-
-  eyebrowDot: {
-    width: "7px",
-    height: "7px",
-    borderRadius: "50%",
-    background: "#2563eb",
-  },
-
-  heroTitle: {
-    margin: "20px 0 17px",
-    fontSize: "clamp(40px, 5vw, 65px)",
-    lineHeight: 1.03,
-    letterSpacing: "-2.5px",
-    fontWeight: "900",
-    color: "#0f172a",
-  },
-
-  heroBlue: {
-    color: "#2563eb",
-  },
-
-  heroText: {
-    maxWidth: "600px",
-    margin: 0,
-    color: "#64748b",
-    fontSize: "17px",
-    lineHeight: 1.7,
-  },
-
-  heroButtons: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "11px",
-    marginTop: "28px",
-  },
-
-  primaryButton: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "12px",
-    minHeight: "52px",
-    boxSizing: "border-box",
-    padding: "0 20px",
-    borderRadius: "11px",
-    background:
-      "linear-gradient(135deg, #2563eb, #1d4ed8)",
-    color: "#ffffff",
-    textDecoration: "none",
-    fontSize: "14px",
-    fontWeight: "800",
-    boxShadow:
-      "0 10px 25px rgba(37,99,235,0.22)",
-  },
-
-  buttonArrow: {
-    fontSize: "18px",
-  },
-
-  secondaryButton: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "52px",
-    boxSizing: "border-box",
-    padding: "0 20px",
-    borderRadius: "11px",
-    border: "1px solid #cbd5e1",
-    background: "#ffffff",
-    color: "#1e3a8a",
-    textDecoration: "none",
-    fontSize: "14px",
-    fontWeight: "800",
-  },
-
-  heroTrust: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "17px",
-    marginTop: "23px",
-  },
-
-  trustItem: {
-    display: "flex",
-    alignItems: "center",
-    gap: "7px",
-    color: "#64748b",
-    fontSize: "12px",
-    fontWeight: "650",
-  },
-
-  trustIcon: {
-    width: "18px",
-    height: "18px",
-    borderRadius: "50%",
-    background: "#dcfce7",
-    color: "#15803d",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "10px",
-    fontWeight: "900",
-  },
-
-  heroVisual: {
-    position: "relative",
-    minWidth: 0,
-  },
-
-  imageCard: {
-    position: "relative",
-    height: "510px",
-    borderRadius: "28px",
-    overflow: "hidden",
-    boxShadow:
-      "0 30px 70px rgba(15,23,42,0.18)",
-    background: "#dbeafe",
-  },
-
-  heroImage: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    display: "block",
-  },
-
-  imageOverlay: {
-    position: "absolute",
-    inset: 0,
-    background:
-      "linear-gradient(180deg, rgba(15,23,42,0.02) 25%, rgba(15,23,42,0.70) 100%)",
-  },
-
-  opportunityBadge: {
-    position: "absolute",
-    top: "20px",
-    left: "20px",
-    right: "20px",
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    background: "rgba(255,255,255,0.95)",
-    borderRadius: "14px",
-    padding: "12px",
-    boxShadow:
-      "0 12px 30px rgba(15,23,42,0.16)",
-  },
-
-  badgeIcon: {
-    width: "36px",
-    height: "36px",
-    borderRadius: "10px",
-    background: "#dcfce7",
-    color: "#15803d",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: "900",
-  },
-
-  badgeTitle: {
-    display: "block",
-    color: "#0f172a",
-    fontSize: "12px",
-  },
-
-  badgeText: {
-    color: "#64748b",
-    fontSize: "11px",
-    marginTop: "2px",
-  },
-
-  imageCaption: {
-    position: "absolute",
-    left: "24px",
-    bottom: "26px",
-    color: "#ffffff",
-  },
-
-  captionSmall: {
-    fontSize: "10px",
-    fontWeight: "800",
-    letterSpacing: "1px",
-    opacity: 0.85,
-  },
-
-  captionTitle: {
-    marginTop: "5px",
-    fontSize: "24px",
-    fontWeight: "850",
-  },
-
-  floatingStat: {
-    position: "absolute",
-    right: "-25px",
-    bottom: "34px",
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: "15px",
-    padding: "12px 14px",
-    boxShadow:
-      "0 18px 35px rgba(15,23,42,0.15)",
-  },
-
-  statCircle: {
-    width: "35px",
-    height: "35px",
-    borderRadius: "50%",
-    background: "#dbeafe",
-    color: "#2563eb",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  statTitle: {
-    display: "block",
-    fontSize: "12px",
-    color: "#0f172a",
-  },
-
-  statText: {
-    fontSize: "10px",
-    color: "#64748b",
-    marginTop: "2px",
-  },
-
-  quickSection: {
-    background: "#ffffff",
-    borderBottom: "1px solid #e2e8f0",
-  },
-
-  sectionContainer: {
-    width: "100%",
-    maxWidth: "1180px",
-    margin: "0 auto",
-    padding: "0 20px",
-    boxSizing: "border-box",
-  },
-
-  quickGrid: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
-  },
-
-  quickItem: {
-    display: "grid",
-    gridTemplateColumns: "48px 1fr 20px",
-    alignItems: "center",
-    gap: "13px",
-    padding: "25px 18px",
-    textDecoration: "none",
-    borderRight: "1px solid #e2e8f0",
-  },
-
-  quickIcon: {
-    width: "46px",
-    height: "46px",
-    borderRadius: "13px",
-    background: "#eff6ff",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "20px",
-  },
-
-  quickTitle: {
-    display: "block",
-    color: "#0f172a",
-    fontSize: "13px",
-  },
-
-  quickText: {
-    margin: "4px 0 0",
-    color: "#64748b",
-    fontSize: "11px",
-    lineHeight: 1.45,
-  },
-
-  quickArrow: {
-    color: "#2563eb",
-    fontSize: "18px",
-  },
-
-  internshipSection: {
-    padding: "80px 0",
-    background: "#f8fafc",
-  },
-
-  sectionHeader: {
-    display: "flex",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: "30px",
-    marginBottom: "30px",
-  },
-
-  sectionEyebrow: {
-    color: "#2563eb",
-    fontSize: "10px",
-    fontWeight: "900",
-    letterSpacing: "1px",
-    marginBottom: "8px",
-  },
-
-  sectionTitle: {
-    margin: 0,
-    color: "#0f172a",
-    fontSize: "clamp(28px, 4vw, 40px)",
-    lineHeight: 1.1,
-    letterSpacing: "-1.2px",
-    fontWeight: "900",
-  },
-
-  sectionText: {
-    maxWidth: "580px",
-    margin: "10px 0 0",
-    color: "#64748b",
-    fontSize: "14px",
-    lineHeight: 1.6,
-  },
-
-  viewAll: {
-    flexShrink: 0,
-    color: "#2563eb",
-    textDecoration: "none",
-    fontSize: "13px",
-    fontWeight: "800",
-  },
-
-  internshipGrid: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
-    gap: "16px",
-  },
-
-  internshipCard: {
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: "17px",
-    padding: "20px",
-    textDecoration: "none",
-    boxSizing: "border-box",
-    boxShadow:
-      "0 8px 25px rgba(15,23,42,0.045)",
-    transition: "transform 0.2s ease",
-  },
-
-  cardTop: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "10px",
-    marginBottom: "17px",
-  },
-
-  companyLogo: {
-    width: "42px",
-    height: "42px",
-    borderRadius: "11px",
-    background:
-      "linear-gradient(135deg, #2563eb, #1e40af)",
-    color: "#ffffff",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: "900",
-    fontSize: "16px",
-  },
-
-  internshipLabel: {
-    color: "#2563eb",
-    background: "#eff6ff",
-    borderRadius: "999px",
-    padding: "6px 8px",
-    fontSize: "8px",
-    fontWeight: "900",
-    letterSpacing: "0.5px",
-  },
-
-  cardTitle: {
-    margin: 0,
-    color: "#0f172a",
-    fontSize: "16px",
-    lineHeight: 1.35,
-    fontWeight: "850",
-  },
-
-  companyName: {
-    margin: "6px 0 0",
-    color: "#64748b",
-    fontSize: "12px",
-    fontWeight: "650",
-  },
-
-  cardDetails: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "7px",
-    marginTop: "17px",
-  },
-
-  detail: {
-    background: "#f8fafc",
-    border: "1px solid #e2e8f0",
-    borderRadius: "7px",
-    padding: "6px 8px",
-    color: "#64748b",
-    fontSize: "9px",
-    lineHeight: 1.2,
-  },
-
-  cardBottom: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: "19px",
-    paddingTop: "15px",
-    borderTop: "1px solid #f1f5f9",
-  },
-
-  viewOpportunity: {
-    color: "#2563eb",
-    fontSize: "11px",
-    fontWeight: "800",
-  },
-
-  cardArrow: {
-    color: "#2563eb",
-    fontSize: "17px",
-  },
-
-  loadingBox: {
-    minHeight: "180px",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "#64748b",
-    fontSize: "13px",
-  },
-
-  loadingSpinner: {
-    width: "28px",
-    height: "28px",
-    borderRadius: "50%",
-    border: "3px solid #dbeafe",
-    borderTopColor: "#2563eb",
-    marginBottom: "10px",
-  },
-
-  emptyBox: {
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: "18px",
-    padding: "45px 20px",
-    textAlign: "center",
-  },
-
-  emptyIcon: {
-    fontSize: "32px",
-  },
-
-  emptyTitle: {
-    margin: "12px 0 5px",
-    fontSize: "17px",
-    color: "#0f172a",
-  },
-
-  emptyText: {
-    margin: 0,
-    color: "#64748b",
-    fontSize: "13px",
-  },
-
-  primarySmall: {
-    display: "inline-flex",
-    marginTop: "17px",
-    padding: "11px 16px",
-    borderRadius: "9px",
-    background: "#2563eb",
-    color: "#ffffff",
-    textDecoration: "none",
-    fontSize: "12px",
-    fontWeight: "800",
-  },
-
-  graduateSection: {
-    padding: "80px 0",
-    background: "#ffffff",
-  },
-
-  graduatePanel: {
-    display: "grid",
-    gridTemplateColumns:
-      "minmax(0, 0.9fr) minmax(0, 1.1fr)",
-    background: "#f8fafc",
-    border: "1px solid #e2e8f0",
-    borderRadius: "25px",
-    overflow: "hidden",
-  },
-
-  graduateImageWrap: {
-    minHeight: "470px",
-    position: "relative",
-  },
-
-  graduateImage: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    display: "block",
-  },
-
-  imageShade: {
-    position: "absolute",
-    inset: 0,
-    background:
-      "linear-gradient(180deg, rgba(15,23,42,0.03), rgba(15,23,42,0.50))",
-  },
-
-  photoBadge: {
-    position: "absolute",
-    left: "20px",
-    bottom: "20px",
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "10px 13px",
-    borderRadius: "10px",
-    background: "#ffffff",
-    color: "#0f172a",
-    fontSize: "11px",
-    fontWeight: "800",
-    boxShadow:
-      "0 10px 25px rgba(15,23,42,0.15)",
-  },
-
-  photoBadgeIcon: {
-    width: "20px",
-    height: "20px",
-    borderRadius: "50%",
-    background: "#dcfce7",
-    color: "#15803d",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "10px",
-  },
-
-  graduateContent: {
-    padding: "55px 55px",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-  },
-
-  graduateTitle: {
-    margin: "5px 0 15px",
-    color: "#0f172a",
-    fontSize: "clamp(27px, 3.5vw, 40px)",
-    lineHeight: 1.1,
-    letterSpacing: "-1.2px",
-    fontWeight: "900",
-  },
-
-  graduateText: {
-    margin: 0,
-    color: "#64748b",
-    fontSize: "14px",
-    lineHeight: 1.7,
-    maxWidth: "500px",
-  },
-
-  featureList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "12px",
-    margin: "22px 0 27px",
-  },
-
-  feature: {
-    display: "flex",
-    alignItems: "center",
-    gap: "9px",
-    color: "#334155",
-    fontSize: "13px",
-    fontWeight: "700",
-  },
-
-  featureCheck: {
-    width: "21px",
-    height: "21px",
-    borderRadius: "50%",
-    background: "#dbeafe",
-    color: "#2563eb",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "11px",
-    fontWeight: "900",
-  },
-
-  companySection: {
-    padding: "80px 0",
-    background: "#f8fafc",
-  },
-
-  companyPanel: {
-    display: "grid",
-    gridTemplateColumns:
-      "minmax(0, 1fr) minmax(0, 1fr)",
-    borderRadius: "25px",
-    overflow: "hidden",
-    background:
-      "linear-gradient(135deg, #0f2f73, #1d4ed8)",
-    boxShadow:
-      "0 25px 60px rgba(29,78,216,0.20)",
-  },
-
-  companyContent: {
-    padding: "60px",
-    color: "#ffffff",
-  },
-
-  companyEyebrow: {
-    color: "#bfdbfe",
-    fontSize: "10px",
-    fontWeight: "900",
-    letterSpacing: "1px",
-  },
-
-  companyTitle: {
-    margin: "13px 0 15px",
-    color: "#ffffff",
-    fontSize: "clamp(30px, 4vw, 46px)",
-    lineHeight: 1.05,
-    letterSpacing: "-1.5px",
-    fontWeight: "900",
-  },
-
-  companyTitleSpan: {
-    color: "#bfdbfe",
-  },
-
-  companyText: {
-    margin: 0,
-    maxWidth: "490px",
-    color: "#dbeafe",
-    fontSize: "14px",
-    lineHeight: 1.7,
-  },
-
-  companyFeatures: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "11px",
-    margin: "25px 0 30px",
-  },
-
-  companyFeature: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    color: "#ffffff",
-    fontSize: "13px",
-    fontWeight: "700",
-  },
-
-  whiteButton: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "12px",
-    minHeight: "50px",
-    padding: "0 19px",
-    borderRadius: "10px",
-    background: "#ffffff",
-    color: "#1d4ed8",
-    textDecoration: "none",
-    fontSize: "13px",
-    fontWeight: "850",
-  },
-
-  companyVisual: {
-    minHeight: "500px",
-    position: "relative",
-  },
-
-  companyImage: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-    display: "block",
-  },
-
-  companyImageOverlay: {
-    position: "absolute",
-    inset: 0,
-    background:
-      "linear-gradient(90deg, rgba(15,47,115,0.35), rgba(15,47,115,0.05))",
-  },
-
-  companyQuote: {
-    position: "absolute",
-    left: "25px",
-    right: "25px",
-    bottom: "25px",
-    padding: "18px",
-    background: "rgba(15,23,42,0.78)",
-    borderRadius: "15px",
-    backdropFilter: "blur(10px)",
-  },
-
-  quoteMark: {
-    color: "#93c5fd",
-    fontSize: "27px",
-    lineHeight: 0.7,
-  },
-
-  companyQuoteText: {
-    color: "#ffffff",
-    fontSize: "13px",
-    lineHeight: 1.5,
-  },
-
-  stepsSection: {
-    padding: "80px 0",
-    background: "#ffffff",
-  },
-
-  centerHeader: {
-    textAlign: "center",
-    marginBottom: "45px",
-  },
-
-  stepsGrid: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
-    gap: "18px",
-  },
-
-  step: {
-    position: "relative",
-    padding: "28px 25px",
-    border: "1px solid #e2e8f0",
-    borderRadius: "17px",
-    background: "#ffffff",
-  },
-
-  stepNumber: {
-    position: "absolute",
-    top: "18px",
-    right: "20px",
-    color: "#cbd5e1",
-    fontSize: "11px",
-    fontWeight: "900",
-  },
-
-  stepIcon: {
-    width: "52px",
-    height: "52px",
-    borderRadius: "14px",
-    background: "#eff6ff",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "23px",
-    marginBottom: "20px",
-  },
-
-  stepTitle: {
-    margin: 0,
-    color: "#0f172a",
-    fontSize: "16px",
-    fontWeight: "850",
-  },
-
-  stepText: {
-    margin: "9px 0 0",
-    color: "#64748b",
-    fontSize: "12px",
-    lineHeight: 1.65,
-  },
-
-  ctaSection: {
-    padding: "0 20px 80px",
-    background: "#ffffff",
-  },
-
-  ctaContainer: {
-    position: "relative",
-    width: "100%",
-    maxWidth: "1180px",
-    margin: "0 auto",
-    overflow: "hidden",
-    borderRadius: "25px",
-    background:
-      "linear-gradient(135deg, #0f2f73, #2563eb)",
-  },
-
-  ctaGlow: {
-    position: "absolute",
-    width: "500px",
-    height: "500px",
-    right: "-200px",
-    top: "-300px",
-    borderRadius: "50%",
-    background:
-      "radial-gradient(circle, rgba(147,197,253,0.25), transparent 70%)",
-  },
-
-  ctaContent: {
-    position: "relative",
-    zIndex: 1,
-    padding: "65px 25px",
-    textAlign: "center",
-  },
-
-  ctaEyebrow: {
-    color: "#bfdbfe",
-    fontSize: "10px",
-    fontWeight: "900",
-    letterSpacing: "1px",
-  },
-
-  ctaTitle: {
-    margin: "12px 0 12px",
-    color: "#ffffff",
-    fontSize: "clamp(29px, 4vw, 45px)",
-    letterSpacing: "-1.2px",
-    fontWeight: "900",
-  },
-
-  ctaText: {
-    maxWidth: "620px",
-    margin: "0 auto",
-    color: "#dbeafe",
-    fontSize: "14px",
-    lineHeight: 1.7,
-  },
-
-  ctaButtons: {
-    display: "flex",
-    justifyContent: "center",
-    flexWrap: "wrap",
-    gap: "10px",
-    marginTop: "26px",
-  },
-
-  ctaPrimary: {
-    minHeight: "50px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "0 20px",
-    borderRadius: "10px",
-    background: "#ffffff",
-    color: "#1d4ed8",
-    textDecoration: "none",
-    fontSize: "13px",
-    fontWeight: "850",
-  },
-
-  ctaSecondary: {
-    minHeight: "50px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "0 20px",
-    borderRadius: "10px",
-    border: "1px solid rgba(255,255,255,0.4)",
-    background: "rgba(255,255,255,0.08)",
-    color: "#ffffff",
-    textDecoration: "none",
-    fontSize: "13px",
-    fontWeight: "850",
-  },
-
-  footer: {
-    background: "#0f172a",
-    color: "#ffffff",
-  },
-
-  footerContainer: {
-    width: "100%",
-    maxWidth: "1180px",
-    margin: "0 auto",
-    padding: "55px 20px",
-    boxSizing: "border-box",
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "50px",
-  },
-
-  footerBrand: {
-    maxWidth: "390px",
-  },
-
-  footerLogoRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: "9px",
-    textDecoration: "none",
-  },
-
-  footerLogo: {
-    width: "38px",
-    height: "38px",
-    borderRadius: "10px",
-    background: "#2563eb",
-    color: "#ffffff",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: "900",
-  },
-
-  footerBrandText: {
-    color: "#ffffff",
-    fontSize: "18px",
-    fontWeight: "850",
-  },
-
-  footerDescription: {
-    color: "#94a3b8",
-    fontSize: "12px",
-    lineHeight: 1.6,
-    marginTop: "14px",
-  },
-
-  footerLinks: {
-    display: "flex",
-    gap: "70px",
-  },
-
-  footerColumn: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "11px",
-  },
-
-  footerColumnHeading: {
-    color: "#ffffff",
-    fontSize: "12px",
-    margin: "0 0 5px",
-  },
-
-  footerBottom: {
-    borderTop: "1px solid #1e293b",
-    padding: "18px 20px",
-    textAlign: "center",
-    color: "#64748b",
-    fontSize: "11px",
-  },
-};
-
-/* ============================================================
-   MOBILE STYLES
-   ============================================================ */
-
-if (typeof document !== "undefined") {
-  const styleId = "gradlink-home-mobile-styles";
-
-  if (!document.getElementById(styleId)) {
-    const style = document.createElement("style");
-
-    style.id = styleId;
-
-    style.innerHTML = `
-      @media (max-width: 900px) {
-        nav {
-          display: none !important;
+        * {
+          box-sizing: border-box;
         }
 
-        .gradlink-mobile-placeholder {
-          display: none;
-        }
-      }
-
-      @media (max-width: 760px) {
-
-        header {
-          position: sticky !important;
-          top: 0 !important;
+        html {
+          scroll-behavior: smooth;
         }
 
-        header > div {
-          min-height: 64px !important;
-          padding: 0 14px !important;
+        body {
+          margin: 0;
+          padding: 0;
+          background: #ffffff;
+          color: #0f172a;
+          overflow-x: hidden;
         }
 
-        header nav {
-          display: none !important;
+        a {
+          text-decoration: none;
         }
 
-        header a {
+        .home-page {
+          width: 100%;
+          overflow-x: hidden;
+          background: #ffffff;
+        }
+
+        .container {
+          width: min(1180px, calc(100% - 40px));
+          margin: 0 auto;
+        }
+
+
+        /* =========================
+           HEADER
+        ========================= */
+
+        .home-header {
+          position: sticky;
+          top: 0;
+          z-index: 100;
+          width: 100%;
+          background: rgba(255,255,255,0.96);
+          backdrop-filter: blur(16px);
+          border-bottom: 1px solid #e8edf5;
+        }
+
+        .header-inner {
+          min-height: 76px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 28px;
+        }
+
+        .logo {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          color: #0f172a;
+          font-size: 20px;
+          font-weight: 800;
+          letter-spacing: -0.5px;
           white-space: nowrap;
         }
 
-        header a:last-child {
-          padding: 9px 11px !important;
-          font-size: 11px !important;
+        .logo strong {
+          color: #2563eb;
         }
 
-        header a:nth-last-child(2) {
-          font-size: 12px !important;
-          padding: 8px 7px !important;
+        .logo-mark {
+          width: 38px;
+          height: 38px;
+          border-radius: 11px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #ffffff;
+          background: linear-gradient(135deg, #2563eb, #1d4ed8);
+          box-shadow: 0 8px 20px rgba(37,99,235,0.22);
+          font-size: 18px;
+          font-weight: 800;
         }
 
-        main {
-          overflow-x: hidden !important;
-        }
-      }
-
-      @media (max-width: 700px) {
-
-        section {
-          overflow: hidden;
+        .desktop-nav {
+          display: flex;
+          align-items: center;
+          gap: 34px;
+          margin-left: auto;
         }
 
-        /* HERO */
-
-        section:first-of-type > div {
-          display: block !important;
-          padding: 48px 17px 55px !important;
+        .desktop-nav a {
+          color: #475569;
+          font-size: 14px;
+          font-weight: 600;
+          transition: color 0.2s ease;
         }
 
-        section:first-of-type > div > div:first-child {
-          margin-bottom: 35px;
+        .desktop-nav a:hover {
+          color: #2563eb;
         }
 
-        section:first-of-type h1 {
-          font-size: 42px !important;
-          letter-spacing: -1.8px !important;
+        .header-actions {
+          display: flex;
+          align-items: center;
+          gap: 16px;
         }
 
-        section:first-of-type p {
-          font-size: 15px !important;
+        .login-link {
+          color: #334155;
+          font-size: 14px;
+          font-weight: 700;
         }
 
-        section:first-of-type img {
-          height: 390px !important;
+        .header-signup {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 42px;
+          padding: 0 18px;
+          border-radius: 10px;
+          background: #2563eb;
+          color: #ffffff;
+          font-size: 14px;
+          font-weight: 700;
+          box-shadow: 0 8px 20px rgba(37,99,235,0.18);
         }
 
-        section:first-of-type > div > div:last-child > div {
-          height: 390px !important;
+
+        /* =========================
+           HERO
+        ========================= */
+
+        .hero-section {
+          padding: 78px 0 90px;
+          background:
+            radial-gradient(circle at 15% 20%, rgba(37,99,235,0.08), transparent 32%),
+            linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
         }
 
-        /* QUICK LINKS */
-
-        section:nth-of-type(2) > div > div {
-          display: block !important;
+        .hero-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+          align-items: center;
+          gap: 70px;
         }
 
-        section:nth-of-type(2) a {
-          border-right: none !important;
-          border-bottom: 1px solid #e2e8f0;
-          padding: 19px 5px !important;
+        .hero-content {
+          min-width: 0;
         }
 
-        /* GENERAL */
-
-        section > div {
-          max-width: 100% !important;
+        .eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 9px;
+          padding: 8px 13px;
+          border-radius: 999px;
+          background: #eff6ff;
+          color: #2563eb;
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 0.3px;
         }
 
-        /* INTERNSHIPS */
-
-        section:nth-of-type(3) {
-          padding: 55px 0 !important;
+        .eyebrow-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #2563eb;
         }
 
-        section:nth-of-type(3) > div {
-          padding: 0 17px !important;
+        .hero-content h1 {
+          margin: 22px 0 20px;
+          max-width: 680px;
+          color: #0f172a;
+          font-size: clamp(44px, 5vw, 72px);
+          line-height: 1.03;
+          letter-spacing: -3px;
+          font-weight: 850;
         }
 
-        section:nth-of-type(3) > div > div:first-child {
-          display: block !important;
+        .hero-content h1 span {
+          display: block;
+          color: #2563eb;
         }
 
-        section:nth-of-type(3) > div > div:first-child > a {
-          display: inline-block;
-          margin-top: 15px;
+        .hero-description {
+          max-width: 620px;
+          margin: 0;
+          color: #64748b;
+          font-size: 18px;
+          line-height: 1.7;
         }
 
-        section:nth-of-type(3) > div > div:nth-child(2) {
-          display: block !important;
+        .hero-buttons {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 12px;
+          margin-top: 32px;
         }
 
-        /* GRADUATES */
-
-        section:nth-of-type(4) {
-          padding: 55px 0 !important;
+        .primary-button,
+        .secondary-button,
+        .white-button,
+        .cta-outline-button {
+          min-height: 50px;
+          padding: 0 20px;
+          border-radius: 11px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          font-size: 14px;
+          font-weight: 750;
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
-        section:nth-of-type(4) > div {
-          padding: 0 17px !important;
+        .primary-button {
+          color: #ffffff;
+          background: #2563eb;
+          box-shadow: 0 12px 25px rgba(37,99,235,0.2);
         }
 
-        section:nth-of-type(4) > div > div {
-          display: block !important;
+        .secondary-button {
+          color: #1e293b;
+          background: #ffffff;
+          border: 1px solid #dbe3ef;
         }
 
-        section:nth-of-type(4) img {
-          height: 310px !important;
+        .primary-button:hover,
+        .secondary-button:hover,
+        .white-button:hover {
+          transform: translateY(-2px);
         }
 
-        section:nth-of-type(4) > div > div > div:last-child {
-          padding: 35px 24px !important;
-        }
-
-        /* COMPANY */
-
-        section:nth-of-type(5) {
-          padding: 55px 0 !important;
-        }
-
-        section:nth-of-type(5) > div {
-          padding: 0 17px !important;
-        }
-
-        section:nth-of-type(5) > div > div {
-          display: block !important;
-        }
-
-        section:nth-of-type(5) > div > div > div:first-child {
-          padding: 35px 24px !important;
-        }
-
-        section:nth-of-type(5) img {
-          height: 310px !important;
-        }
-
-        /* STEPS */
-
-        section:nth-of-type(6) {
-          padding: 55px 0 !important;
-        }
-
-        section:nth-of-type(6) > div {
-          padding: 0 17px !important;
-        }
-
-        section:nth-of-type(6) > div > div:last-child {
-          display: block !important;
-        }
-
-        section:nth-of-type(6) > div > div:last-child > div {
-          margin-bottom: 12px;
-        }
-
-        /* CTA */
-
-        section:nth-of-type(7) {
-          padding: 0 17px 55px !important;
-        }
-
-        section:nth-of-type(7) > div {
-          border-radius: 20px !important;
-        }
-
-        /* FOOTER */
-
-        footer > div:first-child {
-          display: block !important;
-          padding: 40px 20px !important;
-        }
-
-        footer > div:first-child > div:last-child {
+        .hero-trust {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 18px;
           margin-top: 30px;
-          display: flex !important;
-          gap: 45px !important;
         }
 
-        footer {
+        .trust-item {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          color: #64748b;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .trust-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 19px;
+          height: 19px;
+          border-radius: 50%;
+          background: #dcfce7;
+          color: #15803d;
+          font-size: 11px;
+          font-weight: 900;
+        }
+
+        .hero-image-wrap {
+          min-width: 0;
+          border-radius: 24px;
           overflow: hidden;
-        }
-      }
-
-      @media (max-width: 430px) {
-
-        section:first-of-type h1 {
-          font-size: 37px !important;
+          box-shadow: 0 25px 70px rgba(15,23,42,0.16);
+          background: #e2e8f0;
         }
 
-        section:first-of-type img {
-          height: 330px !important;
+        .hero-image {
+          display: block;
+          width: 100%;
+          height: 560px;
+          object-fit: cover;
         }
 
-        section:first-of-type > div > div:last-child > div {
-          height: 330px !important;
+
+        /* =========================
+           QUICK LINKS
+        ========================= */
+
+        .quick-section {
+          padding: 0 0 90px;
+          background: #ffffff;
         }
 
-        section:first-of-type > div > div:last-child > div > div:last-child {
-          left: 17px !important;
-          bottom: 20px !important;
+        .quick-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 18px;
         }
 
-        section:first-of-type > div > div:last-child > div > div:last-child > div:last-child {
-          font-size: 20px !important;
+        .quick-item {
+          min-width: 0;
+          display: grid;
+          grid-template-columns: auto minmax(0,1fr) auto;
+          align-items: center;
+          gap: 15px;
+          padding: 22px;
+          border: 1px solid #e5eaf2;
+          border-radius: 16px;
+          background: #ffffff;
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
-        section:first-of-type > div > div:last-child > div > div:nth-child(3) {
-          display: none !important;
+        .quick-item:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 15px 35px rgba(15,23,42,0.08);
         }
 
-        section:nth-of-type(3) h2 {
-          font-size: 30px !important;
+        .quick-icon {
+          width: 46px;
+          height: 46px;
+          flex: 0 0 46px;
+          border-radius: 13px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 20px;
         }
 
-        section:nth-of-type(4) h2,
-        section:nth-of-type(5) h2 {
-          font-size: 29px !important;
+        .quick-icon.blue {
+          background: #eff6ff;
         }
 
-        section:nth-of-type(7) h2 {
-          font-size: 30px !important;
+        .quick-icon.navy {
+          background: #e0e7ff;
         }
-      }
-    `;
 
-    document.head.appendChild(style);
-  }
+        .quick-icon.light {
+          background: #f1f5f9;
+        }
+
+        .quick-item h3 {
+          margin: 0 0 4px;
+          color: #0f172a;
+          font-size: 15px;
+        }
+
+        .quick-item p {
+          margin: 0;
+          color: #64748b;
+          font-size: 12px;
+          line-height: 1.5;
+        }
+
+        .quick-arrow {
+          color: #2563eb;
+          font-size: 20px;
+          font-weight: 700;
+        }
+
+
+        /* =========================
+           FEATURED
+        ========================= */
+
+        .featured-section {
+          padding: 100px 0;
+          background: #f8fafc;
+        }
+
+        .section-heading {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          gap: 30px;
+          margin-bottom: 38px;
+        }
+
+        .section-eyebrow {
+          display: block;
+          margin-bottom: 10px;
+          color: #2563eb;
+          font-size: 11px;
+          font-weight: 850;
+          letter-spacing: 1.4px;
+        }
+
+        .section-heading h2,
+        .center-heading h2 {
+          margin: 0;
+          color: #0f172a;
+          font-size: clamp(30px, 4vw, 46px);
+          line-height: 1.1;
+          letter-spacing: -1.5px;
+        }
+
+        .section-heading p,
+        .center-heading p {
+          max-width: 650px;
+          margin: 12px 0 0;
+          color: #64748b;
+          font-size: 15px;
+          line-height: 1.7;
+        }
+
+        .view-all {
+          flex: 0 0 auto;
+          color: #2563eb;
+          font-size: 14px;
+          font-weight: 750;
+        }
+
+        .internship-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 18px;
+        }
+
+        .internship-card {
+          min-width: 0;
+          display: block;
+          padding: 22px;
+          border: 1px solid #e5eaf2;
+          border-radius: 17px;
+          background: #ffffff;
+          box-shadow: 0 8px 25px rgba(15,23,42,0.04);
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .internship-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 18px 40px rgba(15,23,42,0.09);
+        }
+
+        .company-row {
+          display: flex;
+          align-items: center;
+          gap: 11px;
+          margin-bottom: 18px;
+        }
+
+        .company-avatar {
+          width: 40px;
+          height: 40px;
+          border-radius: 11px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #eff6ff;
+          color: #2563eb;
+          font-size: 15px;
+          font-weight: 800;
+        }
+
+        .company-name {
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          color: #475569;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .internship-card h3 {
+          margin: 0 0 15px;
+          color: #0f172a;
+          font-size: 18px;
+          line-height: 1.35;
+        }
+
+        .internship-meta {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          color: #64748b;
+          font-size: 12px;
+          line-height: 1.4;
+        }
+
+        .field-tag {
+          display: inline-flex;
+          width: fit-content;
+          max-width: 100%;
+          margin-top: 14px;
+          padding: 7px 10px;
+          border-radius: 8px;
+          background: #f1f5f9;
+          color: #475569;
+          font-size: 11px;
+          font-weight: 700;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .card-bottom {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-top: 20px;
+          padding-top: 17px;
+          border-top: 1px solid #edf1f6;
+          color: #2563eb;
+          font-size: 12px;
+          font-weight: 750;
+        }
+
+        .loading-box,
+        .empty-box {
+          padding: 55px 25px;
+          border: 1px dashed #cbd5e1;
+          border-radius: 17px;
+          background: #ffffff;
+          text-align: center;
+        }
+
+        .empty-icon {
+          font-size: 35px;
+          margin-bottom: 10px;
+        }
+
+        .empty-box h3 {
+          margin: 0 0 8px;
+          color: #0f172a;
+        }
+
+        .empty-box p {
+          max-width: 450px;
+          margin: 0 auto;
+          color: #64748b;
+          line-height: 1.6;
+        }
+
+
+        /* =========================
+           GRADUATE
+        ========================= */
+
+        .graduate-section {
+          padding: 110px 0;
+          background: #ffffff;
+        }
+
+        .graduate-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr);
+          align-items: center;
+          gap: 80px;
+        }
+
+        .graduate-image-wrap {
+          min-width: 0;
+          overflow: hidden;
+          border-radius: 22px;
+          box-shadow: 0 22px 55px rgba(15,23,42,0.13);
+        }
+
+        .section-image {
+          display: block;
+          width: 100%;
+          height: 540px;
+          object-fit: cover;
+        }
+
+        .graduate-content {
+          min-width: 0;
+        }
+
+        .graduate-content h2 {
+          margin: 0;
+          color: #0f172a;
+          font-size: clamp(32px, 4vw, 48px);
+          line-height: 1.1;
+          letter-spacing: -1.6px;
+        }
+
+        .graduate-content > p {
+          margin: 20px 0 30px;
+          color: #64748b;
+          font-size: 15px;
+          line-height: 1.8;
+        }
+
+        .benefit-list {
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+          margin-bottom: 30px;
+        }
+
+        .benefit-item {
+          display: flex;
+          gap: 13px;
+        }
+
+        .benefit-check {
+          width: 26px;
+          height: 26px;
+          flex: 0 0 26px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          background: #eff6ff;
+          color: #2563eb;
+          font-size: 12px;
+          font-weight: 900;
+        }
+
+        .benefit-item strong {
+          color: #0f172a;
+          font-size: 14px;
+        }
+
+        .benefit-item p {
+          margin: 5px 0 0;
+          color: #64748b;
+          font-size: 12px;
+          line-height: 1.5;
+        }
+
+
+        /* =========================
+           COMPANY
+        ========================= */
+
+        .company-section {
+          padding: 100px 0;
+          background: #f8fafc;
+        }
+
+        .company-panel {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+          overflow: hidden;
+          border-radius: 24px;
+          background: linear-gradient(135deg, #0f3f91 0%, #2563eb 100%);
+          box-shadow: 0 25px 60px rgba(37,99,235,0.18);
+        }
+
+        .company-panel-content {
+          padding: 60px;
+        }
+
+        .section-eyebrow.white {
+          color: #bfdbfe;
+        }
+
+        .company-panel h2 {
+          max-width: 600px;
+          margin: 0;
+          color: #ffffff;
+          font-size: clamp(31px, 4vw, 48px);
+          line-height: 1.1;
+          letter-spacing: -1.5px;
+        }
+
+        .company-panel-content > p {
+          max-width: 550px;
+          margin: 20px 0 30px;
+          color: #dbeafe;
+          font-size: 15px;
+          line-height: 1.7;
+        }
+
+        .company-features {
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+          margin-bottom: 32px;
+        }
+
+        .company-features div {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .company-features span {
+          color: #93c5fd;
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .company-features p {
+          margin: 0;
+          color: #ffffff;
+          font-size: 13px;
+          font-weight: 650;
+        }
+
+        .white-button {
+          color: #1d4ed8;
+          background: #ffffff;
+          box-shadow: 0 10px 25px rgba(15,23,42,0.14);
+        }
+
+        .company-panel-image {
+          min-height: 500px;
+        }
+
+        .company-panel-image img {
+          display: block;
+          width: 100%;
+          height: 100%;
+          min-height: 500px;
+          object-fit: cover;
+        }
+
+
+        /* =========================
+           HOW IT WORKS
+        ========================= */
+
+        .how-section {
+          padding: 110px 0;
+          background: #ffffff;
+        }
+
+        .center-heading {
+          max-width: 760px;
+          margin: 0 auto 55px;
+          text-align: center;
+        }
+
+        .center-heading p {
+          margin-left: auto;
+          margin-right: auto;
+        }
+
+        .steps-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 20px;
+        }
+
+        .step {
+          padding: 30px;
+          border-top: 3px solid #2563eb;
+          border-radius: 15px;
+          background: #f8fafc;
+        }
+
+        .step-number {
+          margin-bottom: 25px;
+          color: #2563eb;
+          font-size: 13px;
+          font-weight: 850;
+          letter-spacing: 1px;
+        }
+
+        .step h3 {
+          margin: 0 0 10px;
+          color: #0f172a;
+          font-size: 18px;
+        }
+
+        .step p {
+          margin: 0;
+          color: #64748b;
+          font-size: 13px;
+          line-height: 1.7;
+        }
+
+
+        /* =========================
+           CTA
+        ========================= */
+
+        .cta-section {
+          padding: 0 0 100px;
+          background: #ffffff;
+        }
+
+        .cta-box {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 35px;
+          padding: 55px 60px;
+          border-radius: 24px;
+          background: linear-gradient(135deg, #0f3f91, #2563eb);
+        }
+
+        .cta-box h2 {
+          margin: 0;
+          color: #ffffff;
+          font-size: clamp(30px, 4vw, 44px);
+          letter-spacing: -1.2px;
+        }
+
+        .cta-box p {
+          max-width: 600px;
+          margin: 12px 0 0;
+          color: #dbeafe;
+          line-height: 1.6;
+          font-size: 14px;
+        }
+
+        .cta-buttons {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 10px;
+          flex: 0 0 auto;
+        }
+
+        .cta-outline-button {
+          color: #ffffff;
+          border: 1px solid rgba(255,255,255,0.4);
+          background: rgba(255,255,255,0.08);
+        }
+
+
+        /* =========================
+           FOOTER
+        ========================= */
+
+        .footer {
+          padding: 70px 0 25px;
+          background: #0b1220;
+        }
+
+        .footer-grid {
+          display: grid;
+          grid-template-columns: 1.7fr repeat(3, 1fr);
+          gap: 50px;
+        }
+
+        .footer-logo {
+          color: #ffffff;
+        }
+
+        .footer-brand p {
+          max-width: 360px;
+          margin: 18px 0 18px;
+          color: #94a3b8;
+          font-size: 13px;
+          line-height: 1.7;
+        }
+
+        .footer-email {
+          color: #cbd5e1;
+          font-size: 12px;
+        }
+
+        .footer-column {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .footer-column h4 {
+          margin: 0 0 8px;
+          color: #ffffff;
+          font-size: 13px;
+        }
+
+        .footer-column a {
+          color: #94a3b8;
+          font-size: 12px;
+        }
+
+        .footer-column a:hover {
+          color: #ffffff;
+        }
+
+        .footer-bottom {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          margin-top: 55px;
+          padding-top: 20px;
+          border-top: 1px solid #1e293b;
+          color: #64748b;
+          font-size: 11px;
+        }
+
+
+        /* =====================================================
+           TABLET
+        ===================================================== */
+
+        @media (max-width: 900px) {
+
+          .desktop-nav {
+            display: none;
+          }
+
+          .hero-grid {
+            grid-template-columns: 1fr;
+            gap: 45px;
+          }
+
+          .hero-image {
+            height: 420px;
+          }
+
+          .quick-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .internship-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .graduate-grid {
+            grid-template-columns: 1fr;
+            gap: 45px;
+          }
+
+          .section-image {
+            height: 430px;
+          }
+
+          .company-panel {
+            grid-template-columns: 1fr;
+          }
+
+          .company-panel-image {
+            min-height: 360px;
+          }
+
+          .company-panel-image img {
+            min-height: 360px;
+            height: 360px;
+          }
+
+          .steps-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .cta-box {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .footer-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+
+        }
+
+
+        /* =====================================================
+           MOBILE
+        ===================================================== */
+
+        @media (max-width: 600px) {
+
+          .container {
+            width: min(100% - 28px, 1180px);
+          }
+
+
+          /* Header */
+
+          .home-header {
+            position: sticky;
+            top: 0;
+          }
+
+          .header-inner {
+            min-height: 66px;
+            gap: 10px;
+          }
+
+          .logo {
+            font-size: 17px;
+            gap: 7px;
+          }
+
+          .logo-mark {
+            width: 33px;
+            height: 33px;
+            border-radius: 9px;
+            font-size: 16px;
+          }
+
+          .header-actions {
+            gap: 8px;
+          }
+
+          .login-link {
+            font-size: 12px;
+          }
+
+          .header-signup {
+            min-height: 37px;
+            padding: 0 12px;
+            border-radius: 9px;
+            font-size: 11px;
+          }
+
+
+          /* Hero */
+
+          .hero-section {
+            padding: 45px 0 55px;
+          }
+
+          .hero-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+          }
+
+          .hero-content h1 {
+            margin: 17px 0 17px;
+            font-size: 43px;
+            line-height: 1.03;
+            letter-spacing: -2.1px;
+          }
+
+          .hero-description {
+            font-size: 15px;
+            line-height: 1.65;
+          }
+
+          .eyebrow {
+            max-width: 100%;
+            padding: 7px 10px;
+            font-size: 9px;
+            line-height: 1.3;
+          }
+
+          .hero-buttons {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin-top: 25px;
+          }
+
+          .primary-button,
+          .secondary-button,
+          .white-button,
+          .cta-outline-button {
+            width: 100%;
+            min-height: 49px;
+          }
+
+          .hero-trust {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            margin-top: 24px;
+          }
+
+          .hero-image-wrap {
+            width: 100%;
+            border-radius: 18px;
+          }
+
+          .hero-image {
+            width: 100%;
+            height: 310px;
+            object-fit: cover;
+          }
+
+
+          /* Quick links */
+
+          .quick-section {
+            padding-bottom: 60px;
+          }
+
+          .quick-grid {
+            gap: 10px;
+          }
+
+          .quick-item {
+            grid-template-columns: auto minmax(0,1fr) auto;
+            padding: 16px;
+            gap: 11px;
+            border-radius: 14px;
+          }
+
+          .quick-icon {
+            width: 40px;
+            height: 40px;
+            flex-basis: 40px;
+            font-size: 17px;
+          }
+
+          .quick-item h3 {
+            font-size: 14px;
+          }
+
+          .quick-item p {
+            font-size: 11px;
+          }
+
+
+          /* Featured */
+
+          .featured-section {
+            padding: 65px 0;
+          }
+
+          .section-heading {
+            display: block;
+            margin-bottom: 25px;
+          }
+
+          .section-heading h2,
+          .center-heading h2 {
+            font-size: 31px;
+            letter-spacing: -1px;
+          }
+
+          .section-heading p,
+          .center-heading p {
+            font-size: 13px;
+            line-height: 1.65;
+          }
+
+          .view-all {
+            display: inline-block;
+            margin-top: 18px;
+          }
+
+          .internship-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+
+          .internship-card {
+            padding: 18px;
+            border-radius: 15px;
+          }
+
+          .internship-card h3 {
+            font-size: 17px;
+          }
+
+
+          /* Graduate */
+
+          .graduate-section {
+            padding: 70px 0;
+          }
+
+          .graduate-grid {
+            gap: 32px;
+          }
+
+          .section-image {
+            height: 300px;
+          }
+
+          .graduate-image-wrap {
+            border-radius: 18px;
+          }
+
+          .graduate-content h2 {
+            font-size: 32px;
+            letter-spacing: -1px;
+          }
+
+          .graduate-content > p {
+            font-size: 14px;
+            line-height: 1.7;
+          }
+
+          .benefit-list {
+            gap: 17px;
+          }
+
+
+          /* Company */
+
+          .company-section {
+            padding: 65px 0;
+          }
+
+          .company-panel {
+            border-radius: 19px;
+          }
+
+          .company-panel-content {
+            padding: 32px 22px;
+          }
+
+          .company-panel h2 {
+            font-size: 31px;
+            letter-spacing: -1px;
+          }
+
+          .company-panel-content > p {
+            font-size: 14px;
+          }
+
+          .company-panel-image {
+            min-height: 270px;
+          }
+
+          .company-panel-image img {
+            min-height: 270px;
+            height: 270px;
+          }
+
+
+          /* How it works */
+
+          .how-section {
+            padding: 70px 0;
+          }
+
+          .center-heading {
+            margin-bottom: 35px;
+          }
+
+          .step {
+            padding: 24px;
+          }
+
+
+          /* CTA */
+
+          .cta-section {
+            padding-bottom: 65px;
+          }
+
+          .cta-box {
+            padding: 32px 22px;
+            border-radius: 19px;
+          }
+
+          .cta-box h2 {
+            font-size: 31px;
+            letter-spacing: -1px;
+          }
+
+          .cta-buttons {
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr;
+          }
+
+
+          /* Footer */
+
+          .footer {
+            padding: 55px 0 22px;
+          }
+
+          .footer-grid {
+            grid-template-columns: 1fr 1fr;
+            gap: 35px 25px;
+          }
+
+          .footer-brand {
+            grid-column: 1 / -1;
+          }
+
+          .footer-bottom {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 7px;
+            margin-top: 40px;
+          }
+
+        }
+
+
+        /* =====================================================
+           VERY SMALL PHONES
+        ===================================================== */
+
+        @media (max-width: 380px) {
+
+          .container {
+            width: calc(100% - 22px);
+          }
+
+          .logo {
+            font-size: 15px;
+          }
+
+          .logo-mark {
+            width: 30px;
+            height: 30px;
+          }
+
+          .header-signup {
+            padding: 0 9px;
+            font-size: 10px;
+          }
+
+          .hero-content h1 {
+            font-size: 38px;
+          }
+
+          .hero-image {
+            height: 270px;
+          }
+
+          .footer-grid {
+            grid-template-columns: 1fr;
+          }
+
+        }
+
+      `}</style>
+
+    </main>
+  );
 }
