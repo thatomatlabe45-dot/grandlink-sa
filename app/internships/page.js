@@ -1,32 +1,28 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import Link from "next/link";
 import SiteHeader from "../components/SiteHeader";
 import SiteFooter from "../components/SiteFooter";
+import { supabase } from "../lib/supabase";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
-export default function InternshipPage() {
+export default function PostInternshipPage() {
   const router = useRouter();
 
-  const [loading, setLoading] = useState(false);
-  const [loadingCompany, setLoadingCompany] = useState(true);
-  const [message, setMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const [form, setForm] = useState({
-    job_title: "",
     company_name: "",
     company_email: "",
     company_website: "",
+    job_title: "",
     province: "",
     location: "",
-    internship_type: "",
+    internship_type: "On-site",
     stipend: "",
     qualification: "",
     field_of_study: "",
@@ -36,160 +32,243 @@ export default function InternshipPage() {
   });
 
   useEffect(() => {
-    loadCompany();
+    checkCompanyAccess();
   }, []);
 
-  async function loadCompany() {
+  async function checkCompanyAccess() {
     try {
-      setLoadingCompany(true);
-      setErrorMessage("");
+      setLoading(true);
+      setError("");
 
       const {
         data: { user },
-        error: userError,
       } = await supabase.auth.getUser();
 
-      if (userError || !user) {
+      if (!user) {
         router.replace("/login");
         return;
       }
 
-      const { data: company, error } = await supabase
+      // Check the selected GradLink profile
+      const profile = localStorage.getItem("gradlink_profile");
+
+      if (profile === "graduate") {
+        router.replace("/graduate");
+        return;
+      }
+
+      // A company profile must exist before an internship can be posted
+      const { data: company, error: companyError } = await supabase
         .from("companies")
         .select("*")
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (error) {
-        throw error;
+      if (companyError) {
+        throw companyError;
       }
 
       if (!company) {
-        setErrorMessage(
-          "No company profile was found. Please complete your company profile first."
+        // If this is a company account that has not paid yet,
+        // send them to pricing.
+        if (profile === "company") {
+          router.replace("/company-pricing");
+          return;
+        }
+
+        setError(
+          "Only verified company accounts can post internships."
         );
+        setLoading(false);
         return;
       }
 
-      setForm((prev) => ({
-        ...prev,
+      // Check for an active paid subscription
+      const { data: subscriptions, error: subscriptionError } =
+        await supabase
+          .from("company_subscriptions")
+          .select("company_id,status")
+          .eq("company_id", user.id)
+          .ilike("status", "active")
+          .limit(1);
+
+      if (subscriptionError) {
+        throw subscriptionError;
+      }
+
+      if (!subscriptions || subscriptions.length === 0) {
+        router.replace("/company-pricing");
+        return;
+      }
+
+      // Load company information into the form
+      setForm((current) => ({
+        ...current,
         company_name: company.company_name || "",
-        company_email: company.email || "",
+        company_email: user.email || "",
         company_website: company.website || "",
       }));
-    } catch (err) {
-      console.error("Load company error:", err);
 
-      setErrorMessage(
-        err.message || "Could not load your company information."
+      setLoading(false);
+    } catch (err) {
+      console.error("Access check error:", err);
+      setError(
+        err?.message ||
+          "Something went wrong while checking your company account."
       );
-    } finally {
-      setLoadingCompany(false);
+      setLoading(false);
     }
   }
 
   function handleChange(e) {
-    setForm((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
+    const { name, value } = e.target;
+
+    setForm((current) => ({
+      ...current,
+      [name]: value,
     }));
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
 
-    try {
-      setLoading(true);
-      setMessage("");
-      setErrorMessage("");
+    setError("");
+    setSuccess("");
+    setSubmitting(true);
 
+    try {
       const {
         data: { user },
-        error: userError,
       } = await supabase.auth.getUser();
 
-      if (userError || !user) {
+      if (!user) {
         router.replace("/login");
+        return;
+      }
+
+      // Final security check before inserting
+      const { data: company, error: companyError } = await supabase
+        .from("companies")
+        .select("company_name,website")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (companyError) {
+        throw companyError;
+      }
+
+      if (!company) {
+        router.replace("/company-pricing");
+        return;
+      }
+
+      const { data: subscriptions, error: subscriptionError } =
+        await supabase
+          .from("company_subscriptions")
+          .select("company_id,status")
+          .eq("company_id", user.id)
+          .ilike("status", "active")
+          .limit(1);
+
+      if (subscriptionError) {
+        throw subscriptionError;
+      }
+
+      if (!subscriptions || subscriptions.length === 0) {
+        router.replace("/company-pricing");
+        return;
+      }
+
+      if (!form.job_title.trim()) {
+        setError("Please enter the internship title.");
+        setSubmitting(false);
+        return;
+      }
+
+      if (!form.province.trim()) {
+        setError("Please select a province.");
+        setSubmitting(false);
+        return;
+      }
+
+      if (!form.location.trim()) {
+        setError("Please enter the internship location.");
+        setSubmitting(false);
+        return;
+      }
+
+      if (!form.qualification.trim()) {
+        setError("Please enter the required qualification.");
+        setSubmitting(false);
+        return;
+      }
+
+      if (!form.field_of_study.trim()) {
+        setError("Please enter the field of study.");
+        setSubmitting(false);
+        return;
+      }
+
+      if (!form.description.trim()) {
+        setError("Please provide an internship description.");
+        setSubmitting(false);
         return;
       }
 
       const internshipData = {
         user_id: user.id,
-        company_name: form.company_name,
-        company_email: form.company_email,
-        company_website: form.company_website,
-        job_title: form.job_title,
+        company_name: company.company_name || form.company_name,
+        company_email: user.email || form.company_email,
+        company_website: company.website || form.company_website,
+        job_title: form.job_title.trim(),
         province: form.province,
-        location: form.location,
+        location: form.location.trim(),
         internship_type: form.internship_type,
-        stipend: form.stipend,
-        qualification: form.qualification,
-        field_of_study: form.field_of_study,
-        deadline: form.deadline,
-        description: form.description,
-        skills: form.skills,
+        stipend: form.stipend.trim(),
+        qualification: form.qualification.trim(),
+        field_of_study: form.field_of_study.trim(),
+        deadline: form.deadline || null,
+        description: form.description.trim(),
+        skills: form.skills.trim(),
       };
 
-      const { error } = await supabase
+      const { error: insertError } = await supabase
         .from("internships")
         .insert([internshipData]);
 
-      if (error) {
-        throw error;
+      if (insertError) {
+        throw insertError;
       }
 
-      setMessage(
-        "🎉 Internship posted successfully! Returning to your dashboard..."
-      );
-
-      setForm((prev) => ({
-        job_title: "",
-        company_name: prev.company_name,
-        company_email: prev.company_email,
-        company_website: prev.company_website,
-        province: "",
-        location: "",
-        internship_type: "",
-        stipend: "",
-        qualification: "",
-        field_of_study: "",
-        deadline: "",
-        description: "",
-        skills: "",
-      }));
+      setSuccess("Internship published successfully!");
 
       setTimeout(() => {
         router.push("/company-dashboard");
       }, 1200);
     } catch (err) {
       console.error("Post internship error:", err);
-
-      setErrorMessage(
-        err.message || "Could not publish the internship."
+      setError(
+        err?.message ||
+          "Unable to publish the internship. Please try again."
       );
-    } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   }
 
-  if (loadingCompany) {
+  if (loading) {
     return (
       <>
         <SiteHeader />
 
         <main style={styles.loadingPage}>
-          <div style={styles.loadingBox}>
-            <div style={styles.loadingIcon}>💼</div>
-
-            <h2 style={styles.loadingTitle}>
-              Loading Internship Form...
-            </h2>
-
-            <p style={styles.loadingText}>
-              Preparing your company information
-            </p>
-          </div>
+          <div style={styles.loader}></div>
+          <h2 style={styles.loadingTitle}>Checking your company account</h2>
+          <p style={styles.loadingText}>
+            Please wait while we verify your subscription.
+          </p>
         </main>
+
+        <SiteFooter />
       </>
     );
   }
@@ -199,620 +278,557 @@ export default function InternshipPage() {
       <SiteHeader />
 
       <main style={styles.page}>
-        <div style={styles.container}>
+        <section style={styles.hero}>
+          <div style={styles.heroGlow}></div>
 
-          {/* BACK BUTTON */}
-          <button
-            type="button"
-            onClick={() => router.push("/company-dashboard")}
-            style={styles.backButton}
-          >
-            ← Back to Dashboard
-          </button>
+          <div style={styles.heroInner}>
+            <Link href="/company-dashboard" style={styles.backLink}>
+              ← Back to Dashboard
+            </Link>
 
-          {/* MAIN FORM */}
-          <section style={styles.card}>
+            <div style={styles.badge}>COMPANY HIRING</div>
 
-            <div style={styles.headingArea}>
-              <div style={styles.eyebrow}>
-                GRADLINK SA • COMPANY PORTAL
-              </div>
+            <h1 style={styles.heroTitle}>
+              List an <span style={styles.heroAccent}>Internship</span>
+            </h1>
 
-              <h1 style={styles.title}>
-                Post an Internship
-              </h1>
+            <p style={styles.heroText}>
+              Connect your company with talented South African graduates
+              looking for meaningful career opportunities.
+            </p>
+          </div>
+        </section>
 
-              <p style={styles.subtitle}>
-                Reach talented South African graduates
-                through GradLink SA.
-              </p>
-            </div>
-
-            {/* SUCCESS */}
-            {message && (
-              <div style={styles.successBox}>
-                <div style={styles.successIcon}>✓</div>
-
-                <div>
-                  <strong>Internship Published</strong>
-
-                  <p style={styles.alertText}>
-                    {message}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* ERROR */}
-            {errorMessage && (
+        <section style={styles.formSection}>
+          <form onSubmit={handleSubmit} style={styles.form}>
+            {error && (
               <div style={styles.errorBox}>
-                <div style={styles.errorIcon}>!</div>
-
-                <div>
-                  <strong>Unable to continue</strong>
-
-                  <p style={styles.alertText}>
-                    {errorMessage}
-                  </p>
-                </div>
+                <strong>Unable to continue</strong>
+                <span>{error}</span>
               </div>
             )}
 
-            <form onSubmit={handleSubmit}>
+            {success && (
+              <div style={styles.successBox}>
+                <strong>✓ Internship published</strong>
+                <span>{success}</span>
+              </div>
+            )}
 
-              {/* BASIC INFORMATION */}
+            {/* 01 */}
+            <div style={styles.section}>
               <div style={styles.sectionHeader}>
-                <span>01</span>
-
+                <span style={styles.sectionNumber}>01</span>
                 <div>
-                  <h2>Internship Details</h2>
-                  <p>
+                  <h2 style={styles.sectionTitle}>Internship Details</h2>
+                  <p style={styles.sectionSubtitle}>
                     Tell graduates about the opportunity.
                   </p>
                 </div>
               </div>
 
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  Internship Title
-                </label>
-
-                <input
-                  style={inputStyle}
+              <div style={styles.grid}>
+                <Field
+                  label="Internship Title"
                   name="job_title"
-                  placeholder="e.g. Software Development Intern"
                   value={form.job_title}
                   onChange={handleChange}
+                  placeholder="e.g. Software Development Intern"
                   required
+                  full
                 />
-              </div>
 
-              {/* COMPANY INFORMATION */}
-              <div style={styles.sectionHeader}>
-                <span>02</span>
-
-                <div>
-                  <h2>Company Information</h2>
-                  <p>
-                    This information comes from your company profile.
-                  </p>
-                </div>
-              </div>
-
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  Company Name
-                </label>
-
-                <input
-                  style={readOnlyInputStyle}
-                  value={form.company_name}
-                  readOnly
-                />
-              </div>
-
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  Company Email
-                </label>
-
-                <input
-                  style={readOnlyInputStyle}
-                  value={form.company_email}
-                  readOnly
-                />
-              </div>
-
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  Company Website
-                </label>
-
-                <input
-                  style={readOnlyInputStyle}
-                  value={form.company_website}
-                  readOnly
-                />
-              </div>
-
-              {/* LOCATION */}
-              <div style={styles.sectionHeader}>
-                <span>03</span>
-
-                <div>
-                  <h2>Location & Work Type</h2>
-                  <p>
-                    Help candidates understand where they will work.
-                  </p>
-                </div>
-              </div>
-
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  Province
-                </label>
-
-                <select
-                  style={inputStyle}
+                <SelectField
+                  label="Province"
                   name="province"
                   value={form.province}
                   onChange={handleChange}
                   required
-                >
-                  <option value="">
-                    Select Province
-                  </option>
+                  options={[
+                    "Gauteng",
+                    "Western Cape",
+                    "KwaZulu-Natal",
+                    "Eastern Cape",
+                    "Free State",
+                    "Limpopo",
+                    "Mpumalanga",
+                    "North West",
+                    "Northern Cape",
+                  ]}
+                />
 
-                  <option>Eastern Cape</option>
-                  <option>Free State</option>
-                  <option>Gauteng</option>
-                  <option>KwaZulu-Natal</option>
-                  <option>Limpopo</option>
-                  <option>Mpumalanga</option>
-                  <option>North West</option>
-                  <option>Northern Cape</option>
-                  <option>Western Cape</option>
-                </select>
-              </div>
-
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  Location
-                </label>
-
-                <input
-                  style={inputStyle}
+                <Field
+                  label="Location"
                   name="location"
-                  placeholder="City / Town"
                   value={form.location}
                   onChange={handleChange}
+                  placeholder="e.g. Johannesburg, Gauteng"
                   required
                 />
-              </div>
 
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  Work Type
-                </label>
-
-                <select
-                  style={inputStyle}
+                <SelectField
+                  label="Work Arrangement"
                   name="internship_type"
                   value={form.internship_type}
                   onChange={handleChange}
-                  required
-                >
-                  <option value="">
-                    Select Work Type
-                  </option>
-
-                  <option>On-site</option>
-                  <option>Remote</option>
-                  <option>Hybrid</option>
-                </select>
+                  options={[
+                    "On-site",
+                    "Hybrid",
+                    "Remote",
+                  ]}
+                />
               </div>
+            </div>
 
-              {/* REQUIREMENTS */}
+            {/* 02 */}
+            <div style={styles.section}>
               <div style={styles.sectionHeader}>
-                <span>04</span>
-
+                <span style={styles.sectionNumber}>02</span>
                 <div>
-                  <h2>Candidate Requirements</h2>
-                  <p>
-                    Define who you are looking for.
+                  <h2 style={styles.sectionTitle}>Candidate Requirements</h2>
+                  <p style={styles.sectionSubtitle}>
+                    Help graduates understand who you are looking for.
                   </p>
                 </div>
               </div>
 
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  Required Qualification
-                </label>
-
-                <input
-                  style={inputStyle}
+              <div style={styles.grid}>
+                <Field
+                  label="Minimum Qualification"
                   name="qualification"
-                  placeholder="e.g. BSc Computer Science"
                   value={form.qualification}
                   onChange={handleChange}
+                  placeholder="e.g. Diploma / Degree"
                   required
                 />
-              </div>
 
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  Field of Study
-                </label>
-
-                <input
-                  style={inputStyle}
+                <Field
+                  label="Field of Study"
                   name="field_of_study"
-                  placeholder="e.g. Information Technology"
                   value={form.field_of_study}
                   onChange={handleChange}
+                  placeholder="e.g. Computer Science"
                   required
                 />
-              </div>
 
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  Required Skills
-                </label>
-
-                <textarea
-                  style={textareaStyle}
-                  rows={4}
+                <Field
+                  label="Key Skills"
                   name="skills"
-                  placeholder="e.g. JavaScript, React, Excel, Communication"
                   value={form.skills}
                   onChange={handleChange}
+                  placeholder="e.g. JavaScript, Excel, Communication"
+                  full
                 />
               </div>
-
-              {/* OPPORTUNITY */}
-              <div style={styles.sectionHeader}>
-                <span>05</span>
-
-                <div>
-                  <h2>Opportunity Information</h2>
-                  <p>
-                    Give graduates the information they need.
-                  </p>
-                </div>
-              </div>
-
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  Monthly Stipend
-                </label>
-
-                <input
-                  style={inputStyle}
-                  name="stipend"
-                  placeholder="e.g. R7,000 per month"
-                  value={form.stipend}
-                  onChange={handleChange}
-                />
-              </div>
-
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  Application Deadline
-                </label>
-
-                <input
-                  style={inputStyle}
-                  type="date"
-                  name="deadline"
-                  value={form.deadline}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  Internship Description
-                </label>
-
-                <textarea
-                  style={textareaLargeStyle}
-                  rows={7}
-                  name="description"
-                  placeholder="Describe the internship, responsibilities, learning opportunities and what the successful candidate will be doing."
-                  value={form.description}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-
-              {/* SUBMIT */}
-              <div style={styles.submitArea}>
-                <div style={styles.secureText}>
-                  🔒 Your internship will be published
-                  securely on GradLink SA.
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading || !form.company_name}
-                  style={{
-                    ...styles.submitButton,
-                    background:
-                      loading || !form.company_name
-                        ? "#94a3b8"
-                        : "linear-gradient(135deg, #2563eb, #1d4ed8)",
-                    cursor:
-                      loading || !form.company_name
-                        ? "not-allowed"
-                        : "pointer",
-                  }}
-                >
-                  {loading
-                    ? "Publishing..."
-                    : "🚀 Publish Internship"}
-                </button>
-              </div>
-            </form>
-          </section>
-        </div>
-      </main>
-
-      <SiteFooter />
-    </>
-  );
-}
-
-const inputStyle = {
-  width: "100%",
-  minHeight: "52px",
-  padding: "14px 15px",
-  border: "1px solid #cbd5e1",
-  borderRadius: "11px",
-  fontSize: "15px",
-  color: "#0f172a",
-  background: "#ffffff",
-  boxSizing: "border-box",
-  outline: "none",
-};
-
-const readOnlyInputStyle = {
-  ...inputStyle,
-  background: "#f8fafc",
-  color: "#64748b",
-  borderColor: "#e2e8f0",
-};
-
-const textareaStyle = {
-  ...inputStyle,
-  minHeight: "120px",
-  resize: "vertical",
-  lineHeight: 1.6,
-};
-
-const textareaLargeStyle = {
-  ...inputStyle,
-  minHeight: "170px",
-  resize: "vertical",
-  lineHeight: 1.6,
-};
-
-const styles = {
-  loadingPage: {
-    minHeight: "calc(100vh - 72px)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "30px 16px",
-    background:
-      "linear-gradient(135deg, #f5f9ff 0%, #eef5ff 50%, #ffffff 100%)",
-    boxSizing: "border-box",
-  },
-
-  loadingBox: {
-    width: "100%",
-    maxWidth: "420px",
-    background: "#ffffff",
-    padding: "38px 25px",
-    borderRadius: "20px",
-    textAlign: "center",
-    boxShadow: "0 18px 50px rgba(15,23,42,0.09)",
-    border: "1px solid #dbe5f0",
-    boxSizing: "border-box",
-  },
-
-  loadingIcon: {
-    fontSize: "44px",
-    marginBottom: "12px",
-  },
-
-  loadingTitle: {
-    color: "#0f172a",
-    margin: "0 0 8px",
-    fontSize: "21px",
-  },
-
-  loadingText: {
-    color: "#64748b",
-    margin: 0,
-    fontSize: "14px",
-  },
-
-  page: {
-    minHeight: "100vh",
-    background:
-      "linear-gradient(135deg, #f5f9ff 0%, #eef5ff 50%, #ffffff 100%)",
-    padding: "28px 16px 70px",
-    boxSizing: "border-box",
-  },
-
-  container: {
-    width: "100%",
-    maxWidth: "900px",
+            </div>
+            
+             heroInner: {
+    maxWidth: "1200px",
     margin: "0 auto",
+    padding: "70px 24px 80px",
+    position: "relative",
+    zIndex: 2,
   },
 
-  backButton: {
+  heroBadge: {
     display: "inline-flex",
     alignItems: "center",
-    gap: "6px",
-    background: "#ffffff",
-    color: "#2563eb",
-    border: "1px solid #dbe5f0",
-    padding: "11px 16px",
-    borderRadius: "10px",
-    fontWeight: "750",
-    fontSize: "14px",
-    cursor: "pointer",
-    marginBottom: "18px",
-    boxShadow: "0 4px 12px rgba(15,23,42,0.04)",
+    gap: "8px",
+    padding: "8px 14px",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.14)",
+    border: "1px solid rgba(255,255,255,0.25)",
+    color: "#ffffff",
+    fontSize: "13px",
+    fontWeight: "700",
+    marginBottom: "20px",
   },
 
-  card: {
+  heroTitle: {
+    margin: "0",
+    maxWidth: "800px",
+    fontSize: "clamp(34px, 6vw, 58px)",
+    lineHeight: "1.05",
+    letterSpacing: "-1.8px",
+    fontWeight: "900",
+    color: "#ffffff",
+  },
+
+  heroText: {
+    margin: "20px 0 0",
+    maxWidth: "680px",
+    fontSize: "18px",
+    lineHeight: "1.7",
+    color: "rgba(255,255,255,0.88)",
+  },
+
+  searchSection: {
+    maxWidth: "1200px",
+    margin: "-34px auto 0",
+    padding: "0 24px",
+    position: "relative",
+    zIndex: 5,
+  },
+
+  searchBox: {
     background: "#ffffff",
-    border: "1px solid #dbe5f0",
     borderRadius: "22px",
-    padding: "34px",
-    boxShadow: "0 20px 55px rgba(15,23,42,0.09)",
+    padding: "18px",
+    boxShadow: "0 18px 45px rgba(15,23,42,0.14)",
+    border: "1px solid #e5e7eb",
+  },
+
+  searchGrid: {
+    display: "grid",
+    gridTemplateColumns: "2fr 1fr 1fr auto",
+    gap: "12px",
+    alignItems: "center",
+  },
+
+  input: {
+    width: "100%",
+    minHeight: "50px",
+    padding: "0 16px",
+    borderRadius: "12px",
+    border: "1px solid #dbe2ea",
+    outline: "none",
+    fontSize: "15px",
+    color: "#0f172a",
+    background: "#f8fafc",
     boxSizing: "border-box",
   },
 
-  headingArea: {
-    marginBottom: "32px",
-  },
-
-  eyebrow: {
-    display: "inline-block",
-    color: "#2563eb",
-    fontSize: "11px",
-    fontWeight: "850",
-    letterSpacing: "1px",
-    marginBottom: "9px",
-  },
-
-  title: {
-    margin: "0 0 9px",
+  select: {
+    width: "100%",
+    minHeight: "50px",
+    padding: "0 14px",
+    borderRadius: "12px",
+    border: "1px solid #dbe2ea",
+    outline: "none",
+    fontSize: "15px",
     color: "#0f172a",
-    fontSize: "32px",
+    background: "#f8fafc",
+    boxSizing: "border-box",
+  },
+
+  searchButton: {
+    minHeight: "50px",
+    padding: "0 24px",
+    border: "none",
+    borderRadius: "12px",
+    background: "#2563eb",
+    color: "#ffffff",
+    fontSize: "15px",
+    fontWeight: "800",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  },
+
+  content: {
+    maxWidth: "1200px",
+    margin: "0 auto",
+    padding: "55px 24px 80px",
+  },
+
+  sectionHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+    gap: "20px",
+    marginBottom: "24px",
+  },
+
+  sectionTitle: {
+    margin: "0",
+    fontSize: "28px",
+    lineHeight: "1.2",
     fontWeight: "850",
-    letterSpacing: "-0.8px",
+    color: "#0f172a",
+    letterSpacing: "-0.7px",
   },
 
-  subtitle: {
-    margin: 0,
+  sectionText: {
+    margin: "8px 0 0",
+    fontSize: "15px",
+    lineHeight: "1.6",
     color: "#64748b",
+  },
+
+  resultsCount: {
     fontSize: "14px",
-    lineHeight: 1.6,
+    color: "#64748b",
+    fontWeight: "700",
+    whiteSpace: "nowrap",
   },
 
-  sectionHeader: {
+  internshipGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "20px",
+  },
+
+  internshipCard: {
+    background: "#ffffff",
+    border: "1px solid #e5e7eb",
+    borderRadius: "20px",
+    padding: "22px",
+    boxShadow: "0 8px 24px rgba(15,23,42,0.06)",
+    transition: "transform 0.2s ease, box-shadow 0.2s ease",
+    minWidth: "0",
+  },
+
+  companyRow: {
     display: "flex",
     alignItems: "center",
-    gap: "13px",
-    padding: "21px 0 17px",
-    marginTop: "5px",
-    borderTop: "1px solid #eef2f7",
+    gap: "12px",
+    marginBottom: "16px",
   },
 
-  sectionHeader: {
+  companyLogo: {
+    width: "46px",
+    height: "46px",
+    borderRadius: "12px",
+    background: "#eff6ff",
+    color: "#2563eb",
     display: "flex",
     alignItems: "center",
-    gap: "13px",
-    padding: "22px 0 17px",
-    marginTop: "5px",
-    borderTop: "1px solid #eef2f7",
+    justifyContent: "center",
+    fontWeight: "900",
+    fontSize: "17px",
+    flexShrink: 0,
   },
 
-  field: {
+  companyName: {
+    margin: "0",
+    fontSize: "14px",
+    fontWeight: "800",
+    color: "#334155",
+  },
+
+  internshipTitle: {
+    margin: "0 0 12px",
+    fontSize: "20px",
+    lineHeight: "1.3",
+    fontWeight: "850",
+    color: "#0f172a",
+  },
+
+  metaList: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
     marginBottom: "18px",
   },
 
-  label: {
-    display: "block",
-    marginBottom: "7px",
-    color: "#334155",
-    fontSize: "13px",
-    fontWeight: "750",
+  metaItem: {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "7px 10px",
+    borderRadius: "8px",
+    background: "#f8fafc",
+    color: "#475569",
+    fontSize: "12px",
+    fontWeight: "700",
+    border: "1px solid #e2e8f0",
   },
 
-  successBox: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "11px",
-    background: "#f0fdf4",
-    color: "#166534",
-    border: "1px solid #bbf7d0",
-    padding: "14px",
-    borderRadius: "12px",
-    marginBottom: "22px",
-    fontSize: "13px",
-    lineHeight: 1.5,
+  description: {
+    margin: "0 0 20px",
+    color: "#64748b",
+    fontSize: "14px",
+    lineHeight: "1.65",
+    display: "-webkit-box",
+    WebkitLineClamp: 3,
+    WebkitBoxOrient: "vertical",
+    overflow: "hidden",
   },
 
-  successIcon: {
-    width: "23px",
-    height: "23px",
-    minWidth: "23px",
-    borderRadius: "50%",
-    background: "#dcfce7",
+  cardFooter: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "center",
-    fontWeight: "900",
-  },
-
-  errorBox: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "11px",
-    background: "#fef2f2",
-    color: "#991b1b",
-    border: "1px solid #fecaca",
-    padding: "14px",
-    borderRadius: "12px",
-    marginBottom: "22px",
-    fontSize: "13px",
-    lineHeight: 1.5,
-  },
-
-  errorIcon: {
-    width: "23px",
-    height: "23px",
-    minWidth: "23px",
-    borderRadius: "50%",
-    background: "#fee2e2",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: "900",
-  },
-
-  alertText: {
-    margin: "4px 0 0",
-    lineHeight: 1.5,
-  },
-
-  submitArea: {
-    marginTop: "28px",
-    paddingTop: "24px",
+    justifyContent: "space-between",
+    gap: "12px",
+    paddingTop: "16px",
     borderTop: "1px solid #eef2f7",
   },
 
-  secureText: {
-    textAlign: "center",
-    color: "#94a3b8",
+  deadline: {
     fontSize: "12px",
-    marginBottom: "13px",
+    color: "#64748b",
+    fontWeight: "700",
   },
 
-  submitButton: {
-    width: "100%",
-    minHeight: "54px",
-    border: "none",
-    borderRadius: "12px",
+  viewButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "42px",
+    padding: "0 16px",
+    borderRadius: "10px",
+    background: "#2563eb",
     color: "#ffffff",
-    fontSize: "16px",
+    textDecoration: "none",
+    fontSize: "13px",
     fontWeight: "800",
-    boxShadow: "0 9px 24px rgba(37,99,235,0.22)",
+    whiteSpace: "nowrap",
   },
+
+  emptyState: {
+    textAlign: "center",
+    padding: "65px 24px",
+    background: "#ffffff",
+    border: "1px dashed #cbd5e1",
+    borderRadius: "20px",
+  },
+
+  emptyIcon: {
+    width: "58px",
+    height: "58px",
+    margin: "0 auto 16px",
+    borderRadius: "16px",
+    background: "#eff6ff",
+    color: "#2563eb",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "25px",
+  },
+
+  emptyTitle: {
+    margin: "0 0 8px",
+    fontSize: "21px",
+    fontWeight: "850",
+    color: "#0f172a",
+  },
+
+  emptyText: {
+    margin: "0",
+    color: "#64748b",
+    fontSize: "14px",
+    lineHeight: "1.6",
+  },
+
+  loading: {
+    minHeight: "300px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#64748b",
+    fontSize: "15px",
+    fontWeight: "700",
+  },
+
+  footerCta: {
+    marginTop: "65px",
+    padding: "45px 30px",
+    borderRadius: "24px",
+    background: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)",
+    border: "1px solid #bfdbfe",
+    textAlign: "center",
+  },
+
+  footerCtaTitle: {
+    margin: "0 0 10px",
+    fontSize: "28px",
+    fontWeight: "900",
+    color: "#0f172a",
+  },
+
+  footerCtaText: {
+    maxWidth: "620px",
+    margin: "0 auto 22px",
+    color: "#475569",
+    fontSize: "15px",
+    lineHeight: "1.65",
+  },
+
+  footerButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "46px",
+    padding: "0 22px",
+    borderRadius: "11px",
+    background: "#0f172a",
+    color: "#ffffff",
+    textDecoration: "none",
+    fontSize: "14px",
+    fontWeight: "800",
+  },
+
+  responsive: `
+    @media (max-width: 1000px) {
+      .internship-search-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .internship-search-button {
+        width: 100%;
+      }
+
+      .internship-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 650px) {
+      .internship-hero-inner {
+        padding: 48px 18px 65px;
+      }
+
+      .internship-search-section {
+        padding: 0 16px;
+      }
+
+      .internship-search-box {
+        padding: 14px;
+        border-radius: 18px;
+      }
+
+      .internship-search-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+
+      .internship-content {
+        padding: 42px 16px 60px;
+      }
+
+      .internship-section-header {
+        display: block;
+      }
+
+      .internship-results-count {
+        margin-top: 8px;
+      }
+
+      .internship-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+
+      .internship-card {
+        padding: 18px;
+        border-radius: 17px;
+      }
+
+      .internship-card-footer {
+        align-items: stretch;
+      }
+
+      .internship-view-button {
+        flex: 1;
+      }
+
+      .internship-footer-cta {
+        margin-top: 45px;
+        padding: 35px 20px;
+        border-radius: 20px;
+      }
+
+      .internship-footer-title {
+        font-size: 24px;
+      }
+    }
+  `,
 };
