@@ -33,24 +33,23 @@ export default function InternshipsPage() {
       setError("");
 
       const { data, error: internshipsError } = await supabase
-        .from("internships")
-        .select(`
-          id,
-          title,
-          job_title,
-          company_name,
-          province,
-          location,
-          internship_type,
-          stipend,
-          qualification,
-          field_of_study,
-          skills,
-          deadline,
-          description,
-          created_at
-        `)
-        .order("created_at", { ascending: false });
+  .from("internships")
+  .select(`
+    id,
+    job_title,
+    company_name,
+    province,
+    location,
+    internship_type,
+    stipend,
+    qualification,
+    field_of_study,
+    skills,
+    deadline,
+    description,
+    created_at
+  `)
+  .order("created_at", { ascending: false });
 
       if (internshipsError) {
         throw internshipsError;
