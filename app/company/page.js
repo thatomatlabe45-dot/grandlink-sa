@@ -945,14 +945,14 @@ export default function CompanyPage() {
                       Company Website
                     </label>
 
-                    <input
-                      type="url"
-                      name="website"
-                      placeholder="https://www.example.co.za"
-                      value={company.website}
-                      onChange={handleChange}
-                      style={inputStyle}
-                    />
+                  <input
+  type="text"
+  name="website"
+  placeholder="https://www.example.co.za"
+  value={company.website}
+  onChange={handleChange}
+  style={inputStyle}
+/>
 
                     <p style={fieldHint}>
                       Adding your website helps
