@@ -33,23 +33,25 @@ export default function InternshipsPage() {
       setError("");
 
       const { data, error: internshipsError } = await supabase
-  .from("internships")
-  .select(`
-    id,
-    job_title,
-    company_name,
-    province,
-    location,
-    internship_type,
-    stipend,
-    qualification,
-    field_of_study,
-    skills,
-    deadline,
-    description,
-    created_at
-  `)
-  .order("created_at", { ascending: false });
+        .from("internships")
+        .select(
+          `
+          id,
+          job_title,
+          company_name,
+          province,
+          location,
+          internship_type,
+          stipend,
+          qualification,
+          field_of_study,
+          skills,
+          deadline,
+          description,
+          created_at
+        `
+        )
+        .order("created_at", { ascending: false });
 
       if (internshipsError) {
         throw internshipsError;
@@ -58,6 +60,7 @@ export default function InternshipsPage() {
       setInternships(data || []);
     } catch (err) {
       console.error("Load internships error:", err);
+
       setError(
         err?.message ||
           "Unable to load internships right now. Please try again."
@@ -87,13 +90,8 @@ export default function InternshipsPage() {
     const searchTerm = search.trim().toLowerCase();
 
     return internships.filter((internship) => {
-      const title =
-        internship.title ||
-        internship.job_title ||
-        "";
-
       const searchableText = [
-        title,
+        internship.job_title,
         internship.company_name,
         internship.province,
         internship.location,
@@ -107,8 +105,7 @@ export default function InternshipsPage() {
         .toLowerCase();
 
       const matchesSearch =
-        !searchTerm ||
-        searchableText.includes(searchTerm);
+        !searchTerm || searchableText.includes(searchTerm);
 
       const matchesProvince =
         province === "All Provinces" ||
@@ -146,10 +143,7 @@ export default function InternshipsPage() {
           <div className="hero-orb hero-orb-two"></div>
 
           <div className="hero-inner">
-            <Link
-              href="/"
-              className="hero-back-link"
-            >
+            <Link href="/" className="hero-back-link">
               ← Back to home
             </Link>
 
@@ -205,9 +199,7 @@ export default function InternshipsPage() {
                 </label>
 
                 <div className="search-input-wrap">
-                  <span className="search-icon">
-                    ⌕
-                  </span>
+                  <span className="search-icon">⌕</span>
 
                   <input
                     id="internship-search"
@@ -383,7 +375,6 @@ export default function InternshipsPage() {
 
 function InternshipCard({ internship, onOpen }) {
   const title =
-    internship.title ||
     internship.job_title ||
     "Internship Opportunity";
 
@@ -395,7 +386,12 @@ function InternshipCard({ internship, onOpen }) {
     internship.description ||
     "Explore this internship opportunity and discover what you could learn and contribute.";
 
-  const skills = internship.skills
+  const skills = Array.isArray(internship.skills)
+    ? internship.skills
+        .map((skill) => String(skill).trim())
+        .filter(Boolean)
+        .slice(0, 3)
+    : typeof internship.skills === "string"
     ? internship.skills
         .split(",")
         .map((skill) => skill.trim())
@@ -468,8 +464,10 @@ function InternshipCard({ internship, onOpen }) {
 
       {skills.length > 0 && (
         <div className="skills-row">
-          {skills.map((skill) => (
-            <span key={skill}>{skill}</span>
+          {skills.map((skill, index) => (
+            <span key={`${skill}-${index}`}>
+              {skill}
+            </span>
           ))}
         </div>
       )}
@@ -477,6 +475,7 @@ function InternshipCard({ internship, onOpen }) {
       <div className="card-footer">
         <div className="stipend">
           <small>STIPEND</small>
+
           <strong>
             {internship.stipend || "Not specified"}
           </strong>
@@ -485,6 +484,7 @@ function InternshipCard({ internship, onOpen }) {
         {deadline && (
           <div className="deadline">
             <small>DEADLINE</small>
+
             <strong>{deadline}</strong>
           </div>
         )}
@@ -513,7 +513,7 @@ function LoadingState() {
       <h2>Finding opportunities</h2>
 
       <p>
-        We're loading the latest internships for you.
+        We&apos;re loading the latest internships for you.
       </p>
     </div>
   );
@@ -524,7 +524,7 @@ function ErrorState({ error, onRetry }) {
     <div className="state-box error-state">
       <div className="state-icon">!</div>
 
-      <h2>We couldn't load the internships</h2>
+      <h2>We couldn&apos;t load the internships</h2>
 
       <p>{error}</p>
 
@@ -578,7 +578,9 @@ function getInitials(name) {
     .filter(Boolean);
 
   if (words.length === 1) {
-    return words[0].slice(0, 2).toUpperCase();
+    return words[0]
+      .slice(0, 2)
+      .toUpperCase();
   }
 
   return `${words[0][0]}${words[1][0]}`.toUpperCase();
@@ -616,10 +618,13 @@ function getRelativeDate(date) {
 
   if (days === 1) return "1 day ago";
 
-  if (days < 7) return `${days} days ago`;
+  if (days < 7) {
+    return `${days} days ago`;
+  }
 
   if (days < 30) {
     const weeks = Math.floor(days / 7);
+
     return weeks === 1
       ? "1 week ago"
       : `${weeks} weeks ago`;
@@ -654,8 +659,6 @@ const globalStyles = `
     min-height: 100vh;
     background: #f8fafc;
   }
-
-  /* HERO */
 
   .marketplace-hero {
     position: relative;
@@ -794,8 +797,6 @@ const globalStyles = `
     background: rgba(255,255,255,0.18);
   }
 
-  /* SEARCH */
-
   .search-section {
     position: relative;
     z-index: 5;
@@ -810,7 +811,10 @@ const globalStyles = `
 
   .search-panel {
     display: grid;
-    grid-template-columns: minmax(0, 1.8fr) minmax(180px, 0.75fr) minmax(180px, 0.75fr);
+    grid-template-columns:
+      minmax(0, 1.8fr)
+      minmax(180px, 0.75fr)
+      minmax(180px, 0.75fr);
     gap: 14px;
     padding: 20px;
     border: 1px solid #e2e8f0;
@@ -899,8 +903,6 @@ const globalStyles = `
     font-weight: 800;
     cursor: pointer;
   }
-
-  /* RESULTS */
 
   .results-section {
     padding: 55px 20px 80px;
@@ -1140,8 +1142,6 @@ const globalStyles = `
     color: #ffffff;
   }
 
-  /* STATES */
-
   .loading-state,
   .state-box {
     min-height: 360px;
@@ -1218,8 +1218,6 @@ const globalStyles = `
     cursor: pointer;
   }
 
-  /* CTA */
-
   .bottom-cta {
     padding: 0 20px 80px;
   }
@@ -1290,8 +1288,6 @@ const globalStyles = `
     transform: translateY(-1px);
   }
 
-  /* TABLET */
-
   @media (max-width: 950px) {
     .internship-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1305,8 +1301,6 @@ const globalStyles = `
       grid-column: 1 / -1;
     }
   }
-
-  /* MOBILE */
 
   @media (max-width: 700px) {
     .hero-inner {
