@@ -19,6 +19,7 @@ const emptyCompany = {
   email: "",
   phone: "",
   description: "",
+  logo_url: "",
 };
 
 export default function CompanyPage() {
@@ -29,6 +30,10 @@ export default function CompanyPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  const [logoPreview, setLogoPreview] = useState("");
+  const [selectedLogo, setSelectedLogo] = useState(null);
 
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -44,10 +49,6 @@ export default function CompanyPage() {
       setErrorMessage("");
 
       try {
-        // --------------------------------------------------------
-        // GET LOGGED-IN USER
-        // --------------------------------------------------------
-
         const {
           data: { user },
           error: userError,
@@ -57,10 +58,6 @@ export default function CompanyPage() {
           router.push("/login");
           return;
         }
-
-        // --------------------------------------------------------
-        // VERIFY ACTIVE COMPANY SUBSCRIPTION
-        // --------------------------------------------------------
 
         const {
           data: subscription,
@@ -88,18 +85,10 @@ export default function CompanyPage() {
           return;
         }
 
-        // --------------------------------------------------------
-        // COMPANY PROFILE REQUIRES VERIFIED PAYMENT
-        // --------------------------------------------------------
-
         if (!subscription) {
           router.replace("/company-pricing");
           return;
         }
-
-        // --------------------------------------------------------
-        // LOAD COMPANY PROFILE
-        // --------------------------------------------------------
 
         const {
           data: companyData,
@@ -121,12 +110,10 @@ export default function CompanyPage() {
           return;
         }
 
-        // --------------------------------------------------------
-        // LOAD EXISTING COMPANY
-        // --------------------------------------------------------
-
         if (companyData) {
           setCompanyId(companyData.id);
+
+          const loadedLogo = companyData.logo_url || "";
 
           setCompany({
             company_name: companyData.company_name || "",
@@ -136,7 +123,10 @@ export default function CompanyPage() {
             email: companyData.email || "",
             phone: companyData.phone || "",
             description: companyData.description || "",
+            logo_url: loadedLogo,
           });
+
+          setLogoPreview(loadedLogo);
         }
       } catch (error) {
         console.error("Company page error:", error);
@@ -170,6 +160,113 @@ export default function CompanyPage() {
   }
 
   // ============================================================
+  // HANDLE LOGO SELECTION
+  // ============================================================
+
+  function handleLogoChange(e) {
+    const file = e.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setMessage("");
+    setErrorMessage("");
+
+    // Maximum 5MB
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage(
+        "Your logo is too large. Please choose an image smaller than 5MB."
+      );
+
+      e.target.value = "";
+      return;
+    }
+
+    // Check image
+    if (!file.type.startsWith("image/")) {
+      setErrorMessage(
+        "Please choose a valid image file."
+      );
+
+      e.target.value = "";
+      return;
+    }
+
+    setSelectedLogo(file);
+
+    const previewUrl = URL.createObjectURL(file);
+
+    setLogoPreview(previewUrl);
+  }
+
+  // ============================================================
+  // UPLOAD LOGO
+  // ============================================================
+
+  async function uploadCompanyLogo(userId) {
+    if (!selectedLogo) {
+      return company.logo_url || "";
+    }
+
+    setUploadingLogo(true);
+
+    try {
+      const fileExtension =
+        selectedLogo.name.split(".").pop()?.toLowerCase() ||
+        "png";
+
+      const safeExtension =
+        fileExtension === "jpeg"
+          ? "jpg"
+          : fileExtension;
+
+      const filePath = `${userId}/company-logo-${Date.now()}.${safeExtension}`;
+
+      const {
+        error: uploadError,
+      } = await supabase.storage
+        .from("company-logos")
+        .upload(filePath, selectedLogo, {
+          cacheControl: "3600",
+          upsert: true,
+          contentType: selectedLogo.type,
+        });
+
+      if (uploadError) {
+        console.error(
+          "Logo upload error:",
+          uploadError
+        );
+
+        throw new Error(
+          uploadError.message ||
+            "Company logo could not be uploaded."
+        );
+      }
+
+      const {
+        data: publicUrlData,
+      } = supabase.storage
+        .from("company-logos")
+        .getPublicUrl(filePath);
+
+      const publicUrl =
+        publicUrlData?.publicUrl || "";
+
+      if (!publicUrl) {
+        throw new Error(
+          "The logo was uploaded, but its public URL could not be created."
+        );
+      }
+
+      return publicUrl;
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+
+  // ============================================================
   // SAVE COMPANY
   // ============================================================
 
@@ -181,10 +278,6 @@ export default function CompanyPage() {
     setErrorMessage("");
 
     try {
-      // --------------------------------------------------------
-      // GET USER
-      // --------------------------------------------------------
-
       const {
         data: { user },
         error: userError,
@@ -194,10 +287,6 @@ export default function CompanyPage() {
         router.push("/login");
         return;
       }
-
-      // --------------------------------------------------------
-      // VERIFY ACTIVE SUBSCRIPTION AGAIN
-      // --------------------------------------------------------
 
       const {
         data: subscription,
@@ -239,11 +328,8 @@ export default function CompanyPage() {
         return;
       }
 
-      // --------------------------------------------------------
-      // VALIDATE COMPANY NAME
-      // --------------------------------------------------------
-
-      const newCompanyName = company.company_name.trim();
+      const newCompanyName =
+        company.company_name.trim();
 
       if (!newCompanyName) {
         setErrorMessage("Company name is required.");
@@ -252,8 +338,15 @@ export default function CompanyPage() {
       }
 
       // --------------------------------------------------------
-      // PREPARE COMPANY DATA
+      // UPLOAD LOGO IF A NEW ONE WAS SELECTED
       // --------------------------------------------------------
+
+      let finalLogoUrl = company.logo_url || "";
+
+      if (selectedLogo) {
+        finalLogoUrl =
+          await uploadCompanyLogo(user.id);
+      }
 
       const companyData = {
         company_name: newCompanyName,
@@ -263,11 +356,8 @@ export default function CompanyPage() {
         email: company.email.trim(),
         phone: company.phone.trim(),
         description: company.description.trim(),
+        logo_url: finalLogoUrl,
       };
-
-      // --------------------------------------------------------
-      // FIND EXISTING COMPANY
-      // --------------------------------------------------------
 
       const {
         data: existingCompany,
@@ -288,7 +378,8 @@ export default function CompanyPage() {
       // ========================================================
 
       if (existingCompany) {
-        const previousName = existingCompany.company_name || "";
+        const previousName =
+          existingCompany.company_name || "";
 
         const {
           data: updatedCompany,
@@ -301,7 +392,11 @@ export default function CompanyPage() {
           .single();
 
         if (updateError) {
-          console.error("Company update error:", updateError);
+          console.error(
+            "Company update error:",
+            updateError
+          );
+
           throw updateError;
         }
 
@@ -339,24 +434,35 @@ export default function CompanyPage() {
           }
         }
 
-        // ------------------------------------------------------
-        // UPDATE STATE
-        // ------------------------------------------------------
-
         setCompanyId(updatedCompany.id);
 
         setCompany({
-          company_name: updatedCompany.company_name || "",
-          industry: updatedCompany.industry || "",
-          website: updatedCompany.website || "",
-          location: updatedCompany.location || "",
-          email: updatedCompany.email || "",
-          phone: updatedCompany.phone || "",
-          description: updatedCompany.description || "",
+          company_name:
+            updatedCompany.company_name || "",
+          industry:
+            updatedCompany.industry || "",
+          website:
+            updatedCompany.website || "",
+          location:
+            updatedCompany.location || "",
+          email:
+            updatedCompany.email || "",
+          phone:
+            updatedCompany.phone || "",
+          description:
+            updatedCompany.description || "",
+          logo_url:
+            updatedCompany.logo_url || "",
         });
 
+        setLogoPreview(
+          updatedCompany.logo_url || ""
+        );
+
+        setSelectedLogo(null);
+
         setMessage(
-          "Company profile and internships updated successfully."
+          "Company profile, logo and internships updated successfully."
         );
 
         setSaving(false);
@@ -380,7 +486,11 @@ export default function CompanyPage() {
         .single();
 
       if (insertError) {
-        console.error("Company insert error:", insertError);
+        console.error(
+          "Company insert error:",
+          insertError
+        );
+
         throw insertError;
       }
 
@@ -393,20 +503,38 @@ export default function CompanyPage() {
       setCompanyId(createdCompany.id);
 
       setCompany({
-        company_name: createdCompany.company_name || "",
-        industry: createdCompany.industry || "",
-        website: createdCompany.website || "",
-        location: createdCompany.location || "",
-        email: createdCompany.email || "",
-        phone: createdCompany.phone || "",
-        description: createdCompany.description || "",
+        company_name:
+          createdCompany.company_name || "",
+        industry:
+          createdCompany.industry || "",
+        website:
+          createdCompany.website || "",
+        location:
+          createdCompany.location || "",
+        email:
+          createdCompany.email || "",
+        phone:
+          createdCompany.phone || "",
+        description:
+          createdCompany.description || "",
+        logo_url:
+          createdCompany.logo_url || "",
       });
 
+      setLogoPreview(
+        createdCompany.logo_url || ""
+      );
+
+      setSelectedLogo(null);
+
       setMessage(
-        "Company profile created successfully."
+        "Company profile and logo created successfully."
       );
     } catch (error) {
-      console.error("Company profile error:", error);
+      console.error(
+        "Company profile error:",
+        error
+      );
 
       setErrorMessage(
         error?.message ||
@@ -478,13 +606,18 @@ export default function CompanyPage() {
 
             <h1 style={heroTitle}>
               Build a company profile
-              <span style={heroAccent}> graduates trust.</span>
+              <span style={heroAccent}>
+                {" "}
+                graduates trust.
+              </span>
             </h1>
 
             <p style={heroDescription}>
-              Tell graduates who you are, what you do and where
-              your organisation is based. A strong company profile
-              helps attract the right candidates on GradLink SA.
+              Tell graduates who you are, what you
+              do and where your organisation is
+              based. A strong company profile helps
+              attract the right candidates on
+              GradLink SA.
             </p>
 
             <div style={heroActions}>
@@ -497,7 +630,9 @@ export default function CompanyPage() {
               </button>
 
               <div style={verifiedBadge}>
-                <span style={verifiedIcon}>✓</span>
+                <span style={verifiedIcon}>
+                  ✓
+                </span>
                 Paid access verified
               </div>
             </div>
@@ -510,7 +645,6 @@ export default function CompanyPage() {
 
         <section style={contentSection}>
           <div style={contentContainer}>
-            {/* TOP INTRO */}
             <div style={sectionIntro}>
               <div>
                 <p style={sectionEyebrow}>
@@ -524,9 +658,9 @@ export default function CompanyPage() {
                 </h2>
 
                 <p style={sectionDescription}>
-                  Keep your organisation details accurate so
-                  graduates can understand your business before
-                  applying.
+                  Keep your organisation details
+                  accurate so graduates can understand
+                  your business before applying.
                 </p>
               </div>
 
@@ -538,14 +672,18 @@ export default function CompanyPage() {
               )}
             </div>
 
-            {/* MESSAGES */}
+            {/* ==================================================
+                MESSAGES
+            ================================================== */}
 
             {message && (
               <div style={successBox}>
                 <div style={successIcon}>✓</div>
 
                 <div>
-                  <strong>Saved successfully</strong>
+                  <strong>
+                    Saved successfully
+                  </strong>
 
                   <p>{message}</p>
                 </div>
@@ -557,31 +695,120 @@ export default function CompanyPage() {
                 <div style={errorIcon}>!</div>
 
                 <div>
-                  <strong>Something went wrong</strong>
+                  <strong>
+                    Something went wrong
+                  </strong>
 
                   <p>{errorMessage}</p>
                 </div>
               </div>
             )}
 
-            {/* FORM */}
-
             <form onSubmit={handleSubmit}>
               {/* ==================================================
-                  SECTION 01
+                  SECTION 01 — BRANDING
               ================================================== */}
 
               <div style={formSection}>
                 <div style={formSectionHeader}>
-                  <div style={numberBadge}>01</div>
+                  <div style={numberBadge}>
+                    01
+                  </div>
+
+                  <div>
+                    <h3 style={formSectionTitle}>
+                      Company branding
+                    </h3>
+
+                    <p
+                      style={
+                        formSectionDescription
+                      }
+                    >
+                      Add your organisation's logo so
+                      graduates can recognise your
+                      company.
+                    </p>
+                  </div>
+                </div>
+
+                <div style={logoArea}>
+                  <div style={logoPreviewBox}>
+                    {logoPreview ? (
+                      <img
+                        src={logoPreview}
+                        alt="Company logo preview"
+                        style={logoImage}
+                      />
+                    ) : (
+                      <div style={logoPlaceholder}>
+                        <span style={logoPlaceholderIcon}>
+                          🏢
+                        </span>
+
+                        <span>
+                          Your logo
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={logoControls}>
+                    <label
+                      htmlFor="company-logo"
+                      style={uploadButton}
+                    >
+                      {selectedLogo
+                        ? "Choose a different logo"
+                        : "Upload company logo"}
+                    </label>
+
+                    <input
+                      id="company-logo"
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      onChange={handleLogoChange}
+                      style={{
+                        display: "none",
+                      }}
+                    />
+
+                    <p style={logoHint}>
+                      PNG, JPG or WEBP · Maximum
+                      5MB
+                    </p>
+
+                    <p style={logoHint}>
+                      Your logo will appear on your
+                      company profile and internship
+                      listings.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* ==================================================
+                  SECTION 02 — ORGANISATION
+              ================================================== */}
+
+              <div style={formSection}>
+                <div style={formSectionHeader}>
+                  <div style={numberBadge}>
+                    02
+                  </div>
 
                   <div>
                     <h3 style={formSectionTitle}>
                       Organisation details
                     </h3>
 
-                    <p style={formSectionDescription}>
-                      The basics graduates need to know.
+                    <p
+                      style={
+                        formSectionDescription
+                      }
+                    >
+                      The basics graduates need to
+                      know.
                     </p>
                   </div>
                 </div>
@@ -590,7 +817,11 @@ export default function CompanyPage() {
                   <div style={fieldFull}>
                     <label style={labelStyle}>
                       Company Name
-                      <span style={requiredMark}>*</span>
+                      <span
+                        style={requiredMark}
+                      >
+                        *
+                      </span>
                     </label>
 
                     <input
@@ -606,7 +837,11 @@ export default function CompanyPage() {
                   <div style={fieldHalf}>
                     <label style={labelStyle}>
                       Industry
-                      <span style={requiredMark}>*</span>
+                      <span
+                        style={requiredMark}
+                      >
+                        *
+                      </span>
                     </label>
 
                     <input
@@ -622,7 +857,11 @@ export default function CompanyPage() {
                   <div style={fieldHalf}>
                     <label style={labelStyle}>
                       Location
-                      <span style={requiredMark}>*</span>
+                      <span
+                        style={requiredMark}
+                      >
+                        *
+                      </span>
                     </label>
 
                     <input
@@ -638,21 +877,28 @@ export default function CompanyPage() {
               </div>
 
               {/* ==================================================
-                  SECTION 02
+                  SECTION 03 — CONTACT
               ================================================== */}
 
               <div style={formSection}>
                 <div style={formSectionHeader}>
-                  <div style={numberBadge}>02</div>
+                  <div style={numberBadge}>
+                    03
+                  </div>
 
                   <div>
                     <h3 style={formSectionTitle}>
                       Contact details
                     </h3>
 
-                    <p style={formSectionDescription}>
-                      Give candidates a professional way to
-                      identify your organisation.
+                    <p
+                      style={
+                        formSectionDescription
+                      }
+                    >
+                      Give candidates a professional
+                      way to identify your
+                      organisation.
                     </p>
                   </div>
                 </div>
@@ -661,7 +907,11 @@ export default function CompanyPage() {
                   <div style={fieldHalf}>
                     <label style={labelStyle}>
                       Company Email
-                      <span style={requiredMark}>*</span>
+                      <span
+                        style={requiredMark}
+                      >
+                        *
+                      </span>
                     </label>
 
                     <input
@@ -705,29 +955,36 @@ export default function CompanyPage() {
                     />
 
                     <p style={fieldHint}>
-                      Adding your website helps graduates learn
-                      more about your organisation.
+                      Adding your website helps
+                      graduates learn more about
+                      your organisation.
                     </p>
                   </div>
                 </div>
               </div>
 
               {/* ==================================================
-                  SECTION 03
+                  SECTION 04 — DESCRIPTION
               ================================================== */}
 
               <div style={formSection}>
                 <div style={formSectionHeader}>
-                  <div style={numberBadge}>03</div>
+                  <div style={numberBadge}>
+                    04
+                  </div>
 
                   <div>
                     <h3 style={formSectionTitle}>
                       About your company
                     </h3>
 
-                    <p style={formSectionDescription}>
-                      Make your organisation stand out to
-                      graduate talent.
+                    <p
+                      style={
+                        formSectionDescription
+                      }
+                    >
+                      Make your organisation stand
+                      out to graduate talent.
                     </p>
                   </div>
                 </div>
@@ -747,30 +1004,34 @@ export default function CompanyPage() {
                   />
 
                   <p style={fieldHint}>
-                    A clear description can help candidates
-                    understand whether your organisation is the
-                    right fit for them.
+                    A clear description can help
+                    candidates understand whether your
+                    organisation is the right fit for
+                    them.
                   </p>
                 </div>
               </div>
 
               {/* ==================================================
-                  PROFILE PREVIEW NOTE
+                  PROFILE NOTE
               ================================================== */}
 
               <div style={profileNote}>
-                <div style={profileNoteIcon}>✦</div>
+                <div style={profileNoteIcon}>
+                  ✦
+                </div>
 
                 <div>
                   <h3 style={profileNoteTitle}>
-                    Your profile represents your organisation
+                    Your profile represents your
+                    organisation
                   </h3>
 
                   <p style={profileNoteText}>
-                    Keep your company name, contact details and
-                    description professional and up to date.
-                    These details can be used throughout your
-                    GradLink SA hiring experience.
+                    Your logo, company name, contact
+                    details and description can appear
+                    throughout your GradLink SA hiring
+                    experience.
                   </p>
                 </div>
               </div>
@@ -782,16 +1043,24 @@ export default function CompanyPage() {
               <div style={actionArea}>
                 <button
                   type="submit"
-                  disabled={saving}
+                  disabled={
+                    saving || uploadingLogo
+                  }
                   style={{
                     ...primaryButton,
-                    opacity: saving ? 0.7 : 1,
-                    cursor: saving
-                      ? "not-allowed"
-                      : "pointer",
+                    opacity:
+                      saving || uploadingLogo
+                        ? 0.7
+                        : 1,
+                    cursor:
+                      saving || uploadingLogo
+                        ? "not-allowed"
+                        : "pointer",
                   }}
                 >
-                  {saving
+                  {uploadingLogo
+                    ? "Uploading logo..."
+                    : saving
                     ? "Saving profile..."
                     : companyId
                     ? "Save Changes"
@@ -812,10 +1081,6 @@ export default function CompanyPage() {
       </main>
 
       <SiteFooter />
-
-      {/* ==========================================================
-          MOBILE / PAGE STYLES
-      ========================================================== */}
 
       <style jsx>{`
         @media (max-width: 760px) {
@@ -888,7 +1153,8 @@ const loadingOrb = {
   alignItems: "center",
   justifyContent: "center",
   marginBottom: "20px",
-  boxShadow: "0 12px 35px rgba(0,87,184,0.25)",
+  boxShadow:
+    "0 12px 35px rgba(0,87,184,0.25)",
 };
 
 const loadingDot = {
@@ -924,7 +1190,8 @@ const heroGlowOne = {
   width: "360px",
   height: "360px",
   borderRadius: "50%",
-  background: "rgba(255,255,255,0.08)",
+  background:
+    "rgba(255,255,255,0.08)",
   top: "-180px",
   right: "-100px",
 };
@@ -934,7 +1201,8 @@ const heroGlowTwo = {
   width: "260px",
   height: "260px",
   borderRadius: "50%",
-  background: "rgba(80,180,255,0.12)",
+  background:
+    "rgba(80,180,255,0.12)",
   bottom: "-150px",
   left: "-80px",
 };
@@ -962,7 +1230,8 @@ const eyebrowDot = {
   height: "8px",
   borderRadius: "50%",
   background: "#ffffff",
-  boxShadow: "0 0 0 5px rgba(255,255,255,0.12)",
+  boxShadow:
+    "0 0 0 5px rgba(255,255,255,0.12)",
 };
 
 const heroTitle = {
@@ -997,8 +1266,10 @@ const heroActions = {
 };
 
 const secondaryHeroButton = {
-  border: "1px solid rgba(255,255,255,0.5)",
-  background: "rgba(255,255,255,0.1)",
+  border:
+    "1px solid rgba(255,255,255,0.5)",
+  background:
+    "rgba(255,255,255,0.1)",
   color: "#ffffff",
   padding: "13px 20px",
   borderRadius: "10px",
@@ -1014,8 +1285,10 @@ const verifiedBadge = {
   gap: "9px",
   padding: "11px 15px",
   borderRadius: "999px",
-  background: "rgba(255,255,255,0.12)",
-  border: "1px solid rgba(255,255,255,0.18)",
+  background:
+    "rgba(255,255,255,0.12)",
+  border:
+    "1px solid rgba(255,255,255,0.18)",
   color: "#ffffff",
   fontSize: "13px",
   fontWeight: "700",
@@ -1143,7 +1416,8 @@ const formSection = {
   borderRadius: "18px",
   padding: "30px",
   marginBottom: "20px",
-  boxShadow: "0 8px 28px rgba(15,57,95,0.05)",
+  boxShadow:
+    "0 8px 28px rgba(15,57,95,0.05)",
 };
 
 const formSectionHeader = {
@@ -1183,7 +1457,8 @@ const formSectionDescription = {
 
 const formGrid = {
   display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gridTemplateColumns:
+    "repeat(2, minmax(0, 1fr))",
   gap: "0 18px",
 };
 
@@ -1239,6 +1514,81 @@ const textareaStyle = {
 
 const fieldHint = {
   margin: "-10px 0 18px",
+  color: "#8492a5",
+  fontSize: "12px",
+  lineHeight: "1.5",
+};
+
+const logoArea = {
+  display: "flex",
+  alignItems: "center",
+  gap: "24px",
+  flexWrap: "wrap",
+};
+
+const logoPreviewBox = {
+  width: "140px",
+  height: "140px",
+  flexShrink: 0,
+  borderRadius: "20px",
+  border: "1px solid #dce8f5",
+  background:
+    "linear-gradient(145deg, #f5faff, #edf5ff)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  overflow: "hidden",
+  boxShadow:
+    "0 8px 24px rgba(0,87,184,0.08)",
+};
+
+const logoImage = {
+  width: "100%",
+  height: "100%",
+  objectFit: "contain",
+  padding: "12px",
+  boxSizing: "border-box",
+};
+
+const logoPlaceholder = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "8px",
+  color: "#7c8ea3",
+  fontSize: "13px",
+  fontWeight: "700",
+};
+
+const logoPlaceholderIcon = {
+  fontSize: "38px",
+};
+
+const logoControls = {
+  flex: "1 1 300px",
+  minWidth: 0,
+};
+
+const uploadButton = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minHeight: "48px",
+  padding: "12px 18px",
+  borderRadius: "10px",
+  background:
+    "linear-gradient(135deg, #0057B8, #0878df)",
+  color: "#ffffff",
+  fontSize: "14px",
+  fontWeight: "850",
+  cursor: "pointer",
+  boxShadow:
+    "0 8px 20px rgba(0,87,184,0.18)",
+};
+
+const logoHint = {
+  margin: "10px 0 0",
   color: "#8492a5",
   fontSize: "12px",
   lineHeight: "1.5",
@@ -1301,7 +1651,8 @@ const primaryButton = {
   color: "#ffffff",
   fontSize: "16px",
   fontWeight: "850",
-  boxShadow: "0 10px 24px rgba(0,87,184,0.2)",
+  boxShadow:
+    "0 10px 24px rgba(0,87,184,0.2)",
 };
 
 const secondaryButton = {
