@@ -14,6 +14,7 @@ const supabase = createClient(
 export default function JobsPage() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     fetchJobs();
@@ -21,17 +22,28 @@ export default function JobsPage() {
 
   async function fetchJobs() {
     setLoading(true);
+    setErrorMessage("");
 
-    const { data, error } = await supabase
-      .from("internships")
-      .select("*")
-      .order("created_at", { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from("internships")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-    if (!error && data) {
-      setJobs(data);
+      if (error) {
+        console.error("Error loading internships:", error);
+        setErrorMessage(error.message);
+        setJobs([]);
+      } else {
+        setJobs(data || []);
+      }
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      setErrorMessage("Unable to load internships right now.");
+      setJobs([]);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   return (
@@ -49,15 +61,12 @@ export default function JobsPage() {
 
             <h1 style={styles.title}>
               Find Your Next
-              <span style={styles.titleBlue}>
-                {" "}Opportunity
-              </span>
+              <span style={styles.titleBlue}> Opportunity</span>
             </h1>
 
             <p style={styles.subtitle}>
-              Explore internship opportunities from
-              companies across South Africa and take
-              the next step in your career.
+              Explore internship opportunities from companies across South
+              Africa and take the next step in your career.
             </p>
 
             <div style={styles.heroStats}>
@@ -103,8 +112,29 @@ export default function JobsPage() {
             </Link>
           </div>
 
-          {/* LOADING */}
-          {loading ? (
+          {/* ERROR */}
+          {!loading && errorMessage ? (
+            <div style={styles.errorBox}>
+              <div style={styles.errorIcon}>⚠️</div>
+
+              <h3 style={styles.errorTitle}>
+                We couldn't load the internships
+              </h3>
+
+              <p style={styles.errorText}>
+                {errorMessage}
+              </p>
+
+              <button
+                type="button"
+                onClick={fetchJobs}
+                style={styles.retryButton}
+              >
+                Try Again
+              </button>
+            </div>
+          ) : loading ? (
+            /* LOADING */
             <div style={styles.loadingBox}>
               <div style={styles.loadingIcon}>
                 💼
@@ -130,12 +160,12 @@ export default function JobsPage() {
               </h3>
 
               <p style={styles.emptyText}>
-                New opportunities will appear here as
-                companies begin posting on GradLink SA.
+                New opportunities will appear here as companies begin
+                posting on GradLink SA.
               </p>
 
               <Link
-                href="/signup"
+                href="/signup?role=graduate"
                 style={styles.emptyButton}
               >
                 Create Your Graduate Account
@@ -150,7 +180,6 @@ export default function JobsPage() {
                   style={styles.jobCard}
                 >
                   <div>
-
                     {/* CARD TOP */}
                     <div style={styles.cardTop}>
                       <div style={styles.companyIcon}>
@@ -162,18 +191,17 @@ export default function JobsPage() {
                       </div>
 
                       <div style={styles.typeBadge}>
-                        {job.internship_type ||
-                          "Internship"}
+                        {job.internship_type || "Internship"}
                       </div>
                     </div>
 
                     {/* TITLE */}
                     <h2 style={styles.jobTitle}>
-                      {job.job_title}
+                      {job.job_title || "Internship Opportunity"}
                     </h2>
 
                     <p style={styles.companyName}>
-                      🏢 {job.company_name}
+                      🏢 {job.company_name || "GradLink SA Company"}
                     </p>
 
                     {/* DETAILS */}
@@ -184,8 +212,9 @@ export default function JobsPage() {
                           📍
                         </span>
 
-                        <div>
+                        <div style={styles.detailContent}>
                           <small>Location</small>
+
                           <strong>
                             {job.location ||
                               job.province ||
@@ -199,11 +228,11 @@ export default function JobsPage() {
                           🎓
                         </span>
 
-                        <div>
+                        <div style={styles.detailContent}>
                           <small>Qualification</small>
+
                           <strong>
-                            {job.qualification ||
-                              "Graduate"}
+                            {job.qualification || "Graduate"}
                           </strong>
                         </div>
                       </div>
@@ -213,11 +242,11 @@ export default function JobsPage() {
                           💰
                         </span>
 
-                        <div>
+                        <div style={styles.detailContent}>
                           <small>Stipend</small>
+
                           <strong>
-                            {job.stipend ||
-                              "Not specified"}
+                            {job.stipend || "Not specified"}
                           </strong>
                         </div>
                       </div>
@@ -227,22 +256,19 @@ export default function JobsPage() {
                     {/* DESCRIPTION */}
                     <p style={styles.description}>
                       {job.description?.length > 145
-                        ? job.description.substring(
-                            0,
-                            145
-                          ) + "..."
+                        ? job.description.substring(0, 145) + "..."
                         : job.description ||
                           "Explore this internship opportunity on GradLink SA."}
                     </p>
                   </div>
 
-                  {/* BUTTON */}
+                  {/* VIEW BUTTON */}
                   <Link
                     href={`/jobs/${job.id}`}
                     style={styles.viewButton}
                   >
-                    View Internship
-                    <span>→</span>
+                    <span>View Internship</span>
+                    <span style={styles.viewArrow}>→</span>
                   </Link>
                 </article>
               ))}
@@ -250,9 +276,9 @@ export default function JobsPage() {
           )}
 
           {/* BOTTOM CTA */}
-          {!loading && (
+          {!loading && !errorMessage && (
             <section style={styles.bottomCta}>
-              <div>
+              <div style={styles.ctaContent}>
                 <div style={styles.ctaEyebrow}>
                   START YOUR CAREER JOURNEY
                 </div>
@@ -263,17 +289,21 @@ export default function JobsPage() {
                 </h2>
 
                 <p style={styles.ctaText}>
-                  Create your free graduate profile
-                  and start discovering opportunities
-                  built for South African graduates.
+                  Create your free graduate profile and start discovering
+                  opportunities built for South African graduates.
                 </p>
               </div>
 
+              {/* IMPORTANT:
+                  Explicit graduate signup route.
+                  This fixes the Create Free Profile button.
+              */}
               <Link
-                href="/signup"
+                href="/signup?role=graduate"
                 style={styles.ctaButton}
               >
-                Create Free Profile →
+                <span>Create Free Profile</span>
+                <span style={styles.ctaArrow}>→</span>
               </Link>
             </section>
           )}
@@ -344,20 +374,25 @@ const styles = {
     border: "1px solid #dbe5f0",
     borderRadius: "15px",
     padding: "13px 20px",
-    boxShadow:
-      "0 10px 30px rgba(15,23,42,0.06)",
+    boxShadow: "0 10px 30px rgba(15,23,42,0.06)",
+    maxWidth: "100%",
+    boxSizing: "border-box",
   },
 
   stat: {
     display: "flex",
     alignItems: "center",
     gap: "7px",
+    color: "#475569",
+    fontSize: "12px",
+    whiteSpace: "nowrap",
   },
 
   statDivider: {
     width: "1px",
     height: "28px",
     background: "#e2e8f0",
+    flexShrink: 0,
   },
 
   contentHeader: {
@@ -410,7 +445,6 @@ const styles = {
     justifyContent: "space-between",
     minHeight: "390px",
     boxSizing: "border-box",
-    transition: "transform 0.2s ease",
   },
 
   cardTop: {
@@ -418,6 +452,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: "17px",
+    gap: "12px",
   },
 
   companyIcon: {
@@ -432,6 +467,7 @@ const styles = {
     justifyContent: "center",
     fontSize: "18px",
     fontWeight: "900",
+    flexShrink: 0,
   },
 
   typeBadge: {
@@ -441,6 +477,10 @@ const styles = {
     padding: "7px 10px",
     fontSize: "10px",
     fontWeight: "800",
+    maxWidth: "150px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
   },
 
   jobTitle: {
@@ -472,6 +512,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     gap: "10px",
+    minWidth: 0,
   },
 
   detailIcon: {
@@ -486,10 +527,11 @@ const styles = {
     flexShrink: 0,
   },
 
-  detail: {
+  detailContent: {
     display: "flex",
-    alignItems: "center",
-    gap: "10px",
+    flexDirection: "column",
+    minWidth: 0,
+    gap: "2px",
   },
 
   description: {
@@ -518,6 +560,11 @@ const styles = {
       "0 7px 18px rgba(37,99,235,0.18)",
   },
 
+  viewArrow: {
+    fontSize: "18px",
+    lineHeight: 1,
+  },
+
   loadingBox: {
     background: "#ffffff",
     border: "1px solid #dbe5f0",
@@ -543,6 +590,48 @@ const styles = {
     margin: 0,
     color: "#64748b",
     fontSize: "13px",
+  },
+
+  errorBox: {
+    background: "#ffffff",
+    border: "1px solid #fecaca",
+    borderRadius: "19px",
+    padding: "55px 20px",
+    textAlign: "center",
+    boxShadow:
+      "0 12px 35px rgba(15,23,42,0.06)",
+  },
+
+  errorIcon: {
+    fontSize: "40px",
+    marginBottom: "10px",
+  },
+
+  errorTitle: {
+    margin: "0 0 8px",
+    color: "#0f172a",
+    fontSize: "20px",
+  },
+
+  errorText: {
+    maxWidth: "600px",
+    margin: "0 auto 20px",
+    color: "#64748b",
+    fontSize: "13px",
+    lineHeight: 1.6,
+    wordBreak: "break-word",
+  },
+
+  retryButton: {
+    border: "none",
+    padding: "12px 20px",
+    borderRadius: "10px",
+    background:
+      "linear-gradient(135deg, #2563eb, #1d4ed8)",
+    color: "#ffffff",
+    fontSize: "13px",
+    fontWeight: "800",
+    cursor: "pointer",
   },
 
   emptyBox: {
@@ -575,14 +664,21 @@ const styles = {
   },
 
   emptyButton: {
-    display: "inline-block",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "44px",
     padding: "12px 18px",
     borderRadius: "10px",
-    background: "#2563eb",
+    background:
+      "linear-gradient(135deg, #2563eb, #1d4ed8)",
     color: "#ffffff",
     textDecoration: "none",
     fontSize: "13px",
     fontWeight: "800",
+    boxShadow:
+      "0 7px 18px rgba(37,99,235,0.18)",
+    boxSizing: "border-box",
   },
 
   bottomCta: {
@@ -599,6 +695,10 @@ const styles = {
     boxShadow:
       "0 18px 40px rgba(37,99,235,0.20)",
     boxSizing: "border-box",
+  },
+
+  ctaContent: {
+    minWidth: 0,
   },
 
   ctaEyebrow: {
@@ -626,6 +726,7 @@ const styles = {
 
   ctaButton: {
     flexShrink: 0,
+    minHeight: "46px",
     padding: "13px 18px",
     borderRadius: "10px",
     background: "#ffffff",
@@ -635,6 +736,16 @@ const styles = {
     fontWeight: "850",
     boxShadow:
       "0 7px 18px rgba(0,0,0,0.12)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    boxSizing: "border-box",
+    whiteSpace: "nowrap",
+  },
+
+  ctaArrow: {
+    fontSize: "17px",
+    lineHeight: 1,
   },
 };
-
