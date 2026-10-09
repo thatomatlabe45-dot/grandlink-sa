@@ -52,7 +52,6 @@ export default function NewInternshipPage() {
         return;
       }
 
-      // Load the logged-in company's profile.
       const { data: companyData, error: companyError } =
         await supabase
           .from("companies")
@@ -67,19 +66,17 @@ export default function NewInternshipPage() {
       }
 
       if (!companyData) {
-        setError(
+        throw new Error(
           "Please complete your company profile before posting an internship."
         );
-        setLoading(false);
-        return;
       }
 
       setCompany({
         ...companyData,
         user_id: user.id,
+        login_email: user.email,
       });
 
-      // Verify the company's subscription.
       const { data: subscriptions, error: subscriptionError } =
         await supabase
           .from("company_subscriptions")
@@ -98,17 +95,15 @@ export default function NewInternshipPage() {
       );
 
       if (!activeSubscription) {
-        setError(
-          "An active paid subscription is required to post internships. Please view our company plans."
+        throw new Error(
+          "An active paid subscription is required to post internships."
         );
-        setLoading(false);
-        return;
       }
 
       setSubscription(activeSubscription);
-      setLoading(false);
     } catch (err) {
-      setError(err.message || "Something went wrong. Please try again.");
+      setError(err.message || "Something went wrong.");
+    } finally {
       setLoading(false);
     }
   }
@@ -148,7 +143,14 @@ export default function NewInternshipPage() {
       return;
     }
 
-    if (form.deadline < new Date().toISOString().slice(0, 10)) {
+    const today = new Date();
+    const localToday = new Date(
+      today.getTime() - today.getTimezoneOffset() * 60000
+    )
+      .toISOString()
+      .slice(0, 10);
+
+    if (form.deadline < localToday) {
       setError("The application deadline cannot be in the past.");
       return;
     }
@@ -162,10 +164,12 @@ export default function NewInternshipPage() {
       } = await supabase.auth.getUser();
 
       if (authError || !user) {
-        throw new Error("Your session has expired. Please log in again.");
+        throw new Error(
+          "Your session has expired. Please log in again."
+        );
       }
 
-      // Recheck the subscription immediately before saving.
+      // Recheck the subscription before inserting the listing.
       const { data: subscriptions, error: subscriptionError } =
         await supabase
           .from("company_subscriptions")
@@ -184,6 +188,7 @@ export default function NewInternshipPage() {
       );
 
       if (!activeSubscription) {
+        setSubscription(null);
         throw new Error(
           "Your subscription is not active. Please check your company plans."
         );
@@ -193,7 +198,8 @@ export default function NewInternshipPage() {
         user_id: user.id,
         job_title: form.job_title.trim(),
         company_name: company.company_name,
-        company_email: company.company_email || user.email,
+        company_email:
+          company.company_email || user.email || "",
         company_website: company.company_website || "",
         province: form.province,
         location: form.location.trim(),
@@ -213,212 +219,209 @@ export default function NewInternshipPage() {
       if (insertError) {
         console.error("Internship insert error:", insertError);
 
+        if (insertError.code === "42501") {
+          throw new Error(
+            "Your account does not have permission to publish this internship. Please check the internships table security policies."
+          );
+        }
+
         throw new Error(
-          "We could not publish your internship. Please check your database permissions and try again."
+          insertError.message ||
+            "We could not publish your internship. Please try again."
         );
       }
 
-      setSuccess("Your internship has been published successfully!");
+      setSuccess(
+        "Your internship has been published successfully!"
+      );
 
       setTimeout(() => {
         router.push("/company-dashboard");
         router.refresh();
       }, 1200);
     } catch (err) {
-      setError(err.message || "Unable to publish your internship.");
+      setError(
+        err.message || "Unable to publish your internship."
+      );
     } finally {
       setSaving(false);
     }
   }
 
-  const inputStyle = {
-    width: "100%",
-    padding: "13px 14px",
-    border: "1px solid #d7e0ed",
-    borderRadius: "10px",
-    fontSize: "15px",
-    color: "#172b4d",
-    background: "#ffffff",
-    outline: "none",
-    boxSizing: "border-box",
-  };
-
-  const labelStyle = {
-    display: "block",
-    marginBottom: "7px",
-    fontSize: "14px",
-    fontWeight: 700,
-    color: "#263b59",
-  };
-
-  function Field({ label, name, required = false, children }) {
-    return (
-      <div style={{ marginBottom: "20px" }}>
-        <label htmlFor={name} style={labelStyle}>
-          {label}
-          {required && <span style={{ color: "#dc2626" }}> *</span>}
-        </label>
-        {children}
-      </div>
-    );
-  }
+  const today = new Date();
+  const minimumDeadline = new Date(
+    today.getTime() - today.getTimezoneOffset() * 60000
+  )
+    .toISOString()
+    .slice(0, 10);
 
   if (loading) {
     return (
-      <main style={styles.page}>
-        <div style={styles.loadingCard}>
-          <div style={styles.spinner} />
-          <h2 style={{ marginBottom: 8 }}>Preparing your workspace</h2>
-          <p style={{ color: "#64748b", margin: 0 }}>
+      <main className="page loading-page">
+        <div className="loading-card">
+          <div className="spinner" />
+          <h2>Preparing your workspace</h2>
+          <p>
             Checking your company profile and subscription...
           </p>
         </div>
+
+        <style jsx global>{globalStyles}</style>
       </main>
     );
   }
 
   if (error && (!company || !subscription)) {
+    const subscriptionProblem =
+      error.toLowerCase().includes("subscription");
+
+    const profileProblem =
+      error.toLowerCase().includes("company profile");
+
     return (
-      <main style={styles.page}>
-        <div style={styles.loadingCard}>
-          <div style={styles.errorIcon}>!</div>
-          <h2 style={{ color: "#172b4d" }}>
-            Unable to open internship posting
-          </h2>
+      <main className="page loading-page">
+        <div className="loading-card">
+          <div className="error-icon">!</div>
 
-          <p style={{ color: "#64748b", lineHeight: 1.7 }}>
-            {error}
-          </p>
+          <h2>We need to check something</h2>
 
-          <div style={styles.buttonRow}>
-            {error.toLowerCase().includes("subscription") ||
-            error.toLowerCase().includes("paid subscription") ? (
-              <Link href="/company-pricing" style={styles.primaryButton}>
+          <p className="notice-text">{error}</p>
+
+          <div className="action-stack">
+            {subscriptionProblem ? (
+              <Link
+                href="/company-pricing"
+                className="primary-button"
+              >
                 View Company Plans
+              </Link>
+            ) : profileProblem ? (
+              <Link
+                href="/company"
+                className="primary-button"
+              >
+                Complete Company Profile
               </Link>
             ) : (
               <button
+                type="button"
                 onClick={checkAccess}
-                style={styles.primaryButton}
+                className="primary-button"
               >
                 Try Again
               </button>
             )}
 
-            <Link href="/company-dashboard" style={styles.secondaryButton}>
-              Dashboard
+            <Link
+              href="/company-dashboard"
+              className="secondary-button"
+            >
+              Return to Dashboard
             </Link>
           </div>
         </div>
+
+        <style jsx global>{globalStyles}</style>
       </main>
     );
   }
 
   return (
-    <main style={styles.page}>
-      <header style={styles.header}>
-        <Link href="/company-dashboard" style={styles.brand}>
-          <span style={styles.brandIcon}>G</span>
-          <span>
+    <main className="page">
+      <header className="topbar">
+        <Link href="/company-dashboard" className="brand">
+          <span className="brand-icon">G</span>
+
+          <span className="brand-text">
             <strong>GradLink</strong>
-            <small> SOUTH AFRICA</small>
+            <small>SOUTH AFRICA</small>
           </span>
         </Link>
 
-        <Link href="/company-dashboard" style={styles.backLink}>
+        <Link
+          href="/company-dashboard"
+          className="back-link"
+        >
           ← Dashboard
         </Link>
       </header>
 
-      <section style={styles.hero}>
-        <div style={styles.heroBadge}>COMPANY RECRUITMENT</div>
+      <section className="hero">
+        <div className="hero-badge">
+          COMPANY RECRUITMENT
+        </div>
 
-        <h1 style={styles.title}>Post an internship</h1>
+        <h1>Post an internship</h1>
 
-        <p style={styles.subtitle}>
-          Connect your organisation with talented South African graduates.
-          Create a clear opportunity and start finding your next candidate.
+        <p className="hero-description">
+          Connect your organisation with talented South African
+          graduates. Publish an opportunity and start finding
+          your next candidate.
         </p>
 
-        <div style={styles.trustRow}>
-          <span>✓ Verified company access</span>
+        <div className="trust-row">
+          <span>✓ Company access</span>
           <span>✓ Graduate applications</span>
           <span>✓ Candidate matching</span>
         </div>
       </section>
 
-      <div style={styles.content}>
-        <aside style={styles.sidePanel}>
-          <div style={styles.planIcon}>✓</div>
-
-          <h3>Subscription active</h3>
-
-          <p>
-            Your company is ready to publish internship opportunities.
-          </p>
-
-          <div style={styles.planDivider} />
-
-          <span style={styles.smallLabel}>CURRENT PLAN</span>
-
-          <strong style={styles.planName}>
-            {subscription?.plan || "Company plan"}
-          </strong>
-
-          <span style={styles.activeStatus}>● Active</span>
-
-          <div style={styles.tipBox}>
-            <strong>Make your listing stand out</strong>
-            <p>
-              Include the qualification requirements, responsibilities,
-              application deadline and skills candidates need.
-            </p>
-          </div>
-        </aside>
-
-        <section style={styles.formCard}>
-          <div style={styles.formHeading}>
+      <div className="content">
+        <section className="form-card">
+          <div className="form-heading">
             <div>
               <h2>Internship details</h2>
-              <p>Fields marked with * are required.</p>
+              <p>
+                Tell graduates about the opportunity.
+                Fields marked * are required.
+              </p>
             </div>
-            <span style={styles.secureTag}>Secure posting</span>
+
+            <span className="secure-tag">
+              Secure posting
+            </span>
           </div>
 
           {error && (
-            <div style={styles.errorMessage}>
+            <div className="message error-message">
               {error}
             </div>
           )}
 
           {success && (
-            <div style={styles.successMessage}>
+            <div className="message success-message">
               {success}
             </div>
           )}
 
           <form onSubmit={handleSubmit}>
-            <Field label="Internship title" name="job_title" required>
+            <div className="field">
+              <label htmlFor="job_title">
+                Internship title *
+              </label>
+
               <input
                 id="job_title"
                 name="job_title"
                 value={form.job_title}
                 onChange={updateField}
                 placeholder="e.g. Software Development Intern"
-                style={inputStyle}
                 maxLength={150}
                 required
               />
-            </Field>
+            </div>
 
-            <div style={styles.twoColumns}>
-              <Field label="Province" name="province" required>
+            <div className="field-grid">
+              <div className="field">
+                <label htmlFor="province">
+                  Province *
+                </label>
+
                 <select
                   id="province"
                   name="province"
                   value={form.province}
                   onChange={updateField}
-                  style={inputStyle}
                   required
                 >
                   <option value="">Select province</option>
@@ -433,495 +436,817 @@ export default function NewInternshipPage() {
                   <option>Western Cape</option>
                   <option>Remote</option>
                 </select>
-              </Field>
+              </div>
 
-              <Field label="City or work location" name="location" required>
+              <div className="field">
+                <label htmlFor="location">
+                  City or work location *
+                </label>
+
                 <input
                   id="location"
                   name="location"
                   value={form.location}
                   onChange={updateField}
                   placeholder="e.g. Johannesburg"
-                  style={inputStyle}
+                  maxLength={200}
                   required
                 />
-              </Field>
+              </div>
             </div>
 
-            <div style={styles.twoColumns}>
-              <Field label="Opportunity type" name="internship_type" required>
+            <div className="field-grid">
+              <div className="field">
+                <label htmlFor="internship_type">
+                  Opportunity type *
+                </label>
+
                 <select
                   id="internship_type"
                   name="internship_type"
                   value={form.internship_type}
                   onChange={updateField}
-                  style={inputStyle}
                   required
                 >
                   <option value="Internship">Internship</option>
-                  <option value="Graduate Programme">Graduate Programme</option>
+                  <option value="Graduate Programme">
+                    Graduate Programme
+                  </option>
                   <option value="Learnership">Learnership</option>
-                  <option value="Work Experience">Work Experience</option>
-                  <option value="Remote Internship">Remote Internship</option>
+                  <option value="Work Experience">
+                    Work Experience
+                  </option>
+                  <option value="Remote Internship">
+                    Remote Internship
+                  </option>
                 </select>
-              </Field>
+              </div>
 
-              <Field label="Stipend or salary" name="stipend">
+              <div className="field">
+                <label htmlFor="stipend">
+                  Stipend or salary
+                </label>
+
                 <input
                   id="stipend"
                   name="stipend"
                   value={form.stipend}
                   onChange={updateField}
                   placeholder="e.g. R5,000 per month"
-                  style={inputStyle}
                   maxLength={100}
                 />
-              </Field>
+              </div>
             </div>
 
-            <Field label="Minimum qualification" name="qualification" required>
+            <div className="field">
+              <label htmlFor="qualification">
+                Minimum qualification *
+              </label>
+
               <input
                 id="qualification"
                 name="qualification"
                 value={form.qualification}
                 onChange={updateField}
                 placeholder="e.g. Diploma, Degree or N6"
-                style={inputStyle}
-                required
                 maxLength={200}
+                required
               />
-            </Field>
+            </div>
 
-            <Field label="Field of study" name="field_of_study" required>
+            <div className="field">
+              <label htmlFor="field_of_study">
+                Field of study *
+              </label>
+
               <input
                 id="field_of_study"
                 name="field_of_study"
                 value={form.field_of_study}
                 onChange={updateField}
                 placeholder="e.g. Information Technology"
-                style={inputStyle}
-                required
                 maxLength={200}
+                required
               />
-            </Field>
+            </div>
 
-            <Field label="Application deadline" name="deadline" required>
+            <div className="field">
+              <label htmlFor="deadline">
+                Application deadline *
+              </label>
+
               <input
                 id="deadline"
                 name="deadline"
                 type="date"
                 value={form.deadline}
+                min={minimumDeadline}
                 onChange={updateField}
-                min={new Date().toISOString().slice(0, 10)}
-                style={inputStyle}
                 required
               />
-            </Field>
+            </div>
 
-            <Field label="Required skills" name="skills">
+            <div className="field">
+              <label htmlFor="skills">
+                Required skills
+              </label>
+
               <textarea
                 id="skills"
                 name="skills"
                 value={form.skills}
                 onChange={updateField}
-                placeholder="e.g. Microsoft Excel, communication, Python, teamwork"
+                placeholder="e.g. Excel, communication, Python, teamwork"
                 rows={3}
-                style={{
-                  ...inputStyle,
-                  resize: "vertical",
-                  lineHeight: 1.6,
-                }}
                 maxLength={2000}
               />
-              <small style={styles.helperText}>
-                Separate skills with commas to help graduates understand
-                what you are looking for.
-              </small>
-            </Field>
 
-            <Field label="Internship description and responsibilities" name="description" required>
+              <small className="helper-text">
+                Separate skills with commas to help graduates
+                understand your requirements.
+              </small>
+            </div>
+
+            <div className="field">
+              <label htmlFor="description">
+                Description and responsibilities *
+              </label>
+
               <textarea
                 id="description"
                 name="description"
                 value={form.description}
                 onChange={updateField}
-                placeholder="Describe the opportunity, responsibilities, requirements and how the successful candidate will learn and contribute..."
+                placeholder="Describe the opportunity, responsibilities, requirements and what the successful candidate will learn..."
                 rows={7}
-                style={{
-                  ...inputStyle,
-                  resize: "vertical",
-                  lineHeight: 1.7,
-                }}
-                required
                 maxLength={10000}
+                required
               />
-            </Field>
+            </div>
 
-            <div style={styles.formFooter}>
+            <div className="form-footer">
               <p>
-                By publishing, you confirm that the opportunity details
-                are accurate and that your organisation is authorised to
-                advertise this opportunity.
+                Please confirm that the opportunity details
+                are accurate and that your organisation is
+                authorised to advertise this opportunity.
               </p>
 
               <button
                 type="submit"
                 disabled={saving}
-                style={{
-                  ...styles.publishButton,
-                  opacity: saving ? 0.7 : 1,
-                  cursor: saving ? "wait" : "pointer",
-                }}
+                className="publish-button"
               >
-                {saving ? "Publishing internship..." : "Publish Internship →"}
+                {saving
+                  ? "Publishing internship..."
+                  : "Publish Internship →"}
               </button>
 
               <Link
                 href="/company-dashboard"
-                style={styles.cancelLink}
+                className="cancel-link"
               >
                 Cancel and return to dashboard
               </Link>
             </div>
           </form>
         </section>
+
+        <aside className="side-panel">
+          <div className="plan-icon">✓</div>
+
+          <h3>Subscription active</h3>
+
+          <p>
+            Your company subscription is active.
+            You can submit an internship listing.
+          </p>
+
+          <div className="divider" />
+
+          <span className="small-label">CURRENT PLAN</span>
+
+          <strong className="plan-name">
+            {subscription?.plan || "Company plan"}
+          </strong>
+
+          <span className="active-status">
+            ● Active
+          </span>
+
+          <div className="tip-box">
+            <strong>Tips for a strong listing</strong>
+
+            <p>
+              Be specific about qualifications, responsibilities,
+              required skills and the application deadline.
+              Clear listings help graduates decide whether
+              to apply.
+            </p>
+          </div>
+
+          <Link
+            href="/company-dashboard"
+            className="panel-link"
+          >
+            Back to company dashboard →
+          </Link>
+        </aside>
       </div>
 
-      <footer style={styles.footer}>
-        © {new Date().getFullYear()} GradLink SA · Connecting graduates
-        with opportunity.
+      <footer className="footer">
+        © {new Date().getFullYear()} GradLink SA · Connecting
+        South African graduates with opportunity.
       </footer>
+
+      <style jsx global>{globalStyles}</style>
     </main>
   );
 }
 
-const styles = {
-  page: {
-    minHeight: "100vh",
-    background: "#f3f7fc",
-    color: "#172b4d",
-    fontFamily:
-      "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
-    paddingBottom: 40,
-  },
+const globalStyles = `
+  * {
+    box-sizing: border-box;
+  }
 
-  header: {
-    minHeight: 76,
-    padding: "14px clamp(18px, 5vw, 64px)",
-    background: "#ffffff",
-    borderBottom: "1px solid #e6edf6",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 16,
-  },
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    max-width: 100%;
+  }
 
-  brand: {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    color: "#123b77",
-    textDecoration: "none",
-    fontSize: 19,
-  },
+  body {
+    overflow-x: hidden;
+  }
 
-  brandIcon: {
-    display: "grid",
-    placeItems: "center",
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    color: "#ffffff",
-    background: "linear-gradient(135deg, #1262d6, #073779)",
-    fontSize: 23,
-    fontWeight: 900,
-  },
+  .page {
+    width: 100%;
+    min-height: 100vh;
+    overflow-x: clip;
+    background: #f3f7fc;
+    color: #172b4d;
+    font-family: Inter, -apple-system, BlinkMacSystemFont,
+      "Segoe UI", sans-serif;
+    padding-bottom: 30px;
+  }
 
-  backLink: {
-    color: "#1758ad",
-    fontSize: 14,
-    fontWeight: 700,
-    textDecoration: "none",
-  },
+  .topbar {
+    width: 100%;
+    min-height: 72px;
+    padding: 12px clamp(14px, 4vw, 52px);
+    background: #fff;
+    border-bottom: 1px solid #e4ebf5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
 
-  hero: {
-    padding: "48px 20px 35px",
-    textAlign: "center",
-    color: "#ffffff",
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    text-decoration: none;
+    color: #123b77;
+    min-width: 0;
+  }
+
+  .brand-icon {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    color: #fff;
+    background: linear-gradient(135deg, #1767d8, #073779);
+    font-size: 22px;
+    font-weight: 900;
+  }
+
+  .brand-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .brand-text strong {
+    font-size: 18px;
+  }
+
+  .brand-text small {
+    font-size: 9px;
+    letter-spacing: 1.2px;
+  }
+
+  .back-link {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1758ad;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .hero {
+    width: 100%;
+    padding: 38px 18px 30px;
+    text-align: center;
+    color: #fff;
     background:
-      "radial-gradient(circle at 85% 10%, #2878df 0, transparent 35%), linear-gradient(125deg, #092b5d, #1156a8)",
-  },
+      radial-gradient(circle at 85% 10%, #2878df 0, transparent 35%),
+      linear-gradient(125deg, #092b5d, #1156a8);
+  }
 
-  heroBadge: {
-    display: "inline-block",
-    padding: "8px 13px",
-    border: "1px solid rgba(255,255,255,.3)",
-    borderRadius: 30,
-    color: "#e3efff",
-    fontSize: 11,
-    fontWeight: 800,
-    letterSpacing: 1.3,
-  },
+  .hero-badge {
+    display: inline-block;
+    max-width: 100%;
+    padding: 7px 12px;
+    border: 1px solid rgba(255,255,255,.35);
+    border-radius: 30px;
+    color: #e3efff;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1px;
+  }
 
-  title: {
-    fontSize: "clamp(30px, 5vw, 43px)",
-    lineHeight: 1.15,
-    margin: "19px 0 12px",
-    fontWeight: 850,
-  },
+  .hero h1 {
+    margin: 17px 0 12px;
+    font-size: clamp(28px, 7vw, 42px);
+    line-height: 1.16;
+    font-weight: 850;
+    overflow-wrap: anywhere;
+  }
 
-  subtitle: {
-    maxWidth: 670,
-    margin: "0 auto",
-    color: "#dbeafe",
-    lineHeight: 1.8,
-    fontSize: 15,
-  },
+  .hero-description {
+    max-width: 650px;
+    margin: 0 auto;
+    color: #dbeafe;
+    font-size: 14px;
+    line-height: 1.8;
+  }
 
-  trustRow: {
-    display: "flex",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: "12px 24px",
-    marginTop: 23,
-    fontSize: 12,
-    color: "#e8f2ff",
-  },
+  .trust-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px 18px;
+    margin-top: 20px;
+    color: #e8f2ff;
+    font-size: 11px;
+  }
 
-  content: {
-    width: "min(1120px, calc(100% - 32px))",
-    margin: "32px auto",
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 280px) minmax(0, 1fr)",
-    alignItems: "start",
-    gap: 22,
-  },
+  .content {
+    width: 100%;
+    max-width: 1120px;
+    padding: 0 16px;
+    margin: 24px auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 270px;
+    align-items: start;
+    gap: 18px;
+  }
 
-  sidePanel: {
-    padding: 24,
-    borderRadius: 18,
-    background: "#ffffff",
-    border: "1px solid #e1eaf5",
-    boxShadow: "0 8px 28px rgba(20, 50, 90, .045)",
-  },
+  .form-card,
+  .side-panel {
+    min-width: 0;
+    width: 100%;
+    background: #fff;
+    border: 1px solid #e1eaf5;
+    border-radius: 16px;
+    box-shadow: 0 7px 25px rgba(20, 50, 90, .045);
+  }
 
-  planIcon: {
-    width: 43,
-    height: 43,
-    borderRadius: 14,
-    display: "grid",
-    placeItems: "center",
-    background: "#e3f7ee",
-    color: "#087443",
-    fontSize: 23,
-    fontWeight: 900,
-  },
+  .form-card {
+    padding: clamp(16px, 3vw, 30px);
+  }
 
-  planDivider: {
-    height: 1,
-    background: "#e8eef6",
-    margin: "21px 0",
-  },
+  .form-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-bottom: 20px;
+    margin-bottom: 23px;
+    border-bottom: 1px solid #e8eef6;
+  }
 
-  smallLabel: {
-    display: "block",
-    fontSize: 10,
-    fontWeight: 800,
-    letterSpacing: 1.2,
-    color: "#71839c",
-    marginBottom: 7,
-  },
+  .form-heading h2 {
+    margin: 0 0 8px;
+    font-size: 22px;
+    line-height: 1.3;
+  }
 
-  planName: {
-    display: "block",
-    fontSize: 19,
-    marginBottom: 10,
-    overflowWrap: "anywhere",
-  },
+  .form-heading p {
+    margin: 0;
+    color: #687b94;
+    font-size: 13px;
+    line-height: 1.6;
+  }
 
-  activeStatus: {
-    display: "inline-block",
-    borderRadius: 30,
-    background: "#e4f8ed",
-    color: "#087443",
-    padding: "7px 10px",
-    fontSize: 12,
-    fontWeight: 800,
-  },
+  .secure-tag {
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #edf5ff;
+    color: #1758ad;
+    font-size: 10px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
 
-  tipBox: {
-    background: "#f0f6ff",
-    border: "1px solid #dbe9ff",
-    borderRadius: 13,
-    padding: 16,
-    marginTop: 24,
-    lineHeight: 1.7,
-    fontSize: 13,
-    color: "#38516f",
-  },
+  .field {
+    min-width: 0;
+    width: 100%;
+    margin-bottom: 19px;
+  }
 
-  formCard: {
-    minWidth: 0,
-    padding: "clamp(18px, 4vw, 34px)",
-    background: "#ffffff",
-    border: "1px solid #e1eaf5",
-    borderRadius: 18,
-    boxShadow: "0 8px 28px rgba(20, 50, 90, .045)",
-  },
+  .field-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
 
-  formHeading: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 12,
-    flexWrap: "wrap",
-    paddingBottom: 22,
-    marginBottom: 24,
-    borderBottom: "1px solid #e8eef6",
-  },
+  .field label {
+    display: block;
+    margin-bottom: 7px;
+    color: #263b59;
+    font-size: 13px;
+    font-weight: 750;
+    line-height: 1.5;
+  }
 
-  secureTag: {
-    background: "#edf5ff",
-    color: "#1758ad",
-    borderRadius: 8,
-    padding: "8px 10px",
-    fontSize: 11,
-    fontWeight: 800,
-  },
+  .field input,
+  .field select,
+  .field textarea {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding: 13px 12px;
+    border: 1px solid #d7e0ed;
+    border-radius: 10px;
+    outline: none;
+    background: #fff;
+    color: #172b4d;
+    font-family: inherit;
+    font-size: 16px;
+    line-height: 1.5;
+    box-shadow: none;
+  }
 
-  twoColumns: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: 16,
-  },
+  .field input,
+  .field select {
+    min-height: 48px;
+  }
 
-  helperText: {
-    display: "block",
-    marginTop: 7,
-    color: "#72839a",
-    fontSize: 12,
-    lineHeight: 1.6,
-  },
+  .field textarea {
+    resize: vertical;
+    min-height: 100px;
+  }
 
-  formFooter: {
-    borderTop: "1px solid #e8eef6",
-    paddingTop: 20,
-    marginTop: 8,
-  },
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus {
+    border-color: #2473d4;
+    box-shadow: 0 0 0 3px rgba(36, 115, 212, .11);
+  }
 
-  publishButton: {
-    width: "100%",
-    border: 0,
-    borderRadius: 11,
-    padding: "16px 18px",
-    background: "linear-gradient(120deg, #1767d8, #104797)",
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: 800,
-    boxShadow: "0 7px 18px rgba(23, 103, 216, .2)",
-  },
+  .helper-text {
+    display: block;
+    margin-top: 7px;
+    color: #72839a;
+    font-size: 12px;
+    line-height: 1.6;
+  }
 
-  cancelLink: {
-    display: "block",
-    textAlign: "center",
-    marginTop: 17,
-    fontSize: 13,
-    color: "#526781",
-    textDecoration: "none",
-  },
+  .form-footer {
+    border-top: 1px solid #e8eef6;
+    padding-top: 18px;
+    margin-top: 8px;
+  }
 
-  errorMessage: {
-    background: "#fff1f1",
-    border: "1px solid #fecaca",
-    color: "#b42318",
-    padding: 13,
-    borderRadius: 10,
-    marginBottom: 20,
-    fontSize: 14,
-    lineHeight: 1.6,
-  },
+  .form-footer > p {
+    margin: 0 0 18px;
+    color: #687b94;
+    font-size: 12px;
+    line-height: 1.7;
+  }
 
-  successMessage: {
-    background: "#e9f9f0",
-    border: "1px solid #b7ebcb",
-    color: "#087443",
-    padding: 13,
-    borderRadius: 10,
-    marginBottom: 20,
-    fontSize: 14,
-    lineHeight: 1.6,
-  },
+  .publish-button,
+  .primary-button,
+  .secondary-button {
+    display: flex;
+    width: 100%;
+    min-height: 48px;
+    padding: 13px 15px;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border: 0;
+    border-radius: 10px;
+    text-decoration: none;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+  }
 
-  loadingCard: {
-    width: "min(480px, calc(100% - 36px))",
-    margin: "12vh auto",
-    background: "#ffffff",
-    border: "1px solid #e1eaf5",
-    borderRadius: 18,
-    padding: "34px 24px",
-    textAlign: "center",
-    boxShadow: "0 12px 40px rgba(20, 50, 90, .08)",
-    lineHeight: 1.7,
-  },
+  .publish-button,
+  .primary-button {
+    color: #fff;
+    background: linear-gradient(120deg, #1767d8, #104797);
+  }
 
-  spinner: {
-    width: 36,
-    height: 36,
-    margin: "0 auto 20px",
-    border: "4px solid #dbeafe",
-    borderTop: "4px solid #1767d8",
-    borderRadius: "50%",
-    animation: "gradlinkSpin 1s linear infinite",
-  },
+  .publish-button:disabled {
+    opacity: .65;
+    cursor: wait;
+  }
 
-  errorIcon: {
-    display: "grid",
-    placeItems: "center",
-    width: 46,
-    height: 46,
-    margin: "0 auto 15px",
-    borderRadius: "50%",
-    background: "#fff1f1",
-    color: "#b42318",
-    fontSize: 24,
-    fontWeight: 900,
-  },
+  .secondary-button {
+    color: #254263;
+    background: #eff4fa;
+  }
 
-  buttonRow: {
-    display: "flex",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 10,
-    marginTop: 22,
-  },
+  .cancel-link {
+    display: block;
+    margin-top: 16px;
+    text-align: center;
+    color: #526781;
+    font-size: 13px;
+    line-height: 1.6;
+    text-decoration: none;
+  }
 
-  primaryButton: {
-    display: "inline-block",
-    padding: "12px 16px",
-    borderRadius: 10,
-    background: "#1459b5",
-    color: "#ffffff",
-    textDecoration: "none",
-    border: 0,
-    fontSize: 14,
-    fontWeight: 800,
-  },
+  .side-panel {
+    padding: 22px;
+  }
 
-  secondaryButton: {
-    display: "inline-block",
-    padding: "12px 16px",
-    borderRadius: 10,
-    background: "#eff4fa",
-    color: "#254263",
-    textDecoration: "none",
-    fontSize: 14,
-    fontWeight: 800,
-  },
+  .plan-icon {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    background: #e3f7ee;
+    color: #087443;
+    font-size: 22px;
+    font-weight: 900;
+  }
 
-  footer: {
-    textAlign: "center",
-    padding: "0 20px",
-    color: "#75859b",
-    fontSize: 12,
-  },
-};
+  .side-panel h3 {
+    margin: 16px 0 8px;
+    font-size: 18px;
+  }
+
+  .side-panel > p {
+    margin: 0;
+    color: #687b94;
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+  }
+
+  .divider {
+    height: 1px;
+    margin: 20px 0;
+    background: #e8eef6;
+  }
+
+  .small-label {
+    display: block;
+    margin-bottom: 7px;
+    color: #71839c;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1px;
+  }
+
+  .plan-name {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 18px;
+    overflow-wrap: anywhere;
+  }
+
+  .active-status {
+    display: inline-block;
+    padding: 7px 10px;
+    border-radius: 30px;
+    background: #e4f8ed;
+    color: #087443;
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .tip-box {
+    margin-top: 22px;
+    padding: 14px;
+    border: 1px solid #dbe9ff;
+    border-radius: 12px;
+    background: #f0f6ff;
+    color: #38516f;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+
+  .tip-box p {
+    margin: 7px 0 0;
+  }
+
+  .panel-link {
+    display: block;
+    margin-top: 18px;
+    color: #1758ad;
+    font-size: 12px;
+    font-weight: 750;
+    line-height: 1.7;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+  }
+
+  .message {
+    margin-bottom: 18px;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+  }
+
+  .error-message {
+    border: 1px solid #fecaca;
+    background: #fff1f1;
+    color: #b42318;
+  }
+
+  .success-message {
+    border: 1px solid #b7ebcb;
+    background: #e9f9f0;
+    color: #087443;
+  }
+
+  .footer {
+    padding: 0 18px;
+    color: #75859b;
+    text-align: center;
+    font-size: 11px;
+    line-height: 1.7;
+  }
+
+  .loading-page {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 12vh 16px 30px;
+  }
+
+  .loading-card {
+    width: 100%;
+    max-width: 450px;
+    padding: 28px 20px;
+    border: 1px solid #e1eaf5;
+    border-radius: 16px;
+    background: #fff;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(20, 50, 90, .08);
+  }
+
+  .loading-card h2 {
+    margin: 0 0 10px;
+    font-size: 21px;
+    line-height: 1.4;
+  }
+
+  .loading-card > p {
+    color: #64748b;
+    font-size: 14px;
+    line-height: 1.8;
+    overflow-wrap: anywhere;
+  }
+
+  .notice-text {
+    margin: 12px 0 20px;
+  }
+
+  .spinner {
+    width: 35px;
+    height: 35px;
+    margin: 0 auto 20px;
+    border: 4px solid #dbeafe;
+    border-top-color: #1767d8;
+    border-radius: 50%;
+    animation: gradlinkSpin 1s linear infinite;
+  }
+
+  .error-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 15px;
+    border-radius: 50%;
+    background: #fff1f1;
+    color: #b42318;
+    font-size: 23px;
+    font-weight: 900;
+  }
+
+  .action-stack {
+    display: grid;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  @keyframes gradlinkSpin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (max-width: 760px) {
+    .content {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 16px;
+      padding: 0 12px;
+      margin: 18px auto;
+    }
+
+    .form-card {
+      padding: 18px 14px;
+      border-radius: 14px;
+    }
+
+    .side-panel {
+      padding: 18px;
+      border-radius: 14px;
+    }
+
+    .hero {
+      padding: 30px 16px 26px;
+    }
+
+    .trust-row {
+      gap: 9px 13px;
+      font-size: 10px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .topbar {
+      min-height: 64px;
+      padding: 10px 12px;
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+    }
+
+    .brand-text strong {
+      font-size: 16px;
+    }
+
+    .brand-text small {
+      font-size: 8px;
+    }
+
+    .back-link {
+      font-size: 12px;
+    }
+
+    .hero h1 {
+      font-size: 30px;
+    }
+
+    .hero-description {
+      font-size: 13px;
+    }
+
+    .field-grid {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0;
+    }
+
+    .form-heading h2 {
+      font-size: 20px;
+    }
+
+    .secure-tag {
+      white-space: normal;
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
+      font-size: 16px;
+    }
+
+    .publish-button {
+      padding: 14px 10px;
+      font-size: 13px;
+    }
+  }
+`;
