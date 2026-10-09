@@ -864,7 +864,7 @@ export default function CompanyDashboard() {
             </Link>
 
             <Link
-              href="/internships"
+              href="/company/internships/new"
               style={primaryNavButton}
             >
               + Post Internship
