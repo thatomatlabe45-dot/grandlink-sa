@@ -117,11 +117,11 @@ export default function SiteHeader() {
             </Link>
 
             <Link
-              href="/company"
-              className={isActive("/company") ? "active" : ""}
-            >
-              For Companies
-            </Link>
+  href="/company-solutions"
+  className={isActive("/company-solutions") ? "active" : ""}
+>
+  For Companies
+</Link>
 
             {user ? (
               <>
