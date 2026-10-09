@@ -293,7 +293,7 @@ export default function CompanyPage() {
         error: subscriptionError,
       } = await supabase
         .from("company_subscriptions")
-        .select("id, status, plan, amount")
+        .select("id, status, plan, monthly_price, created_at")
         .eq("company_id", user.id)
         .ilike("status", "active")
         .order("created_at", { ascending: false })
