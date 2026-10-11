@@ -3,24 +3,20 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../../lib/supabase";
+import { supabase } from "../lib/supabase";
 
 export default function Navbar() {
   const router = useRouter();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobile, setMobile] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(null);
   const [profileType, setProfileType] = useState(null);
-  const [loadingProfile, setLoadingProfile] = useState(true);
-
-  // ========================================
-  // CHECK SCREEN SIZE
-  // ========================================
 
   useEffect(() => {
     function updateScreen() {
       const isMobile = window.innerWidth <= 768;
-
       setMobile(isMobile);
 
       if (!isMobile) {
@@ -29,222 +25,129 @@ export default function Navbar() {
     }
 
     updateScreen();
-
     window.addEventListener("resize", updateScreen);
 
-    return () => {
-      window.removeEventListener(
-        "resize",
-        updateScreen
-      );
-    };
+    return () => window.removeEventListener("resize", updateScreen);
   }, []);
 
-  // ========================================
-  // CHECK LOGGED-IN USER PROFILE TYPE
-  // ========================================
-
   useEffect(() => {
-    async function checkProfileType() {
-      try {
-        setLoadingProfile(true);
+    let mounted = true;
 
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
+    async function loadSession() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-        if (userError || !user) {
+      if (!mounted) return;
+
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        const savedProfile =
+          typeof window !== "undefined"
+            ? localStorage.getItem("gradlink_profile")
+            : null;
+
+        if (savedProfile) {
+          setProfileType(savedProfile);
+        } else {
           setProfileType(null);
-          setLoadingProfile(false);
-          return;
         }
-
-        // ------------------------------------
-        // CHECK COMPANY FIRST
-        // ------------------------------------
-
-        const {
-          data: company,
-          error: companyError,
-        } = await supabase
-          .from("companies")
-          .select("id")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (companyError) {
-          console.error(
-            "Navbar company check error:",
-            companyError
-          );
-        }
-
-        if (company) {
-          setProfileType("company");
-
-          localStorage.setItem(
-            "gradlink_profile",
-            "company"
-          );
-
-          setLoadingProfile(false);
-          return;
-        }
-
-        // ------------------------------------
-        // CHECK GRADUATE
-        // ------------------------------------
-
-        const {
-          data: graduate,
-          error: graduateError,
-        } = await supabase
-          .from("graduates")
-          .select("id")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (graduateError) {
-          console.error(
-            "Navbar graduate check error:",
-            graduateError
-          );
-        }
-
-        if (graduate) {
-          setProfileType("graduate");
-
-          localStorage.setItem(
-            "gradlink_profile",
-            "graduate"
-          );
-
-          setLoadingProfile(false);
-          return;
-        }
-
-        // ------------------------------------
-        // NO PROFILE YET
-        // ------------------------------------
-
+      } else {
         setProfileType(null);
-        setLoadingProfile(false);
-
-      } catch (error) {
-        console.error(
-          "Navbar profile check error:",
-          error
-        );
-
-        setProfileType(null);
-        setLoadingProfile(false);
       }
     }
 
-    checkProfileType();
+    loadSession();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
+
+      setUser(session?.user ?? null);
+
+      if (!session?.user) {
+        setProfileType(null);
+      } else {
+        const savedProfile = localStorage.getItem("gradlink_profile");
+        setProfileType(savedProfile || null);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // ========================================
-  // LOGOUT
-  // ========================================
+  async function handleGetStarted() {
+    if (loading) return;
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
-
-    localStorage.removeItem(
-      "gradlink_profile"
-    );
-
+    setLoading(true);
     setMenuOpen(false);
 
-    router.push("/login");
-  }
+    try {
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
 
-  // ========================================
-  // CLOSE MOBILE MENU
-  // ========================================
+      if (error) {
+        router.push("/login");
+        return;
+      }
+
+      if (!session?.user) {
+        router.push("/choose-profile");
+        return;
+      }
+
+      const savedProfile = localStorage.getItem("gradlink_profile");
+
+      if (savedProfile === "company") {
+        router.push("/company-dashboard");
+      } else if (savedProfile === "graduate") {
+        router.push("/graduate");
+      } else {
+        router.push("/choose-profile");
+      }
+    } catch (error) {
+      router.push("/login");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function closeMenu() {
     setMenuOpen(false);
   }
 
-  // ========================================
-  // NAVIGATION
-  // ========================================
-
   const navLink = {
     textDecoration: "none",
     color: "#1f2937",
     fontWeight: "600",
-    fontSize: "16px",
+    fontSize: "15px",
   };
 
-  // ========================================
-  // PROFILE LINK
-  // ========================================
+  const buttonStyle = {
+    background: "#0057b8",
+    color: "#fff",
+    border: "none",
+    padding: "12px 20px",
+    borderRadius: "10px",
+    cursor: loading ? "wait" : "pointer",
+    fontWeight: "700",
+    fontSize: "15px",
+    opacity: loading ? 0.7 : 1,
+  };
 
-  function ProfileLink() {
-    if (loadingProfile) {
-      return null;
-    }
-
-    // --------------------------------------
-    // COMPANY
-    // --------------------------------------
-
-    if (profileType === "company") {
-      return (
-        <>
-          <Link
-            href="/company-dashboard"
-            style={navLink}
-            onClick={closeMenu}
-          >
-            Company Dashboard
-          </Link>
-
-          <Link
-            href="/company"
-            style={navLink}
-            onClick={closeMenu}
-          >
-            Company Profile
-          </Link>
-        </>
-      );
-    }
-
-    // --------------------------------------
-    // GRADUATE
-    // --------------------------------------
-
-    if (profileType === "graduate") {
-      return (
-        <Link
-          href="/graduate"
-          style={navLink}
-          onClick={closeMenu}
-        >
-          My Profile
-        </Link>
-      );
-    }
-
-    // --------------------------------------
-    // NEW USER
-    // --------------------------------------
-
-    return (
-      <Link
-        href="/choose-profile"
-        style={navLink}
-        onClick={closeMenu}
-      >
-        Choose Profile
-      </Link>
-    );
-  }
+  const accountLabel =
+    user && profileType === "company"
+      ? "Company Dashboard"
+      : user && profileType === "graduate"
+      ? "Graduate Dashboard"
+      : "Get Started";
 
   return (
     <nav
@@ -253,29 +156,30 @@ export default function Navbar() {
         top: 0,
         zIndex: 1000,
         background: "#ffffff",
-        boxShadow:
-          "0 2px 15px rgba(0,0,0,.08)",
+        boxShadow: "0 2px 15px rgba(0,0,0,.08)",
       }}
     >
       <div
         style={{
           maxWidth: "1200px",
           margin: "0 auto",
-          padding: "16px 20px",
+          padding: "14px 20px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          gap: "16px",
         }}
       >
         <Link
           href="/"
+          onClick={closeMenu}
           style={{
             textDecoration: "none",
             color: "#0057b8",
-            fontSize: "clamp(24px,4vw,32px)",
+            fontSize: "clamp(23px,4vw,30px)",
             fontWeight: "800",
+            whiteSpace: "nowrap",
           }}
-          onClick={closeMenu}
         >
           GradLink SA
         </Link>
@@ -284,62 +188,72 @@ export default function Navbar() {
           <div
             style={{
               display: "flex",
-              gap: "28px",
+              gap: "22px",
               alignItems: "center",
+              flexWrap: "wrap",
             }}
           >
-            <Link
-              href="/"
-              style={navLink}
-            >
+            <Link href="/" style={navLink}>
               Home
             </Link>
 
-            <Link
-              href="/jobs"
-              style={navLink}
-            >
+            <Link href="/jobs" style={navLink}>
               Internships
             </Link>
 
-            <ProfileLink />
+            <Link href="/graduate" style={navLink}>
+              Graduates
+            </Link>
 
-            <Link
-              href="/admin"
-              style={navLink}
-            >
-              Admin
+            <Link href="/company" style={navLink}>
+              Companies
+            </Link>
+
+            {user && profileType === "company" && (
+              <Link href="/company-dashboard" style={navLink}>
+                Dashboard
+              </Link>
+            )}
+
+            {user && profileType === "graduate" && (
+              <Link href="/graduate" style={navLink}>
+                My Profile
+              </Link>
+            )}
+
+            <Link href="/terms" style={navLink}>
+              Terms
+            </Link>
+
+            <Link href="/privacy" style={navLink}>
+              Privacy
             </Link>
 
             <button
-              onClick={handleLogout}
-              style={{
-                background: "#dc2626",
-                color: "#fff",
-                border: "none",
-                padding: "12px 20px",
-                borderRadius: "10px",
-                cursor: "pointer",
-                fontWeight: "700",
-              }}
+              type="button"
+              onClick={handleGetStarted}
+              disabled={loading}
+              style={buttonStyle}
             >
-              Logout
+              {loading ? "Please wait..." : accountLabel}
             </button>
           </div>
         ) : (
           <button
-            onClick={() =>
-              setMenuOpen(!menuOpen)
-            }
+            type="button"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
             style={{
               border: "none",
               background: "none",
-              fontSize: "32px",
+              fontSize: "30px",
               cursor: "pointer",
               color: "#0057b8",
+              padding: "4px 8px",
             }}
           >
-            ☰
+            {menuOpen ? "✕" : "☰"}
           </button>
         )}
       </div>
@@ -349,53 +263,63 @@ export default function Navbar() {
           style={{
             borderTop: "1px solid #eee",
             background: "#fff",
-            padding: "15px 20px",
+            padding: "18px 20px 22px",
             display: "flex",
             flexDirection: "column",
-            gap: "16px",
+            gap: "18px",
           }}
         >
-          <Link
-            href="/"
-            style={navLink}
-            onClick={closeMenu}
-          >
+          <Link href="/" onClick={closeMenu} style={navLink}>
             Home
           </Link>
 
-          <Link
-            href="/jobs"
-            style={navLink}
-            onClick={closeMenu}
-          >
+          <Link href="/jobs" onClick={closeMenu} style={navLink}>
             Internships
           </Link>
 
-          <ProfileLink />
+          <Link href="/graduate" onClick={closeMenu} style={navLink}>
+            Graduates
+          </Link>
 
-          <Link
-            href="/admin"
-            style={navLink}
-            onClick={closeMenu}
-          >
-            Admin
+          <Link href="/company" onClick={closeMenu} style={navLink}>
+            Companies
+          </Link>
+
+          {user && profileType === "company" && (
+            <Link
+              href="/company-dashboard"
+              onClick={closeMenu}
+              style={navLink}
+            >
+              Company Dashboard
+            </Link>
+          )}
+
+          {user && profileType === "graduate" && (
+            <Link href="/graduate" onClick={closeMenu} style={navLink}>
+              My Profile
+            </Link>
+          )}
+
+          <Link href="/terms" onClick={closeMenu} style={navLink}>
+            Terms & Conditions
+          </Link>
+
+          <Link href="/privacy" onClick={closeMenu} style={navLink}>
+            Privacy Policy
           </Link>
 
           <button
-            onClick={handleLogout}
+            type="button"
+            onClick={handleGetStarted}
+            disabled={loading}
             style={{
+              ...buttonStyle,
               width: "100%",
-              background: "#dc2626",
-              color: "#fff",
-              border: "none",
               padding: "14px",
-              borderRadius: "10px",
-              fontWeight: "700",
-              cursor: "pointer",
-              fontSize: "16px",
             }}
           >
-            Logout
+            {loading ? "Please wait..." : accountLabel}
           </button>
         </div>
       )}
