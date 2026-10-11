@@ -553,15 +553,18 @@ export default function HomePage() {
             </div>
 
             <div className="cta-buttons">
-              <Link href="/signup" className="white-button">
-                Get Started
-                <span>→</span>
-              </Link>
+  <Link
+    href={user ? "/company-dashboard" : "/signup"}
+    className="white-button"
+  >
+    {user ? "Go to Dashboard" : "Get Started"}
+    <span>→</span>
+  </Link>
 
-              <Link href="/internships" className="cta-outline-button">
-                Browse Opportunities
-              </Link>
-            </div>
+  <Link href="/internships" className="cta-outline-button">
+    Browse Opportunities
+  </Link>
+</div>
           </div>
         </div>
       </section>
