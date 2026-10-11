@@ -688,12 +688,14 @@ export default function HomePage() {
             <span className="footer-email">gradlinksa@tuta.com</span>
           </div>
 
-          <div className="footer-column">
-            <h4>For Graduates</h4>
+                    <div className="footer-column">
+            <h4>GradLink SA</h4>
 
-            <Link href="/internships">Internships</Link>
-            <Link href="/jobs">Jobs</Link>
-            <Link href="/signup">Create Profile</Link>
+            <Link href="/">Home</Link>
+            <Link href="/login">Login</Link>
+            <Link href="/signup">Sign Up</Link>
+            <Link href="/terms">Terms &amp; Conditions</Link>
+            <Link href="/privacy">Privacy Policy</Link>
           </div>
 
           <div className="footer-column">
