@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../lib/supabase";
@@ -8,6 +6,7 @@ export default function HomePage() {
   const [internships, setInternships] = useState([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
@@ -17,7 +16,20 @@ export default function HomePage() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
+      const currentUser = session?.user || null;
+      setUser(currentUser);
+
+      if (!currentUser) {
+        setProfile(null);
+        return;
+      }
+
+      const savedProfile = localStorage.getItem("gradlink_profile");
+      setProfile(
+        savedProfile === "graduate" || savedProfile === "company"
+          ? savedProfile
+          : null
+      );
     });
 
     return () => {
@@ -48,12 +60,29 @@ export default function HomePage() {
   async function loadUser() {
     try {
       const {
-        data: { user },
+        data: { user: currentUser },
+        error,
       } = await supabase.auth.getUser();
 
-      setUser(user || null);
+      if (error) throw error;
+
+      setUser(currentUser || null);
+
+      if (!currentUser) {
+        setProfile(null);
+        return;
+      }
+
+      const savedProfile = localStorage.getItem("gradlink_profile");
+      setProfile(
+        savedProfile === "graduate" || savedProfile === "company"
+          ? savedProfile
+          : null
+      );
     } catch (error) {
       console.error("Error loading user:", error);
+      setUser(null);
+      setProfile(null);
     }
   }
 
@@ -96,16 +125,37 @@ export default function HomePage() {
           </Link>
 
           <nav className="desktop-nav">
-            <Link href="/internships">Internships</Link>
-            <Link href="/jobs">Jobs</Link>
-            <Link href="/company">For Companies</Link>
+            {profile !== "company" && (
+              <>
+                <Link href="/internships">Internships</Link>
+                <Link href="/jobs">Jobs</Link>
+              </>
+            )}
+            {profile !== "graduate" && (
+              <Link href={profile === "company" ? "/company-dashboard" : "/company"}>
+                {profile === "company" ? "Company Dashboard" : "For Companies"}
+              </Link>
+            )}
           </nav>
 
           <div className="header-actions">
             {user ? (
               <>
-                <Link href="/company-dashboard" className="dashboard-link">
-                  Dashboard
+                <Link
+                  href={
+                    profile === "graduate"
+                      ? "/graduate"
+                      : profile === "company"
+                        ? "/company-dashboard"
+                        : "/choose-profile"
+                  }
+                  className="dashboard-link"
+                >
+                  {profile === "graduate"
+                    ? "Graduate Dashboard"
+                    : profile === "company"
+                      ? "Company Dashboard"
+                      : "Choose Profile"}
                 </Link>
 
                 <button
@@ -141,49 +191,64 @@ export default function HomePage() {
 
         <div className="container hero-grid">
           <div className="hero-content">
-            <div className="eyebrow">
-              <span className="eyebrow-dot"></span>
-              South Africa&apos;s graduate opportunity platform
-            </div>
-
-            <h1>
-              Your career.
-              <span>Your opportunity.</span>
-            </h1>
-
-            <p className="hero-description">
-              Discover internships, graduate programmes and jobs from
-              companies looking for the next generation of South African
-              talent.
-            </p>
-
-            <div className="hero-buttons">
-              <Link href="/internships" className="primary-button">
-                Find an Internship
-                <span>→</span>
-              </Link>
-
-              <Link href="/jobs" className="secondary-button">
-                Explore Jobs
-              </Link>
-            </div>
-
-            <div className="hero-trust">
-              <div className="trust-item">
-                <span className="trust-icon">✓</span>
-                Built for graduates
-              </div>
-
-              <div className="trust-item">
-                <span className="trust-icon">✓</span>
-                South African opportunities
-              </div>
-
-              <div className="trust-item">
-                <span className="trust-icon">✓</span>
-                Simple to use
-              </div>
-            </div>
+            {profile === "company" ? (
+              <>
+                <div className="eyebrow">
+                  <span className="eyebrow-dot"></span>
+                  YOUR RECRUITMENT PARTNER
+                </div>
+                <h1>
+                  Find the right talent.
+                  <span>Build your future team.</span>
+                </h1>
+                <p className="hero-description">
+                  Connect with South African graduates, publish internship
+                  opportunities and manage your recruitment activity in one place.
+                </p>
+                <div className="hero-buttons">
+                  <Link href="/company-dashboard" className="primary-button">
+                    Company Dashboard <span>→</span>
+                  </Link>
+                  <Link href="/company/internships/new" className="secondary-button">
+                    Post an Internship
+                  </Link>
+                </div>
+                <div className="hero-trust">
+                  <div className="trust-item"><span className="trust-icon">✓</span>Reach emerging talent</div>
+                  <div className="trust-item"><span className="trust-icon">✓</span>Manage applicants</div>
+                  <div className="trust-item"><span className="trust-icon">✓</span>Paid company plans</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="eyebrow">
+                  <span className="eyebrow-dot"></span>
+                  South Africa&apos;s graduate opportunity platform
+                </div>
+                <h1>
+                  Your career.
+                  <span>Your opportunity.</span>
+                </h1>
+                <p className="hero-description">
+                  Discover internships, graduate programmes and jobs from
+                  companies looking for the next generation of South African talent.
+                </p>
+                <div className="hero-buttons">
+                  <Link href={profile === "graduate" ? "/internships" : "/choose-profile"} className="primary-button">
+                    {profile === "graduate" ? "Find an Internship" : "Get Started"}
+                    <span>→</span>
+                  </Link>
+                  <Link href={profile === "graduate" ? "/graduate" : "/jobs"} className="secondary-button">
+                    {profile === "graduate" ? "Graduate Dashboard" : "Explore Jobs"}
+                  </Link>
+                </div>
+                <div className="hero-trust">
+                  <div className="trust-item"><span className="trust-icon">✓</span>Built for graduates</div>
+                  <div className="trust-item"><span className="trust-icon">✓</span>South African opportunities</div>
+                  <div className="trust-item"><span className="trust-icon">✓</span>Simple to use</div>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="hero-visual">
@@ -219,6 +284,7 @@ export default function HomePage() {
       {/* =========================
           QUICK PATHS
       ========================= */}
+      {profile !== "company" && (
       <section className="quick-section">
         <div className="container">
           <div className="quick-grid">
@@ -260,10 +326,12 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* =========================
           FEATURED INTERNSHIPS
       ========================= */}
+      {profile !== "company" && (
       <section className="featured-section">
         <div className="container">
           <div className="section-heading">
@@ -349,10 +417,12 @@ export default function HomePage() {
           )}
         </div>
       </section>
+      )}
 
       {/* =========================
           GRADUATE SECTION
       ========================= */}
+      {profile !== "company" && (
       <section className="graduate-section">
         <div className="container graduate-grid">
           <div className="graduate-image-wrap">
@@ -429,10 +499,12 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* =========================
           COMPANY SECTION
       ========================= */}
+      {profile !== "graduate" && (
       <section className="company-section">
         <div className="container">
           <div className="company-panel">
@@ -479,10 +551,12 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* =========================
           HOW IT WORKS
       ========================= */}
+      {profile !== "company" && (
       <section className="how-section">
         <div className="container">
           <div className="center-heading">
@@ -534,6 +608,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* =========================
           CTA
@@ -542,29 +617,49 @@ export default function HomePage() {
         <div className="container">
           <div className="cta-box">
             <div className="cta-content">
-              <span className="section-eyebrow white">START TODAY</span>
+              <span className="section-eyebrow white">
+                {profile === "company" ? "GROW YOUR TEAM" : "START TODAY"}
+              </span>
 
-              <h2>Ready to take the next step?</h2>
+              <h2>
+                {profile === "company"
+                  ? "Ready to meet your next great candidate?"
+                  : "Ready to take the next step?"}
+              </h2>
 
               <p>
-                Create your GradLink SA profile and start discovering
-                opportunities today.
+                {profile === "company"
+                  ? "Manage your company profile, publish internships and connect with emerging talent."
+                  : "Create your GradLink SA profile and start discovering opportunities today."}
               </p>
             </div>
 
             <div className="cta-buttons">
-  <Link
-    href={user ? "/company-dashboard" : "/signup"}
-    className="white-button"
-  >
-    {user ? "Go to Dashboard" : "Get Started"}
-    <span>→</span>
-  </Link>
+              <Link
+                href={
+                  profile === "company"
+                    ? "/company-dashboard"
+                    : profile === "graduate"
+                      ? "/graduate"
+                      : "/choose-profile"
+                }
+                className="white-button"
+              >
+                {profile === "company"
+                  ? "Go to Company Dashboard"
+                  : profile === "graduate"
+                    ? "Go to Graduate Dashboard"
+                    : "Get Started"}
+                <span>→</span>
+              </Link>
 
-  <Link href="/internships" className="cta-outline-button">
-    Browse Opportunities
-  </Link>
-</div>
+              <Link
+                href={profile === "company" ? "/company-pricing" : "/internships"}
+                className="cta-outline-button"
+              >
+                {profile === "company" ? "View Company Plans" : "Browse Opportunities"}
+              </Link>
+            </div>
           </div>
         </div>
       </section>
