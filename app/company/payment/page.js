@@ -219,7 +219,7 @@ export default function CompanyPaymentPage() {
               <h2>Bank transfer details</h2>
               <div className="bankrow"><div className="banklabel">Account name</div><div className="bankvalue">GradLink SA</div></div>
               <div className="bankrow"><div className="banklabel">Bank</div><div className="bankvalue">Capitec Business</div></div>
-              <div className="bankrow"><div className="banklabel">Account number</div><div className="bankvalue placeholder">ADD BUSINESS ACCOUNT NUMBER</div></div>
+              <div className="bankrow"><div className="banklabel">Account number</div><div className="bankvalue placeholder">2609988253</div></div>
               <div className="bankrow"><div className="banklabel">Account type</div><div className="bankvalue">Entrepreneur Business Account</div></div>
               <div className="note">Before launch, replace the highlighted account-number placeholder in this file with your confirmed business account number. Double-check all bank details in your Capitec app before accepting payments.</div>
 
