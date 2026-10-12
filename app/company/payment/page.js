@@ -1,16 +1,7 @@
-"use client";
 
-import {
-  Suspense,
-  useEffect,
-  useState,
-} from "react";
 
-import {
-  useRouter,
-  useSearchParams,
-} from "next/navigation";
-
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -18,1796 +9,235 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-// ============================================================
-// PLANS
-// ============================================================
-
-const PLANS = {
-  starter: {
-    name: "Starter",
-    monthly: 500,
-    annual: 5000,
-    listings: 5,
-  },
-
-  professional: {
-    name: "Professional",
-    monthly: 950,
-    annual: 9500,
-    listings: 15,
-    popular: true,
-  },
-
-  enterprise: {
-    name: "Enterprise",
-    monthly: 1500,
-    annual: 15000,
-    listings: 30,
-  },
-
-  pay_per_listing: {
-    name: "Pay Per Listing",
-    listing: 250,
-    listings: 1,
-  },
+const PLAN_DETAILS = {
+  starter: { name: "Starter", monthly: 500, annual: 5000, cycle: "monthly" },
+  professional: { name: "Professional", monthly: 1000, annual: 10000, cycle: "monthly" },
+  listing: { name: "Pay Per Listing", monthly: 350, annual: 350, cycle: "listing" },
 };
 
-// ============================================================
-// PAYMENT CONTENT
-// ============================================================
+function money(value) {
+  return new Intl.NumberFormat("en-ZA", { maximumFractionDigits: 0 }).format(value);
+}
 
-function PaymentContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
-  const planId = searchParams.get("plan");
-  const billing = searchParams.get("billing") || "monthly";
-  const subscriptionId = searchParams.get("subscription");
-  const paymentResult = searchParams.get("payment");
-
+export default function CompanyPaymentPage() {
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
   const [user, setUser] = useState(null);
   const [subscription, setSubscription] = useState(null);
-
-  const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(false);
-  const [checking, setChecking] = useState(false);
-
-  const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState("");
-
-  const plan = planId ? PLANS[planId] : null;
-
-  // ==========================================================
-  // AMOUNT
-  // ==========================================================
-
-  function getAmount() {
-    if (!plan) return 0;
-
-    if (planId === "pay_per_listing") {
-      return plan.listing;
-    }
-
-    if (billing === "annual") {
-      return plan.annual;
-    }
-
-    return plan.monthly;
-  }
-
-  // ==========================================================
-  // LOAD PAYMENT DETAILS
-  // ==========================================================
+  const [reference, setReference] = useState("");
+  const [proof, setProof] = useState(null);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    async function loadPaymentDetails() {
+    let active = true;
+
+    async function loadPayment() {
       try {
-        setLoading(true);
-
-        const {
-          data: { user: currentUser },
-        } = await supabase.auth.getUser();
-
+        const params = new URLSearchParams(window.location.search);
+        const subscriptionId = params.get("subscription");
+        const requestedPlan = params.get("plan");
+        const requestedBilling = params.get("billing") || "monthly";
+        const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+        if (authError) throw authError;
         if (!currentUser) {
-          router.replace(
-            `/login?redirect=/company-pricing`
-          );
+          window.location.replace("/login?redirect=/company/payment");
           return;
         }
-
-        setUser(currentUser);
-
-        if (!planId || !plan) {
-          setMessage(
-            "No valid payment plan was selected."
-          );
-          setMessageType("error");
-          return;
+        if (!subscriptionId || !/^\d+$/.test(subscriptionId)) {
+          throw new Error("The payment request is missing or invalid. Please choose a plan again.");
         }
 
-        if (!subscriptionId) {
-          setMessage(
-            "No subscription was found for this payment."
-          );
-          setMessageType("error");
-          return;
-        }
-
-        const {
-          data: subscriptionData,
-          error: subscriptionError,
-        } = await supabase
+        const { data, error: subError } = await supabase
           .from("company_subscriptions")
-          .select("*")
+          .select("id, company_id, plan, status, monthly_price, created_at")
           .eq("id", subscriptionId)
           .eq("company_id", currentUser.id)
           .maybeSingle();
-
-        if (subscriptionError) {
-          console.error(subscriptionError);
-
-          setMessage(
-            "We could not load your payment information."
-          );
-
-          setMessageType("error");
-          return;
+        if (subError) throw subError;
+        if (!data) throw new Error("We could not find this payment request for your account.");
+        if (String(data.status || "").toLowerCase() !== "pending") {
+          throw new Error("This subscription is not awaiting payment. Please return to your company pricing page.");
         }
-
-        if (!subscriptionData) {
-          setMessage(
-            "The selected subscription could not be found."
-          );
-
-          setMessageType("error");
-          return;
+        if (!PLAN_DETAILS[data.plan]) throw new Error("This plan is not recognised. Please choose a plan again.");
+        if (requestedPlan && requestedPlan !== data.plan) throw new Error("The selected plan does not match this payment request. Please choose a plan again.");
+        if (!["monthly", "annual", "listing"].includes(requestedBilling)) throw new Error("The billing option is invalid. Please choose a plan again.");
+        if (data.plan === "listing" && requestedBilling !== "listing") throw new Error("Please restart the Pay Per Listing checkout.");
+        if (data.plan !== "listing" && requestedBilling === "listing") throw new Error("Please choose monthly or annual billing.");
+        data.billing_cycle = requestedBilling;
+        data.payment_amount = data.plan === "listing" ? PLAN_DETAILS.listing.monthly : requestedBilling === "annual" ? PLAN_DETAILS[data.plan].annual : PLAN_DETAILS[data.plan].monthly;
+        if (active) {
+          setUser(currentUser);
+          setSubscription(data);
         }
-
-        setSubscription(subscriptionData);
-
-        const isActive =
-          String(subscriptionData.status).toLowerCase() ===
-          "active";
-
-        if (
-          isActive &&
-          planId !== "pay_per_listing"
-        ) {
-          router.replace("/company");
-          return;
-        }
-
-        if (paymentResult === "success") {
-          setMessage(
-            "PayFast has returned you to GradLink SA. Your payment is now being verified. Please check the payment status below."
-          );
-
-          setMessageType("success");
-        }
-
-        if (paymentResult === "cancelled") {
-          setMessage(
-            "The PayFast payment was cancelled. Your subscription has not been activated."
-          );
-
-          setMessageType("error");
-        }
-      } catch (error) {
-        console.error(
-          "Payment page error:",
-          error
-        );
-
-        setMessage(
-          "Something went wrong while loading the payment page."
-        );
-
-        setMessageType("error");
+      } catch (e) {
+        if (active) setError(e?.message || "Unable to load your payment details.");
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
 
-    loadPaymentDetails();
-  }, [
-    router,
-    planId,
-    subscriptionId,
-    paymentResult,
-    plan,
-  ]);
+    loadPayment();
+    return () => { active = false; };
+  }, []);
 
-  // ==========================================================
-  // CHECK PAYMENT STATUS
-  // ==========================================================
-
-  async function checkPaymentStatus() {
-    if (!user || !subscriptionId) {
+  async function submitPayment(e) {
+    e.preventDefault();
+    setError("");
+    if (!user || !subscription) return;
+    if (!reference.trim()) {
+      setError("Enter the payment reference shown by your bank.");
+      return;
+    }
+    if (!proof) {
+      setError("Please attach your proof of payment.");
+      return;
+    }
+    const allowedTypes = ["application/pdf", "image/jpeg", "image/png"];
+    if (!allowedTypes.includes(proof.type)) {
+      setError("Upload a PDF, JPG or PNG file.");
+      return;
+    }
+    if (proof.size > 5 * 1024 * 1024) {
+      setError("Your proof of payment must be 5 MB or smaller.");
       return;
     }
 
+    setSending(true);
     try {
-      setChecking(true);
+      const extension = proof.name.split(".").pop().toLowerCase().replace(/[^a-z0-9]/g, "") || "pdf";
+      const path = `${user.id}/${subscription.id}-${Date.now()}.${extension}`;
+      const { error: uploadError } = await supabase.storage
+        .from("payment-proofs")
+        .upload(path, proof, { upsert: false, contentType: proof.type });
+      if (uploadError) throw uploadError;
 
-      setMessage(
-        "Checking your payment status..."
-      );
-
-      setMessageType("");
-
-      const {
-        data,
-        error,
-      } = await supabase
-        .from("company_subscriptions")
-        .select("*")
-        .eq("id", subscriptionId)
-        .eq("company_id", user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error(error);
-
-        setMessage(
-          "We could not check your payment status."
-        );
-
-        setMessageType("error");
-        return;
+      const { error: requestError } = await supabase
+        .from("payment_requests")
+        .insert({
+          company_id: user.id,
+          subscription_id: subscription.id,
+          payment_amount: Number(subscription.payment_amount),
+          payment_reference: reference.trim(),
+          proof_path: path,
+          status: "pending",
+        });
+      if (requestError) {
+        // Best-effort cleanup if the database insert did not succeed.
+        await supabase.storage.from("payment-proofs").remove([path]);
+        throw requestError;
       }
-
-      if (!data) {
-        setMessage(
-          "Subscription not found."
-        );
-
-        setMessageType("error");
-        return;
-      }
-
-      setSubscription(data);
-
-      const status =
-        String(data.status).toLowerCase();
-
-      if (status === "active") {
-        setMessage(
-          "Payment verified successfully. Your GradLink SA company access is now active."
-        );
-
-        setMessageType("success");
-
-        setTimeout(() => {
-          router.push("/company");
-        }, 1500);
-
-        return;
-      }
-
-      setMessage(
-        "Payment has not been verified yet. If you have just paid, wait a moment and check again."
-      );
-
-      setMessageType("warning");
-    } catch (error) {
-      console.error(error);
-
-      setMessage(
-        "Something went wrong while checking your payment."
-      );
-
-      setMessageType("error");
+      setSuccess(true);
+    } catch (e) {
+      console.error("Payment submission failed:", e);
+      setError(e?.message || "We could not submit your payment. Please try again.");
     } finally {
-      setChecking(false);
+      setSending(false);
     }
   }
 
-  // ==========================================================
-  // CONTINUE TO PAYFAST
-  // ==========================================================
-
-  async function continueToPayFast() {
-    if (!user || !subscription) {
-      setMessage(
-        "Your payment information is not ready yet."
-      );
-
-      setMessageType("error");
-      return;
-    }
-
-    try {
-      setProcessing(true);
-
-      setMessage(
-        "Preparing secure PayFast checkout..."
-      );
-
-      setMessageType("");
-
-      const currentStatus =
-        String(subscription.status).toLowerCase();
-
-      if (
-        currentStatus === "active" &&
-        planId !== "pay_per_listing"
-      ) {
-        router.push("/company");
-        return;
-      }
-
-      const response = await fetch(
-        "/api/payfast/create-payment",
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          body: JSON.stringify({
-            plan: planId,
-
-            billing:
-              planId === "pay_per_listing"
-                ? "listing"
-                : billing,
-
-            subscriptionId:
-              subscription.id,
-
-            email: user.email,
-          }),
-        }
-      );
-
-      const result = await response.json();
-
-      if (
-        !response.ok ||
-        !result.success
-      ) {
-        console.error(
-          "PayFast creation error:",
-          result
-        );
-
-        throw new Error(
-          result.error ||
-            "Could not create PayFast payment."
-        );
-      }
-
-      const paymentUrl =
-        result.paymentUrl;
-
-      const paymentData =
-        result.paymentData;
-
-      if (
-        !paymentUrl ||
-        !paymentData
-      ) {
-        throw new Error(
-          "PayFast payment information was not returned."
-        );
-      }
-
-      const form =
-        document.createElement("form");
-
-      form.method = "POST";
-      form.action = paymentUrl;
-      form.style.display = "none";
-
-      Object.entries(paymentData).forEach(
-        ([key, value]) => {
-          const input =
-            document.createElement("input");
-
-          input.type = "hidden";
-          input.name = key;
-          input.value = String(
-            value ?? ""
-          );
-
-          form.appendChild(input);
-        }
-      );
-
-      document.body.appendChild(form);
-
-      form.submit();
-    } catch (error) {
-      console.error(
-        "PayFast checkout error:",
-        error
-      );
-
-      setMessage(
-        error.message ||
-          "We could not start PayFast checkout."
-      );
-
-      setMessageType("error");
-
-      setProcessing(false);
-    }
-  }
-
-  // ==========================================================
-  // LOADING
-  // ==========================================================
-
-  if (loading) {
-    return (
-      <main style={styles.page}>
-        <div style={styles.loadingBox}>
-          <div style={styles.spinner}></div>
-
-          <h2 style={styles.loadingTitle}>
-            Loading payment
-          </h2>
-
-          <p style={styles.loadingText}>
-            Preparing your GradLink SA payment details...
-          </p>
-        </div>
-      </main>
-    );
-  }
-
-  // ==========================================================
-  // INVALID PLAN
-  // ==========================================================
-
-  if (!plan) {
-    return (
-      <main style={styles.page}>
-        <div style={styles.container}>
-          <div style={styles.errorBox}>
-            <div style={styles.errorIcon}>
-              !
-            </div>
-
-            <h1 style={styles.errorTitle}>
-              Invalid payment plan
-            </h1>
-
-            <p style={styles.errorText}>
-              Please return to the pricing page
-              and select a valid plan.
-            </p>
-
-            <button
-              onClick={() =>
-                router.push(
-                  "/company-pricing"
-                )
-              }
-              style={styles.primaryButton}
-            >
-              View Plans
-            </button>
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  // ==========================================================
-  // DISPLAY VALUES
-  // ==========================================================
-
-  const amount = getAmount();
-
-  const isPayPerListing =
-    planId === "pay_per_listing";
-
-  const billingLabel =
-    isPayPerListing
-      ? "One-time payment"
-      : billing === "annual"
-      ? "Annual billing"
-      : "Monthly billing";
-
-  const status = subscription
-    ? String(
-        subscription.status
-      ).toLowerCase()
-    : "";
-
-  const formattedAmount =
-    amount.toLocaleString(
-      "en-ZA",
-      {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }
-    );
-
-  // ==========================================================
-  // PAGE
-  // ==========================================================
+  const plan = subscription ? PLAN_DETAILS[subscription.plan] : null;
+  const amount = subscription?.payment_amount ?? (plan ? (subscription?.billing_cycle === "annual" ? plan.annual : plan.monthly) : 0);
+  const billingLabel = subscription?.billing_cycle === "annual" ? "per year" : subscription?.billing_cycle === "listing" ? "once-off · 30 days" : "per month";
 
   return (
-    <main style={styles.page}>
-      <div style={styles.container}>
+    <main className="page">
+      <style jsx>{`
+        * { box-sizing: border-box; }
+        .page { min-height: 100vh; background: #f4f8ff; color: #13233f; padding: 28px 16px 54px; }
+        .wrap { max-width: 850px; margin: 0 auto; }
+        .top { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:26px; }
+        .brand { font-weight:900; font-size:20px; letter-spacing:-.5px; color:#1455c0; text-decoration:none; }
+        .back { color:#2454a6; font-weight:700; text-decoration:none; font-size:14px; }
+        .hero { margin-bottom:22px; }
+        .eyebrow { color:#2762c4; font-size:11px; font-weight:900; letter-spacing:1.6px; text-transform:uppercase; }
+        h1 { font-size:clamp(28px, 5vw, 42px); line-height:1.1; letter-spacing:-1.3px; margin:10px 0; }
+        .intro { color:#60718b; line-height:1.7; max-width:620px; margin:0; }
+        .grid { display:grid; grid-template-columns: .9fr 1.1fr; gap:18px; align-items:start; }
+        .card { background:white; border:1px solid #e0e9f7; border-radius:20px; padding:22px; box-shadow:0 12px 34px rgba(25,65,125,.06); min-width:0; }
+        h2 { margin:0 0 15px; font-size:18px; letter-spacing:-.3px; }
+        .amount { font-size:36px; font-weight:900; color:#1554be; letter-spacing:-1px; }
+        .period { color:#73819a; font-size:13px; margin-left:5px; }
+        .planname { font-size:14px; font-weight:800; margin-bottom:7px; }
+        .line { display:flex; justify-content:space-between; gap:14px; padding:12px 0; border-bottom:1px solid #edf1f7; color:#63718a; font-size:13px; }
+        .line strong { color:#1c2e4a; text-align:right; }
+        .note { background:#f0f6ff; border:1px solid #d9e8ff; border-radius:13px; padding:13px; margin-top:16px; color:#435b7c; font-size:12px; line-height:1.6; }
+        .bankrow { padding:12px 0; border-bottom:1px solid #edf1f7; }
+        .banklabel { color:#7b8aa1; font-size:11px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; margin-bottom:5px; }
+        .bankvalue { font-size:15px; font-weight:800; overflow-wrap:anywhere; }
+        .placeholder { color:#9a5a13; }
+        label { display:block; color:#334763; font-size:13px; font-weight:800; margin:16px 0 7px; }
+        input[type=text], input[type=file] { width:100%; border:1px solid #d7e1f0; border-radius:11px; background:#fff; padding:13px; color:#1b2d48; font:inherit; font-size:14px; }
+        input[type=file] { padding:10px; }
+        .hint { color:#8290a5; font-size:12px; line-height:1.5; margin-top:7px; }
+        .button { width:100%; border:0; border-radius:12px; background:#1554be; color:#fff; padding:15px 16px; font-weight:900; font-size:14px; margin-top:19px; cursor:pointer; }
+        .button:disabled { opacity:.6; cursor:not-allowed; }
+        .error { margin:0 0 16px; padding:12px 14px; border-radius:11px; background:#fff0f0; color:#a32626; font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+        .success { text-align:center; padding:20px 4px 8px; }
+        .successmark { width:52px; height:52px; margin:0 auto 14px; border-radius:50%; display:grid; place-items:center; background:#e2f8eb; color:#167744; font-size:25px; font-weight:900; }
+        .small { color:#6d7b91; font-size:13px; line-height:1.7; }
+        .footer { text-align:center; color:#8390a4; font-size:12px; margin-top:22px; }
+        @media(max-width:680px) { .grid { grid-template-columns:1fr; } .page { padding:20px 13px 40px; } .card { padding:18px; border-radius:17px; } .top { margin-bottom:22px; } }
+      `}</style>
 
-        {/* HEADER */}
-
-        <header style={styles.header}>
-          <button
-            onClick={() =>
-              router.push(
-                "/company-pricing"
-              )
-            }
-            style={styles.backButton}
-          >
-            ← Back to Plans
-          </button>
-
-          <div style={styles.brand}>
-            <div style={styles.logo}>
-              G
-            </div>
-
-            <div>
-              <div style={styles.brandName}>
-                GradLink SA
-              </div>
-
-              <div style={styles.brandSub}>
-                Company Payments
-              </div>
-            </div>
-          </div>
+      <div className="wrap">
+        <header className="top">
+          <Link className="brand" href="/">GradLink SA</Link>
+          <Link className="back" href="/company-pricing">← Back to plans</Link>
         </header>
 
-        {/* TITLE */}
-
-        <section style={styles.titleSection}>
-          <div style={styles.secureBadge}>
-            🔒 Secure Checkout
-          </div>
-
-          <h1 style={styles.title}>
-            Complete your payment
-          </h1>
-
-          <p style={styles.subtitle}>
-            Secure your company access to
-            GradLink SA through PayFast.
-          </p>
+        <section className="hero">
+          <div className="eyebrow">Company billing</div>
+          <h1>Complete your bank transfer</h1>
+          <p className="intro">Use the details below to make payment, then submit your bank reference and proof. Your plan stays pending until GradLink SA verifies that the funds have arrived.</p>
         </section>
 
-        {/* MESSAGE */}
+        {error && <div className="error" role="alert">{error}</div>}
 
-        {message && (
-          <div
-            style={{
-              ...styles.message,
+        {loading ? (
+          <section className="card"><p className="small">Loading your secure payment request…</p></section>
+        ) : success ? (
+          <section className="card success">
+            <div className="successmark">✓</div>
+            <h2>Payment details submitted</h2>
+            <p className="small">Thank you. Your payment request is now pending review. Your plan will activate only after we confirm the payment in the business account.</p>
+            <Link className="back" href="/company-dashboard">Return to company dashboard →</Link>
+          </section>
+        ) : subscription && plan ? (
+          <div className="grid">
+            <section className="card">
+              <h2>Your selected plan</h2>
+              <div className="planname">{plan.name}</div>
+              <div><span className="amount">R{money(amount)}</span><span className="period">{billingLabel}</span></div>
+              <div className="line"><span>Payment reference</span><strong>Use your bank's reference</strong></div>
+              <div className="line"><span>Subscription status</span><strong>Pending payment verification</strong></div>
+              {subscription.plan === "listing" && <div className="note">Pay Per Listing includes one active listing for 30 days. It does not renew automatically.</div>}
+              {subscription.billing_cycle === "annual" && <div className="note">Annual billing is paid once for 12 months, at the agreed discounted annual price.</div>}
+            </section>
 
-              ...(messageType === "success"
-                ? styles.successMessage
-                : {}),
+            <section className="card">
+              <h2>Bank transfer details</h2>
+              <div className="bankrow"><div className="banklabel">Account name</div><div className="bankvalue">GradLink SA</div></div>
+              <div className="bankrow"><div className="banklabel">Bank</div><div className="bankvalue">Capitec Business</div></div>
+              <div className="bankrow"><div className="banklabel">Account number</div><div className="bankvalue placeholder">ADD BUSINESS ACCOUNT NUMBER</div></div>
+              <div className="bankrow"><div className="banklabel">Account type</div><div className="bankvalue">Entrepreneur Business Account</div></div>
+              <div className="note">Before launch, replace the highlighted account-number placeholder in this file with your confirmed business account number. Double-check all bank details in your Capitec app before accepting payments.</div>
 
-              ...(messageType === "error"
-                ? styles.errorMessage
-                : {}),
-
-              ...(messageType === "warning"
-                ? styles.warningMessage
-                : {}),
-            }}
-          >
-            <span style={styles.messageIcon}>
-              {messageType === "success"
-                ? "✓"
-                : messageType === "error"
-                ? "!"
-                : "i"}
-            </span>
-
-            <div>{message}</div>
+              <form onSubmit={submitPayment}>
+                <label htmlFor="reference">Bank payment reference</label>
+                <input id="reference" type="text" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Enter the reference from your transfer" maxLength={120} required />
+                <label htmlFor="proof">Proof of payment</label>
+                <input id="proof" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={(e) => setProof(e.target.files?.[0] || null)} required />
+                <p className="hint">PDF, JPG or PNG · Maximum 5 MB. Upload a receipt or proof of transfer, not a full bank statement.</p>
+                <button className="button" type="submit" disabled={sending}>{sending ? "Submitting payment details…" : "Submit proof of payment"}</button>
+              </form>
+            </section>
           </div>
+        ) : (
+          <section className="card"><h2>Payment request unavailable</h2><p className="small">Return to the pricing page and select a plan to create a new payment request.</p><Link className="back" href="/company-pricing">Choose a plan →</Link></section>
         )}
-
-        {/* ====================================================
-            TOP CARD — PLAN SUMMARY
-        ==================================================== */}
-
-        <section
-          style={styles.mainCard}
-          className="gradlink-main-card"
-        >
-          <div
-            style={styles.cardTop}
-          >
-            <div>
-              <p style={styles.eyebrow}>
-                YOUR PLAN
-              </p>
-
-              <h2 style={styles.planName}>
-                {plan.name}
-              </h2>
-            </div>
-
-            {plan.popular && (
-              <span
-                style={styles.popularBadge}
-              >
-                POPULAR
-              </span>
-            )}
-          </div>
-
-          <div
-            style={styles.summaryMain}
-            className="gradlink-summary-main"
-          >
-            {/* PRICE */}
-
-            <div
-              style={styles.priceBlock}
-              className="gradlink-price-block"
-            >
-              <div
-                style={styles.priceLine}
-              >
-                <span
-                  style={styles.currency}
-                >
-                  R
-                </span>
-
-                <span
-                  style={styles.price}
-                >
-                  {formattedAmount}
-                </span>
-              </div>
-
-              <span
-                style={styles.billingText}
-              >
-                {billingLabel}
-              </span>
-            </div>
-
-            {/* DETAILS */}
-
-            <div
-              style={styles.planDetails}
-              className="gradlink-plan-details"
-            >
-              <div
-                style={styles.detailItem}
-              >
-                <span
-                  style={styles.detailIcon}
-                >
-                  ✓
-                </span>
-
-                <div>
-                  <span
-                    style={styles.detailLabel}
-                  >
-                    Listings included
-                  </span>
-
-                  <strong
-                    style={styles.detailValue}
-                  >
-                    {plan.listings}
-                  </strong>
-                </div>
-              </div>
-
-              <div
-                style={styles.detailItem}
-              >
-                <span
-                  style={styles.detailIcon}
-                >
-                  ✓
-                </span>
-
-                <div>
-                  <span
-                    style={styles.detailLabel}
-                  >
-                    Billing
-                  </span>
-
-                  <strong
-                    style={styles.detailValue}
-                  >
-                    {billingLabel}
-                  </strong>
-                </div>
-              </div>
-
-              <div
-                style={styles.detailItem}
-              >
-                <span
-                  style={styles.detailIcon}
-                >
-                  ✓
-                </span>
-
-                <div>
-                  <span
-                    style={styles.detailLabel}
-                  >
-                    Payment provider
-                  </span>
-
-                  <strong
-                    style={styles.detailValue}
-                  >
-                    PayFast
-                  </strong>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* SECURITY STRIP */}
-
-          <div
-            style={styles.secureStrip}
-          >
-            <span
-              style={styles.secureStripIcon}
-            >
-              🔐
-            </span>
-
-            <div>
-              <strong
-                style={
-                  styles.secureStripTitle
-                }
-              >
-                Secure payment
-              </strong>
-
-              <p
-                style={
-                  styles.secureStripText
-                }
-              >
-                You will be redirected to
-                PayFast to complete your
-                payment securely.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* ====================================================
-            BOTTOM CARD — PAYFAST CHECKOUT
-        ==================================================== */}
-
-        <section
-          style={styles.checkoutCard}
-          className="gradlink-checkout-card"
-        >
-          <div
-            style={styles.checkoutHeader}
-            className="gradlink-checkout-header"
-          >
-            <div>
-              <p
-                style={
-                  styles.checkoutEyebrow
-                }
-              >
-                PAYMENT
-              </p>
-
-              <h2
-                style={styles.checkoutTitle}
-              >
-                Pay with PayFast
-              </h2>
-
-              <p
-                style={styles.checkoutText}
-              >
-                Continue to PayFast to
-                securely complete your
-                payment.
-              </p>
-            </div>
-
-            <div
-              style={styles.payfastMark}
-              className="gradlink-payfast-mark"
-            >
-              <span
-                style={styles.payfastP}
-              >
-                P
-              </span>
-
-              <span>
-                PayFast
-              </span>
-            </div>
-          </div>
-
-          <div
-            style={styles.checkoutContent}
-          >
-
-            {/* PAYMENT METHODS */}
-
-            <div
-              style={styles.paymentMethods}
-              className="gradlink-payment-methods"
-            >
-              <div
-                style={styles.method}
-                className="gradlink-method"
-              >
-                <span>💳</span>
-                <span>Card</span>
-              </div>
-
-              <div
-                style={styles.method}
-                className="gradlink-method"
-              >
-                <span>🏦</span>
-                <span>EFT</span>
-              </div>
-
-              <div
-                style={styles.method}
-                className="gradlink-method"
-              >
-                <span>📱</span>
-                <span>Instant EFT</span>
-              </div>
-            </div>
-
-            {/* PAY BUTTON */}
-
-            <button
-              onClick={
-                continueToPayFast
-              }
-              disabled={
-                processing ||
-                status === "active"
-              }
-              style={{
-                ...styles.payButton,
-
-                ...(processing
-                  ? styles.disabledButton
-                  : {}),
-              }}
-            >
-              {processing
-                ? "Connecting to PayFast..."
-                : `Continue to PayFast — R${formattedAmount}`}
-            </button>
-
-            {/* ACTIVE NOTICE */}
-
-            {status === "active" && (
-              <div
-                style={
-                  styles.activeNotice
-                }
-              >
-                <span>✓</span>
-
-                <span>
-                  This subscription is
-                  already active.
-                </span>
-              </div>
-            )}
-
-            {/* VERIFICATION */}
-
-            <div
-              style={styles.verificationArea}
-              className="gradlink-verification"
-            >
-              <div>
-                <p
-                  style={
-                    styles.verificationEyebrow
-                  }
-                >
-                  PAYMENT VERIFICATION
-                </p>
-
-                <h3
-                  style={
-                    styles.verificationTitle
-                  }
-                >
-                  Already completed
-                  payment?
-                </h3>
-
-                <p
-                  style={
-                    styles.verificationText
-                  }
-                >
-                  PayFast may take a short
-                  moment to send the payment
-                  confirmation to GradLink SA.
-                </p>
-              </div>
-
-              <button
-                onClick={
-                  checkPaymentStatus
-                }
-                disabled={checking}
-                style={
-                  styles.checkButton
-                }
-                className="gradlink-check-button"
-              >
-                {checking
-                  ? "Checking..."
-                  : "Check Payment Status"}
-              </button>
-            </div>
-          </div>
-
-          {/* DISCLAIMER */}
-
-          <div
-            style={styles.disclaimerBox}
-          >
-            <span
-              style={styles.disclaimerIcon}
-            >
-              ℹ
-            </span>
-
-            <p
-              style={styles.disclaimerText}
-            >
-              Selecting a plan does not
-              activate your company account.
-              Access becomes active only
-              after PayFast confirms
-              successful payment.
-            </p>
-          </div>
-        </section>
-
-        {/* FOOTER */}
-
-        <footer style={styles.footer}>
-          <div>
-            <strong
-              style={styles.footerBrand}
-            >
-              GradLink SA
-            </strong>
-
-            <span
-              style={styles.footerText}
-            >
-              Connecting South African
-              graduates with opportunities.
-            </span>
-          </div>
-
-          <div
-            style={styles.footerRight}
-            className="gradlink-footer-right"
-          >
-            🔒 Secure payments powered by
-            PayFast
-          </div>
-        </footer>
+        <div className="footer">Manual bank payments · Plans activate only after verification</div>
       </div>
     </main>
   );
-}
-
-// ============================================================
-// SUSPENSE WRAPPER
-// ============================================================
-
-export default function PaymentPage() {
-  return (
-    <Suspense
-      fallback={
-        <main style={styles.page}>
-          <div
-            style={styles.loadingBox}
-          >
-            <div
-              style={styles.spinner}
-            ></div>
-
-            <h2
-              style={styles.loadingTitle}
-            >
-              Loading...
-            </h2>
-          </div>
-        </main>
-      }
-    >
-      <PaymentContent />
-    </Suspense>
-  );
-}
-
-// ============================================================
-// STYLES
-// ============================================================
-
-const styles = {
-  page: {
-    minHeight: "100vh",
-    background:
-      "linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%)",
-    color: "#102a43",
-    fontFamily:
-      "Inter, Arial, sans-serif",
-    padding:
-      "18px 16px 45px",
-    boxSizing: "border-box",
-  },
-
-  container: {
-    width: "100%",
-    maxWidth: "980px",
-    margin: "0 auto",
-  },
-
-  // ==========================================================
-  // HEADER
-  // ==========================================================
-
-  header: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "15px",
-    flexWrap: "wrap",
-    padding: "5px 0 20px",
-  },
-
-  backButton: {
-    border: "none",
-    background: "transparent",
-    color: "#2563eb",
-    fontSize: "14px",
-    fontWeight: "800",
-    cursor: "pointer",
-    padding: "8px 0",
-  },
-
-  brand: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-  },
-
-  logo: {
-    width: "40px",
-    height: "40px",
-    borderRadius: "11px",
-    background:
-      "linear-gradient(135deg, #2563eb, #1d4ed8)",
-    color: "#ffffff",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "20px",
-    fontWeight: "900",
-    boxShadow:
-      "0 7px 18px rgba(37,99,235,0.18)",
-  },
-
-  brandName: {
-    fontWeight: "900",
-    fontSize: "16px",
-    color: "#0f172a",
-  },
-
-  brandSub: {
-    fontSize: "11px",
-    color: "#64748b",
-    marginTop: "2px",
-  },
-
-  // ==========================================================
-  // TITLE
-  // ==========================================================
-
-  titleSection: {
-    textAlign: "center",
-    maxWidth: "680px",
-    margin: "20px auto 28px",
-  },
-
-  secureBadge: {
-    display: "inline-block",
-    background: "#e8f1ff",
-    color: "#1d4ed8",
-    padding: "7px 13px",
-    borderRadius: "999px",
-    fontSize: "11px",
-    fontWeight: "900",
-    marginBottom: "13px",
-  },
-
-  title: {
-    margin: 0,
-    fontSize:
-      "clamp(29px, 5vw, 43px)",
-    lineHeight: 1.1,
-    letterSpacing: "-1.2px",
-    color: "#0f172a",
-  },
-
-  subtitle: {
-    margin: "12px 0 0",
-    color: "#64748b",
-    fontSize: "15px",
-    lineHeight: 1.6,
-  },
-
-  // ==========================================================
-  // MESSAGE
-  // ==========================================================
-
-  message: {
-    maxWidth: "900px",
-    margin: "0 auto 18px",
-    padding: "14px 16px",
-    borderRadius: "13px",
-    display: "flex",
-    gap: "10px",
-    alignItems: "flex-start",
-    fontSize: "13px",
-    lineHeight: 1.5,
-    border: "1px solid #dbe5f1",
-    background: "#ffffff",
-    boxSizing: "border-box",
-  },
-
-  messageIcon: {
-    minWidth: "20px",
-    fontWeight: "900",
-    textAlign: "center",
-  },
-
-  successMessage: {
-    background: "#ecfdf5",
-    borderColor: "#a7f3d0",
-    color: "#065f46",
-  },
-
-  errorMessage: {
-    background: "#fef2f2",
-    borderColor: "#fecaca",
-    color: "#991b1b",
-  },
-
-  warningMessage: {
-    background: "#fffbeb",
-    borderColor: "#fde68a",
-    color: "#92400e",
-  },
-
-  // ==========================================================
-  // TOP CARD
-  // ==========================================================
-
-  mainCard: {
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: "22px",
-    padding: "28px",
-    boxShadow:
-      "0 12px 35px rgba(15,23,42,0.07)",
-    boxSizing: "border-box",
-  },
-
-  cardTop: {
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: "15px",
-  },
-
-  eyebrow: {
-    margin: 0,
-    fontSize: "10px",
-    fontWeight: "900",
-    letterSpacing: "1.5px",
-    color: "#64748b",
-  },
-
-  planName: {
-    margin: "7px 0 0",
-    fontSize: "27px",
-    color: "#0f172a",
-  },
-
-  popularBadge: {
-    background: "#dbeafe",
-    color: "#1d4ed8",
-    padding: "7px 10px",
-    borderRadius: "999px",
-    fontSize: "9px",
-    fontWeight: "900",
-    whiteSpace: "nowrap",
-  },
-
-  summaryMain: {
-    display: "grid",
-    gridTemplateColumns:
-      "minmax(220px, 0.85fr) minmax(0, 1.15fr)",
-    gap: "35px",
-    alignItems: "center",
-    marginTop: "27px",
-  },
-
-  priceBlock: {
-    paddingRight: "20px",
-    borderRight:
-      "1px solid #e2e8f0",
-  },
-
-  priceLine: {
-    display: "flex",
-    alignItems: "baseline",
-    color: "#0f172a",
-  },
-
-  currency: {
-    fontSize: "19px",
-    fontWeight: "800",
-    marginRight: "4px",
-  },
-
-  price: {
-    fontSize: "42px",
-    fontWeight: "900",
-    letterSpacing: "-1.2px",
-  },
-
-  billingText: {
-    display: "block",
-    color: "#64748b",
-    fontSize: "13px",
-    marginTop: "2px",
-  },
-
-  planDetails: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
-    gap: "12px",
-  },
-
-  detailItem: {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: "9px",
-  },
-
-  detailIcon: {
-    width: "22px",
-    height: "22px",
-    borderRadius: "50%",
-    background: "#dcfce7",
-    color: "#15803d",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "11px",
-    fontWeight: "900",
-    flexShrink: 0,
-  },
-
-  detailLabel: {
-    display: "block",
-    color: "#64748b",
-    fontSize: "10px",
-    marginBottom: "3px",
-  },
-
-  detailValue: {
-    display: "block",
-    color: "#0f172a",
-    fontSize: "13px",
-  },
-
-  secureStrip: {
-    marginTop: "25px",
-    padding: "14px 16px",
-    background: "#f8fbff",
-    border: "1px solid #dbeafe",
-    borderRadius: "13px",
-    display: "flex",
-    alignItems: "center",
-    gap: "11px",
-    boxSizing: "border-box",
-  },
-
-  secureStripIcon: {
-    fontSize: "18px",
-  },
-
-  secureStripTitle: {
-    display: "block",
-    color: "#0f172a",
-    fontSize: "12px",
-  },
-
-  secureStripText: {
-    margin: "3px 0 0",
-    color: "#64748b",
-    fontSize: "11px",
-    lineHeight: 1.5,
-  },
-
-  // ==========================================================
-  // BOTTOM CARD
-  // ==========================================================
-
-  checkoutCard: {
-    marginTop: "18px",
-    background:
-      "linear-gradient(145deg, #0f2f68 0%, #164e9b 100%)",
-    borderRadius: "22px",
-    padding: "28px",
-    color: "#ffffff",
-    boxShadow:
-      "0 18px 45px rgba(15,47,104,0.20)",
-    boxSizing: "border-box",
-  },
-
-  checkoutHeader: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "25px",
-    paddingBottom: "23px",
-    borderBottom:
-      "1px solid rgba(255,255,255,0.15)",
-  },
-
-  checkoutEyebrow: {
-    margin: 0,
-    color: "#93c5fd",
-    fontSize: "10px",
-    fontWeight: "900",
-    letterSpacing: "1.5px",
-  },
-
-  checkoutTitle: {
-    margin: "7px 0 0",
-    fontSize: "26px",
-    color: "#ffffff",
-  },
-
-  checkoutText: {
-    margin: "7px 0 0",
-    color: "#dbeafe",
-    fontSize: "13px",
-    lineHeight: 1.5,
-  },
-
-  payfastMark: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    fontSize: "20px",
-    fontWeight: "900",
-    whiteSpace: "nowrap",
-  },
-
-  payfastP: {
-    width: "34px",
-    height: "34px",
-    borderRadius: "10px",
-    background: "#ffffff",
-    color: "#174ea6",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "19px",
-    fontWeight: "900",
-  },
-
-  checkoutContent: {
-    paddingTop: "23px",
-  },
-
-  paymentMethods: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "9px",
-  },
-
-  method: {
-    display: "flex",
-    alignItems: "center",
-    gap: "7px",
-    background:
-      "rgba(255,255,255,0.10)",
-    border:
-      "1px solid rgba(255,255,255,0.15)",
-    padding: "9px 12px",
-    borderRadius: "10px",
-    color: "#ffffff",
-    fontSize: "12px",
-    fontWeight: "700",
-    boxSizing: "border-box",
-  },
-
-  payButton: {
-    width: "100%",
-    marginTop: "19px",
-    border: "none",
-    borderRadius: "13px",
-    padding: "15px 18px",
-    background: "#ffffff",
-    color: "#174ea6",
-    fontSize: "14px",
-    fontWeight: "900",
-    cursor: "pointer",
-    boxShadow:
-      "0 8px 20px rgba(0,0,0,0.15)",
-    boxSizing: "border-box",
-  },
-
-  disabledButton: {
-    opacity: 0.65,
-    cursor: "not-allowed",
-  },
-
-  activeNotice: {
-    marginTop: "13px",
-    padding: "11px 13px",
-    borderRadius: "11px",
-    background:
-      "rgba(255,255,255,0.10)",
-    color: "#ffffff",
-    fontSize: "12px",
-    textAlign: "center",
-    display: "flex",
-    justifyContent: "center",
-    gap: "7px",
-  },
-
-  verificationArea: {
-    marginTop: "22px",
-    paddingTop: "21px",
-    borderTop:
-      "1px solid rgba(255,255,255,0.15)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "20px",
-  },
-
-  verificationEyebrow: {
-    margin: 0,
-    color: "#93c5fd",
-    fontSize: "9px",
-    fontWeight: "900",
-    letterSpacing: "1.3px",
-  },
-
-  verificationTitle: {
-    margin: "6px 0 0",
-    color: "#ffffff",
-    fontSize: "17px",
-  },
-
-  verificationText: {
-    margin: "5px 0 0",
-    color: "#bfdbfe",
-    fontSize: "11px",
-    lineHeight: 1.5,
-    maxWidth: "550px",
-  },
-
-  checkButton: {
-    border:
-      "1px solid rgba(255,255,255,0.30)",
-    background:
-      "rgba(255,255,255,0.10)",
-    color: "#ffffff",
-    padding: "11px 15px",
-    borderRadius: "10px",
-    fontSize: "12px",
-    fontWeight: "800",
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-  },
-
-  disclaimerBox: {
-    marginTop: "18px",
-    padding: "12px 14px",
-    borderRadius: "11px",
-    background:
-      "rgba(255,255,255,0.07)",
-    display: "flex",
-    gap: "9px",
-    alignItems: "flex-start",
-    boxSizing: "border-box",
-  },
-
-  disclaimerIcon: {
-    color: "#93c5fd",
-    fontWeight: "900",
-    fontSize: "13px",
-    flexShrink: 0,
-  },
-
-  disclaimerText: {
-    margin: 0,
-    color: "#bfdbfe",
-    fontSize: "11px",
-    lineHeight: 1.5,
-  },
-
-  // ==========================================================
-  // FOOTER
-  // ==========================================================
-
-  footer: {
-    marginTop: "25px",
-    paddingTop: "18px",
-    borderTop:
-      "1px solid #dbe5f1",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "15px",
-    flexWrap: "wrap",
-    color: "#64748b",
-    fontSize: "11px",
-  },
-
-  footerBrand: {
-    display: "block",
-    color: "#0f172a",
-    marginBottom: "3px",
-  },
-
-  footerText: {
-    display: "block",
-  },
-
-  footerRight: {
-    textAlign: "right",
-  },
-
-  // ==========================================================
-  // LOADING
-  // ==========================================================
-
-  loadingBox: {
-    minHeight: "70vh",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    textAlign: "center",
-    padding: "30px",
-  },
-
-  spinner: {
-    width: "38px",
-    height: "38px",
-    border: "4px solid #dbeafe",
-    borderTop:
-      "4px solid #2563eb",
-    borderRadius: "50%",
-    animation:
-      "gradlink-spin 1s linear infinite",
-    marginBottom: "18px",
-  },
-
-  loadingTitle: {
-    margin: 0,
-    color: "#0f172a",
-  },
-
-  loadingText: {
-    color: "#64748b",
-    fontSize: "14px",
-  },
-
-  // ==========================================================
-  // ERROR
-  // ==========================================================
-
-  errorBox: {
-    maxWidth: "600px",
-    margin: "80px auto",
-    background: "#ffffff",
-    border:
-      "1px solid #e2e8f0",
-    borderRadius: "20px",
-    padding: "35px",
-    textAlign: "center",
-    boxShadow:
-      "0 15px 40px rgba(15,23,42,0.08)",
-    boxSizing: "border-box",
-  },
-
-  errorIcon: {
-    width: "50px",
-    height: "50px",
-    margin: "0 auto 18px",
-    borderRadius: "50%",
-    background: "#fee2e2",
-    color: "#dc2626",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: "900",
-    fontSize: "22px",
-  },
-
-  errorTitle: {
-    margin: 0,
-    color: "#0f172a",
-  },
-
-  errorText: {
-    color: "#64748b",
-    lineHeight: 1.6,
-    margin: "10px 0 22px",
-  },
-
-  primaryButton: {
-    border: "none",
-    background:
-      "linear-gradient(135deg, #2563eb, #1d4ed8)",
-    color: "#ffffff",
-    padding: "13px 22px",
-    borderRadius: "11px",
-    fontWeight: "800",
-    cursor: "pointer",
-  },
-};
-
-// ============================================================
-// RESPONSIVE CSS
-// ============================================================
-
-if (
-  typeof document !== "undefined"
-) {
-  const styleId =
-    "gradlink-payment-responsive";
-
-  if (
-    !document.getElementById(
-      styleId
-    )
-  ) {
-    const style =
-      document.createElement(
-        "style"
-      );
-
-    style.id = styleId;
-
-    style.innerHTML = `
-      @keyframes gradlink-spin {
-        from {
-          transform: rotate(0deg);
-        }
-
-        to {
-          transform: rotate(360deg);
-        }
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      @media (max-width: 760px) {
-        .gradlink-summary-main {
-          grid-template-columns: 1fr !important;
-        }
-
-        .gradlink-price-block {
-          border-right: none !important;
-          border-bottom: 1px solid #e2e8f0 !important;
-          padding-right: 0 !important;
-          padding-bottom: 20px !important;
-        }
-
-        .gradlink-plan-details {
-          grid-template-columns: 1fr !important;
-          margin-top: 20px !important;
-        }
-
-        .gradlink-checkout-header {
-          align-items: flex-start !important;
-          flex-direction: column !important;
-        }
-
-        .gradlink-verification {
-          align-items: stretch !important;
-          flex-direction: column !important;
-        }
-
-        .gradlink-check-button {
-          width: 100% !important;
-        }
-      }
-
-      @media (max-width: 520px) {
-        body {
-          overflow-x: hidden;
-        }
-
-        .gradlink-main-card {
-          padding: 21px !important;
-          border-radius: 17px !important;
-        }
-
-        .gradlink-checkout-card {
-          padding: 21px !important;
-          border-radius: 17px !important;
-        }
-
-        .gradlink-summary-main {
-          display: block !important;
-        }
-
-        .gradlink-plan-details {
-          display: grid !important;
-          grid-template-columns: 1fr !important;
-        }
-
-        .gradlink-payment-methods {
-          display: grid !important;
-          grid-template-columns: 1fr 1fr !important;
-        }
-
-        .gradlink-payment-methods
-        .gradlink-method:last-child {
-          grid-column: 1 / -1;
-        }
-
-        .gradlink-payfast-mark {
-          margin-top: 3px !important;
-        }
-
-        .gradlink-footer-right {
-          text-align: left !important;
-        }
-      }
-    `;
-
-    document.head.appendChild(
-      style
-    );
-  }
 }
