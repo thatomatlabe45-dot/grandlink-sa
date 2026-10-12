@@ -9,21 +9,16 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-// ============================================================
-// GRADLINK SA COMPANY PLANS
-// ============================================================
-
-const PLANS = {
-  starter: {
+const PLANS = [
+  {
     key: "starter",
     name: "Starter",
     eyebrow: "GET STARTED",
     description:
-      "Everything you need to start discovering promising graduates.",
+      "Everything your company needs to start discovering promising graduates.",
     monthly: 500,
     annual: 5000,
-    listings: 5,
-    listingLabel: "Up to 5 active internship listings",
+    listings: "Up to 5 active internship listings",
     features: [
       "Up to 5 active internship listings",
       "Graduate applications",
@@ -33,17 +28,15 @@ const PLANS = {
       "Basic hiring tools",
     ],
   },
-
-  professional: {
+  {
     key: "professional",
     name: "Professional",
     eyebrow: "MOST POPULAR",
     description:
-      "Powerful recruitment tools for companies growing their graduate pipeline.",
+      "Powerful recruitment tools for companies growing their graduate talent pipeline.",
     monthly: 1000,
     annual: 10000,
-    listings: 15,
-    listingLabel: "Up to 15 active internship listings",
+    listings: "Up to 15 active internship listings",
     popular: true,
     features: [
       "Up to 15 active internship listings",
@@ -54,60 +47,48 @@ const PLANS = {
       "Smarter candidate discovery",
     ],
   },
-
-
-  listing: {
+  {
     key: "listing",
     name: "Pay Per Listing",
     eyebrow: "FLEXIBLE OPTION",
     description:
-      "Advertise one opportunity for 30 days, with no monthly commitment.",
+      "Advertise one opportunity for 30 days without a monthly commitment.",
     monthly: 350,
     annual: 350,
-    listings: 1,
-    listingLabel: "1 active internship listing",
+    listings: "1 active internship listing",
     features: [
       "1 active internship listing",
       "Graduate applications",
       "Applicant management",
       "Candidate profiles",
       "CV access",
-      "Listing remains active for 30 days",
+      "Listing active for 30 days",
       "No monthly commitment",
     ],
   },
-};
+];
 
 export default function CompanyPricingPage() {
   const router = useRouter();
 
   const [billing, setBilling] = useState("monthly");
   const [loading, setLoading] = useState(true);
-  const [processingPlan, setProcessingPlan] = useState(null);
   const [user, setUser] = useState(null);
   const [subscription, setSubscription] = useState(null);
+  const [processingPlan, setProcessingPlan] = useState(null);
   const [error, setError] = useState("");
-
-  // ============================================================
-  // LOAD USER + SUBSCRIPTION
-  // ============================================================
 
   useEffect(() => {
     let mounted = true;
 
     async function loadCompanyData() {
       try {
-        setLoading(true);
-        setError("");
-
         const {
           data: { user: currentUser },
           error: authError,
         } = await supabase.auth.getUser();
 
-        if (authError) {
-          console.error("Auth error:", authError);
-        }
+        if (authError) throw authError;
 
         if (!currentUser) {
           router.replace(
@@ -120,10 +101,7 @@ export default function CompanyPricingPage() {
 
         setUser(currentUser);
 
-        const {
-          data: subscriptionData,
-          error: subscriptionError,
-        } = await supabase
+        const { data, error: subscriptionError } = await supabase
           .from("company_subscriptions")
           .select("*")
           .eq("company_id", currentUser.id)
@@ -131,28 +109,21 @@ export default function CompanyPricingPage() {
           .limit(1)
           .maybeSingle();
 
-        if (subscriptionError) {
-          console.error(
-            "Subscription lookup error:",
-            subscriptionError
-          );
-        }
+        if (subscriptionError) throw subscriptionError;
 
         if (mounted) {
-          setSubscription(subscriptionData || null);
+          setSubscription(data || null);
         }
       } catch (err) {
         console.error("Pricing page error:", err);
 
         if (mounted) {
           setError(
-            "Unable to load your company account."
+            "We could not load your account. Please refresh and try again."
           );
         }
       } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+        if (mounted) setLoading(false);
       }
     }
 
@@ -163,47 +134,32 @@ export default function CompanyPricingPage() {
     };
   }, [router]);
 
-  // ============================================================
-  // HELPERS
-  // ============================================================
-
   const isActive =
-    subscription?.status &&
-    String(subscription.status).toLowerCase() === "active";
+    String(subscription?.status || "").toLowerCase() === "active";
 
-  function formatPrice(value) {
+  function formatPrice(amount) {
     return new Intl.NumberFormat("en-ZA", {
       maximumFractionDigits: 0,
-    }).format(value);
+    }).format(amount);
   }
 
-  function getPlanPrice(plan) {
-    if (plan.key === "listing") {
-      return 350;
-    }
+  function getPrice(plan) {
+    if (plan.key === "listing") return plan.monthly;
 
-    return billing === "annual"
-      ? plan.annual
-      : plan.monthly;
+    return billing === "annual" ? plan.annual : plan.monthly;
   }
 
-  function getBillingLabel(plan) {
-    if (plan.key === "listing") {
-      return "listing";
-    }
+  function getPeriod(plan) {
+    if (plan.key === "listing") return "once-off";
 
-    return billing === "annual"
-      ? "year"
-      : "month";
+    return billing === "annual" ? "per year" : "per month";
   }
-
-  // ============================================================
-  // CHOOSE PLAN
-  // ============================================================
 
   async function choosePlan(plan) {
     if (!user) {
-      router.push("/signup?role=company&redirect=/company-pricing");
+      router.push(
+        "/signup?role=company&redirect=/company-pricing"
+      );
       return;
     }
 
@@ -211,122 +167,328 @@ export default function CompanyPricingPage() {
       setProcessingPlan(plan.key);
       setError("");
 
-      const selectedBilling = plan.key === "listing" ? "listing" : billing;
-      const amount = getPlanPrice(plan);
-      const monthlyEquivalent = selectedBilling === "annual" ? Math.round(amount / 10) : amount;
+      const selectedBilling =
+        plan.key === "listing" ? "listing" : billing;
 
-      // Always create a NEW pending subscription request. Never overwrite an
-      // existing active subscription before a new payment has been approved.
-      const { data: newSubscription, error: insertError } = await supabase
-        .from("company_subscriptions")
-        .insert({
-          company_id: user.id,
-          plan: plan.key,
-          status: "pending",
-          monthly_price: monthlyEquivalent,
-          payment_provider: "bank_transfer",
-          payment_reference: null,
-        })
-        .select("id")
-        .single();
+      const amount = getPrice(plan);
+
+      // The subscription table stores monthly_price.
+      // Annual payments are collected at the full annual price
+      // on the payment page.
+      const storedMonthlyPrice =
+        selectedBilling === "annual"
+          ? Math.round(amount / 10)
+          : amount;
+
+      const { data: newSubscription, error: insertError } =
+        await supabase
+          .from("company_subscriptions")
+          .insert({
+            company_id: user.id,
+            plan: plan.key,
+            status: "pending",
+            monthly_price: storedMonthlyPrice,
+            payment_provider: "bank_transfer",
+            payment_reference: null,
+          })
+          .select("id")
+          .single();
 
       if (insertError) throw insertError;
-      if (!newSubscription?.id) throw new Error("Could not create your payment request.");
 
-      router.push(`/company/payment?plan=${encodeURIComponent(plan.key)}&billing=${encodeURIComponent(selectedBilling)}&subscription=${encodeURIComponent(newSubscription.id)}`);
+      if (!newSubscription?.id) {
+        throw new Error(
+          "We could not create your payment request. Please try again."
+        );
+      }
+
+      router.push(
+        `/company/payment?plan=${encodeURIComponent(
+          plan.key
+        )}&billing=${encodeURIComponent(
+          selectedBilling
+        )}&subscription=${encodeURIComponent(
+          newSubscription.id
+        )}`
+      );
     } catch (err) {
       console.error("Choose plan error:", err);
-      setError(err?.message || "Unable to continue. Please try again.");
+
+      setError(
+        err?.message ||
+          "We could not continue to payment. Please try again."
+      );
+
       setProcessingPlan(null);
     }
   }
 
-  // ============================================================
-  // LOADING
-  // ============================================================
-
   if (loading) {
     return (
-      <>
-        <style jsx>{`
-          .loading-page {
-            min-height: 100vh;
-            background: #f8fbff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 24px;
-          }
+      <main className="loading-page">
+        <div className="loading-box">
+          <div className="logo-mark">G</div>
+          <h1>GradLink SA</h1>
+          <p>Preparing your company plans...</p>
 
-          .loading-box {
-            width: 100%;
-            max-width: 420px;
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 22px;
-            padding: 34px 24px;
-            text-align: center;
-            box-shadow:
-              0 18px 50px rgba(15, 23, 42, 0.08);
-          }
+          <style jsx>{`
+            .loading-page {
+              min-height: 100vh;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              padding: 20px;
+              background: #f5f8ff;
+              color: #0f172a;
+              font-family: Arial, sans-serif;
+            }
 
-          .loading-logo {
-            width: 48px;
-            height: 48px;
-            margin: 0 auto 16px;
-            border-radius: 15px;
-            background: linear-gradient(
-              135deg,
-              #2563eb,
-              #1d4ed8
-            );
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 950;
-            font-size: 20px;
-          }
+            .loading-box {
+              width: 100%;
+              max-width: 380px;
+              padding: 35px 24px;
+              text-align: center;
+              background: #fff;
+              border: 1px solid #e2e8f0;
+              border-radius: 22px;
+              box-shadow: 0 15px 40px rgba(15, 23, 42, 0.07);
+            }
 
-          .loading-title {
-            margin: 0;
-            color: #0f172a;
-            font-size: 18px;
-            font-weight: 850;
-          }
+            .logo-mark {
+              width: 48px;
+              height: 48px;
+              margin: 0 auto 16px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              border-radius: 14px;
+              background: #2563eb;
+              color: #fff;
+              font-size: 23px;
+              font-weight: 900;
+            }
 
-          .loading-text {
-            margin: 8px 0 0;
-            color: #64748b;
-            font-size: 13px;
-          }
-        `}</style>
+            h1 {
+              margin: 0;
+              font-size: 22px;
+            }
 
-        <main className="loading-page">
-          <div className="loading-box">
-            <div className="loading-logo">
-              G
-            </div>
-
-            <h1 className="loading-title">
-              Loading GradLink SA
-            </h1>
-
-            <p className="loading-text">
-              Preparing your company plans...
-            </p>
-          </div>
-        </main>
-      </>
+            p {
+              color: #64748b;
+              font-size: 14px;
+            }
+          `}</style>
+        </div>
+      </main>
     );
   }
 
-  // ============================================================
-  // PAGE
-  // ============================================================
-
   return (
-    <>
+    <main className="page">
+      <header className="header">
+        <div className="header-inner">
+          <a className="brand" href="/">
+            <span className="brand-mark">G</span>
+
+            <span className="brand-copy">
+              <strong>GradLink SA</strong>
+              <small>Graduate recruitment made simpler</small>
+            </span>
+          </a>
+
+          <button
+            type="button"
+            className="dashboard-button"
+            onClick={() => router.push("/company-dashboard")}
+          >
+            Dashboard <span aria-hidden="true">→</span>
+          </button>
+        </div>
+      </header>
+
+      <section className="hero">
+        <div className="hero-badge">
+          COMPANY PRICING
+        </div>
+
+        <h1>
+          Find your next
+          <br />
+          <span>generation of talent.</span>
+        </h1>
+
+        <div className="hero-description">
+          <div className="description-heading">
+            <span className="description-icon">✦</span>
+            <span>BUILT FOR YOUR BUSINESS</span>
+          </div>
+
+          <p>
+            Connect with South African graduates, manage applications,
+            and discover emerging talent through GradLink SA.
+            Choose the plan that works for your recruitment needs.
+          </p>
+        </div>
+      </section>
+
+      {isActive && (
+        <section className="active-banner">
+          <div>
+            <strong>Your company has an active subscription</strong>
+            <p>
+              You can review another plan below if you want to upgrade.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => router.push("/company-dashboard")}
+          >
+            Go to dashboard →
+          </button>
+        </section>
+      )}
+
+      {error && (
+        <div className="error-message" role="alert">
+          {error}
+        </div>
+      )}
+
+      <section className="billing-section">
+        <p className="billing-title">Choose your billing option</p>
+
+        <div className="billing-toggle">
+          <button
+            type="button"
+            className={billing === "monthly" ? "selected" : ""}
+            onClick={() => setBilling("monthly")}
+          >
+            Monthly
+          </button>
+
+          <button
+            type="button"
+            className={billing === "annual" ? "selected" : ""}
+            onClick={() => setBilling("annual")}
+          >
+            Annual <span className="save-badge">SAVE 2 MONTHS</span>
+          </button>
+        </div>
+
+        <p className="billing-help">
+          Annual subscriptions are paid upfront for 12 months.
+        </p>
+      </section>
+
+      <section className="plans">
+        {PLANS.map((plan) => {
+          const price = getPrice(plan);
+          const period = getPeriod(plan);
+
+          return (
+            <article
+              key={plan.key}
+              className={`plan-card ${
+                plan.popular ? "popular" : ""
+              }`}
+            >
+              {plan.popular && (
+                <div className="popular-ribbon">MOST POPULAR</div>
+              )}
+
+              <div className="plan-eyebrow">
+                <span className="plan-symbol">
+                  {plan.key === "listing" ? "◎" : "✦"}
+                </span>
+                {plan.eyebrow}
+              </div>
+
+              <h2 className="plan-name">{plan.name}</h2>
+
+              <div className="plan-description-card">
+                <div className="description-card-heading">
+                  <span className="small-star">✦</span>
+                  <span>PLAN OVERVIEW</span>
+                </div>
+
+                <p>{plan.description}</p>
+              </div>
+
+              <div className="price-area">
+                <span className="price">
+                  R{formatPrice(price)}
+                </span>
+
+                <span className="price-period">{period}</span>
+
+                {plan.key !== "listing" && billing === "annual" && (
+                  <div className="annual-note">
+                    SAVE 2 MONTHS WITH ANNUAL BILLING
+                  </div>
+                )}
+              </div>
+
+              <div className="listing-badge">
+                <span aria-hidden="true">▣</span>
+                {plan.listings}
+              </div>
+
+              <h3 className="features-heading">What's included</h3>
+
+              <ul className="features">
+                {plan.features.map((feature, index) => (
+                  <li key={`${plan.key}-${index}`}>
+                    <span className="check">✓</span>
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <button
+                type="button"
+                className="plan-button"
+                disabled={processingPlan !== null}
+                onClick={() => choosePlan(plan)}
+              >
+                {processingPlan === plan.key
+                  ? "Preparing payment..."
+                  : plan.key === "listing"
+                  ? "Choose Listing"
+                  : isActive
+                  ? "Choose Upgrade"
+                  : "Choose Plan"}
+              </button>
+
+              <p className="payment-note">
+                Pay by bank transfer
+                <br />
+                Activation after payment verification
+              </p>
+            </article>
+          );
+        })}
+      </section>
+
+      <section className="trust-section">
+        <div className="trust-icon">🔒</div>
+
+        <div>
+          <h3>Secure company payments</h3>
+          <p>
+            Choose a plan, follow the bank-transfer instructions, and
+            submit your payment reference and proof of payment.
+            Your plan remains pending until GradLink SA verifies
+            that the payment has arrived.
+          </p>
+        </div>
+      </section>
+
+      <footer className="footer">
+        <a href="/">GradLink SA</a>
+        <span>Connecting South African graduates with opportunity.</span>
+      </footer>
+
       <style jsx>{`
         * {
           box-sizing: border-box;
@@ -334,1588 +496,756 @@ export default function CompanyPricingPage() {
 
         .page {
           min-height: 100vh;
-
+          padding-bottom: 55px;
           background:
             radial-gradient(
-              circle at 50% -10%,
-              rgba(37, 99, 235, 0.10),
-              transparent 35%
+              circle at 50% -5%,
+              rgba(37, 99, 235, 0.12),
+              transparent 36%
             ),
-            #f8fbff;
-
+            #f7f9fd;
           color: #0f172a;
-
-          padding-bottom: 60px;
+          font-family: Arial, Helvetica, sans-serif;
         }
 
-        /* =====================================================
-           HEADER
-        ===================================================== */
-
         .header {
-          width: 100%;
-
-          background: rgba(
-            255,
-            255,
-            255,
-            0.94
-          );
-
-          border-bottom: 1px solid #e2e8f0;
-
           position: sticky;
           top: 0;
-          z-index: 50;
-
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
+          z-index: 20;
+          background: rgba(255, 255, 255, 0.96);
+          border-bottom: 1px solid #e2e8f0;
+          backdrop-filter: blur(14px);
+          -webkit-backdrop-filter: blur(14px);
         }
 
         .header-inner {
-          width: min(
-            1120px,
-            calc(100% - 32px)
-          );
-
+          width: min(1120px, calc(100% - 36px));
           min-height: 72px;
-
           margin: 0 auto;
-
           display: flex;
           align-items: center;
           justify-content: space-between;
-
-          gap: 18px;
+          gap: 14px;
         }
 
         .brand {
           display: flex;
           align-items: center;
-
           gap: 11px;
-
           min-width: 0;
+          text-decoration: none;
+          color: inherit;
         }
 
         .brand-mark {
           width: 42px;
           height: 42px;
-
-          flex: 0 0 auto;
-
-          border-radius: 13px;
-
-          background: linear-gradient(
-            135deg,
-            #2563eb,
-            #1d4ed8
-          );
-
-          color: #ffffff;
-
+          flex-shrink: 0;
           display: flex;
           align-items: center;
           justify-content: center;
-
-          font-size: 19px;
-          font-weight: 950;
-
-          box-shadow:
-            0 8px 20px
-              rgba(37, 99, 235, 0.22);
+          border-radius: 13px;
+          background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+          box-shadow: 0 7px 18px rgba(37, 99, 235, 0.2);
+          color: white;
+          font-size: 20px;
+          font-weight: 900;
         }
 
         .brand-copy {
-          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
         }
 
-        .brand-name {
-          margin: 0;
-
-          color: #0f172a;
-
+        .brand-copy strong {
           font-size: 15px;
-          line-height: 1.1;
-
-          font-weight: 950;
+          font-weight: 900;
         }
 
-        .brand-subtitle {
-          margin: 4px 0 0;
-
+        .brand-copy small {
           color: #64748b;
-
           font-size: 10px;
-          font-weight: 700;
         }
 
         .dashboard-button {
           min-height: 40px;
-
-          padding: 0 15px;
-
-          border: 1px solid #dbe3ef;
-          border-radius: 11px;
-
-          background: #ffffff;
-
-          color: #1e40af;
-
-          font-size: 12px;
-          font-weight: 850;
-
-          cursor: pointer;
-
+          padding: 0 14px;
           display: inline-flex;
           align-items: center;
-
-          gap: 7px;
-
-          transition: 0.2s ease;
+          gap: 8px;
+          border: 1px solid #dbe3ef;
+          border-radius: 11px;
+          background: white;
+          color: #1d4ed8;
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
         }
 
         .dashboard-button:hover {
-          border-color: #93c5fd;
-
           background: #eff6ff;
-
-          transform: translateY(-1px);
+          border-color: #93c5fd;
         }
-
-        .arrow {
-          font-size: 15px;
-          line-height: 1;
-        }
-
-        /* =====================================================
-           HERO
-        ===================================================== */
 
         .hero {
-          width: min(
-            850px,
-            calc(100% - 32px)
-          );
-
+          width: min(790px, calc(100% - 32px));
           margin: 0 auto;
-
-          padding: 48px 0 30px;
-
+          padding: 47px 0 24px;
           text-align: center;
         }
 
         .hero-badge {
-          display: inline-flex;
-          align-items: center;
-
-          gap: 7px;
-
-          padding: 8px 13px;
-
+          display: inline-block;
+          padding: 9px 13px;
+          border: 1px solid #bfdbfe;
           border-radius: 999px;
-
           background: #eff6ff;
-
-          border: 1px solid #bfdbfe;
-
-          color: #2563eb;
-
-          font-size: 9px;
-          font-weight: 950;
-
-          letter-spacing: 0.12em;
-
-          box-shadow:
-            0 5px 16px
-              rgba(37, 99, 235, 0.06);
-        }
-
-        .hero-title {
-          margin: 17px 0 0;
-
-          font-size: clamp(
-            30px,
-            6vw,
-            48px
-          );
-
-          line-height: 1.05;
-
-          letter-spacing: -0.04em;
-
-          font-weight: 950;
-
-          color: #0f172a;
-        }
-
-        .hero-title span {
-          color: #2563eb;
-        }
-
-        /* =====================================================
-           HERO DESCRIPTION CARD
-        ===================================================== */
-
-        .hero-description-card {
-          width: min(
-            680px,
-            100%
-          );
-
-          margin: 22px auto 0;
-
-          padding: 18px 21px;
-
-          text-align: left;
-
-          background: linear-gradient(
-            135deg,
-            #ffffff 0%,
-            #f4f8ff 100%
-          );
-
-          border: 1px solid #dbe7f5;
-
-          border-radius: 18px;
-
-          box-shadow:
-            0 10px 30px
-              rgba(15, 23, 42, 0.06);
-
-          position: relative;
-
-          overflow: hidden;
-        }
-
-        .hero-description-card::before {
-          content: "";
-
-          position: absolute;
-
-          left: 0;
-          top: 0;
-          bottom: 0;
-
-          width: 4px;
-
-          background: linear-gradient(
-            180deg,
-            #2563eb,
-            #60a5fa
-          );
-
-          border-radius: 18px 0 0 18px;
-        }
-
-        .hero-description-top {
-          display: flex;
-          align-items: center;
-
-          gap: 9px;
-
-          margin-bottom: 8px;
-        }
-
-        .hero-description-icon {
-          width: 27px;
-          height: 27px;
-
-          flex: 0 0 auto;
-
-          display: flex;
-          align-items: center;
-          justify-content: center;
-
-          border-radius: 8px;
-
-          background: #dbeafe;
-
-          border: 1px solid #bfdbfe;
-
-          color: #2563eb;
-
-          font-size: 11px;
-          font-weight: 950;
-        }
-
-        .hero-description-label {
           color: #1d4ed8;
-
-          font-size: 8px;
-
-          font-weight: 950;
-
+          font-size: 10px;
+          font-weight: 900;
           letter-spacing: 0.12em;
         }
 
-        .hero-text {
-          margin: 0;
-
-          padding-left: 36px;
-
-          color: #475569;
-
-          font-size: 13px;
-
-          line-height: 1.7;
-
-          font-weight: 600;
-        }
-
-        /* =====================================================
-           ACTIVE SUBSCRIPTION
-        ===================================================== */
-
-        .active-banner {
-          width: min(
-            900px,
-            calc(100% - 32px)
-          );
-
-          margin: 0 auto 25px;
-
-          padding: 15px 17px;
-
-          border-radius: 17px;
-
-          background: linear-gradient(
-            135deg,
-            #eff6ff,
-            #dbeafe
-          );
-
-          border: 1px solid #bfdbfe;
-
-          display: flex;
-
-          align-items: center;
-          justify-content: space-between;
-
-          gap: 15px;
-        }
-
-        .active-copy {
-          min-width: 0;
-        }
-
-        .active-label {
-          color: #2563eb;
-
-          font-size: 9px;
-
-          font-weight: 950;
-
-          letter-spacing: 0.1em;
-        }
-
-        .active-title {
-          margin: 4px 0 0;
-
+        .hero h1 {
+          margin: 19px 0 0;
           color: #0f172a;
-
-          font-size: 14px;
-
+          font-size: clamp(32px, 5vw, 49px);
+          line-height: 1.08;
+          letter-spacing: -1.8px;
           font-weight: 900;
         }
 
-        .active-button {
-          flex: 0 0 auto;
-
-          min-height: 38px;
-
-          padding: 0 13px;
-
-          border: 0;
-
-          border-radius: 10px;
-
-          background: #2563eb;
-
-          color: #ffffff;
-
-          font-size: 11px;
-
-          font-weight: 850;
-
-          cursor: pointer;
-
-          display: inline-flex;
-
-          align-items: center;
-
-          gap: 6px;
+        .hero h1 span {
+          color: #2563eb;
         }
 
-        /* =====================================================
-           BILLING SWITCH
-        ===================================================== */
+        .hero-description {
+          width: min(660px, 100%);
+          margin: 24px auto 0;
+          padding: 19px 21px;
+          position: relative;
+          overflow: hidden;
+          text-align: left;
+          border: 1px solid #dbe7f5;
+          border-radius: 17px;
+          background: linear-gradient(135deg, #fff, #f1f6ff);
+          box-shadow: 0 10px 28px rgba(15, 23, 42, 0.045);
+        }
 
-        .billing-area {
+        .hero-description::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          left: 0;
+          width: 4px;
+          background: linear-gradient(#2563eb, #60a5fa);
+        }
+
+        .description-heading {
           display: flex;
-
-          justify-content: center;
-
-          padding: 5px 16px 30px;
-        }
-
-        .billing-switch {
-          display: inline-flex;
-
           align-items: center;
-
-          gap: 4px;
-
-          padding: 4px;
-
-          border-radius: 14px;
-
-          background: #e8eef7;
-
-          border: 1px solid #dbe3ef;
+          gap: 9px;
+          margin-bottom: 9px;
+          color: #1d4ed8;
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: 0.1em;
         }
 
-        .billing-option {
-          min-height: 39px;
+        .description-icon {
+          width: 27px;
+          height: 27px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 8px;
+          background: #dbeafe;
+          font-size: 13px;
+        }
 
-          padding: 0 15px;
+        .hero-description p {
+          margin: 0;
+          padding-left: 36px;
+          color: #334155;
+          font-size: 13px;
+          line-height: 1.8;
+          overflow-wrap: anywhere;
+        }
 
+        .active-banner {
+          width: min(1000px, calc(100% - 32px));
+          margin: 0 auto 25px;
+          padding: 18px 20px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          border: 1px solid #bfdbfe;
+          border-radius: 15px;
+          background: #eff6ff;
+        }
+
+        .active-banner strong {
+          font-size: 14px;
+        }
+
+        .active-banner p {
+          margin: 6px 0 0;
+          color: #475569;
+          font-size: 12px;
+          line-height: 1.5;
+        }
+
+        .active-banner button {
+          flex-shrink: 0;
+          padding: 10px 12px;
           border: 0;
-
-          border-radius: 10px;
-
-          background: transparent;
-
-          color: #64748b;
-
-          font-size: 11px;
-
-          font-weight: 850;
-
+          border-radius: 9px;
+          background: #2563eb;
+          color: white;
+          font-size: 12px;
+          font-weight: 800;
           cursor: pointer;
         }
 
-        .billing-option.active {
-          background: #ffffff;
+        .error-message {
+          width: min(1000px, calc(100% - 32px));
+          margin: 0 auto 22px;
+          padding: 14px 16px;
+          border: 1px solid #fecaca;
+          border-radius: 12px;
+          background: #fef2f2;
+          color: #991b1b;
+          font-size: 13px;
+          line-height: 1.6;
+          overflow-wrap: anywhere;
+        }
 
+        .billing-section {
+          margin: 8px auto 27px;
+          padding: 0 12px;
+          text-align: center;
+        }
+
+        .billing-title {
+          margin: 0 0 12px;
+          color: #475569;
+          font-size: 12px;
+          font-weight: 800;
+        }
+
+        .billing-toggle {
+          width: fit-content;
+          max-width: 100%;
+          margin: 0 auto;
+          padding: 5px;
+          display: flex;
+          gap: 4px;
+          border: 1px solid #dbe3ef;
+          border-radius: 13px;
+          background: #eaf0f9;
+        }
+
+        .billing-toggle button {
+          min-height: 43px;
+          padding: 0 17px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          border: 0;
+          border-radius: 9px;
+          background: transparent;
+          color: #475569;
+          font-size: 12px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+
+        .billing-toggle button.selected {
+          background: white;
           color: #1d4ed8;
-
-          box-shadow:
-            0 3px 10px
-              rgba(15, 23, 42, 0.08);
+          box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
         }
 
         .save-badge {
-          margin-left: 5px;
-
-          color: #16a34a;
-
-          font-size: 9px;
-
-          font-weight: 950;
+          padding: 5px 7px;
+          border-radius: 6px;
+          background: #dcfce7;
+          color: #166534;
+          font-size: 8px;
+          font-weight: 900;
+          white-space: nowrap;
         }
 
-        /* =====================================================
-           PLAN GRID
-        ===================================================== */
+        .billing-help {
+          margin: 10px 0 0;
+          color: #64748b;
+          font-size: 11px;
+        }
 
         .plans {
-          width: min(
-            900px,
-            calc(100% - 32px)
-          );
-
+          width: min(1120px, calc(100% - 32px));
           margin: 0 auto;
-
           display: grid;
-
-          grid-template-columns:
-            repeat(
-              2,
-              minmax(0, 1fr)
-            );
-
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          align-items: stretch;
           gap: 18px;
         }
 
         .plan-card {
+          min-width: 0;
           position: relative;
-
-          background: #ffffff;
-
-          border: 1px solid #e2e8f0;
-
-          border-radius: 22px;
-
-          padding: 22px;
-
-          box-shadow:
-            0 12px 32px
-              rgba(15, 23, 42, 0.06);
-
-          overflow: hidden;
-
           display: flex;
-
           flex-direction: column;
+          padding: 23px;
+          border: 1px solid #e2e8f0;
+          border-radius: 21px;
+          background: white;
+          box-shadow: 0 9px 30px rgba(15, 23, 42, 0.045);
         }
 
         .plan-card.popular {
-          border: 1px solid #60a5fa;
-
-          box-shadow:
-            0 16px 40px
-              rgba(37, 99, 235, 0.15);
+          border: 2px solid #3b82f6;
+          box-shadow: 0 15px 36px rgba(37, 99, 235, 0.11);
         }
 
         .popular-ribbon {
           position: absolute;
-
-          top: 0;
-          right: 0;
-
-          padding: 8px 13px;
-
-          border-bottom-left-radius: 13px;
-
+          top: -1px;
+          right: 16px;
+          padding: 7px 10px;
+          border-radius: 0 0 9px 9px;
           background: #2563eb;
-
-          color: #ffffff;
-
+          color: white;
           font-size: 8px;
-
-          font-weight: 950;
-
-          letter-spacing: 0.08em;
+          font-weight: 900;
+          letter-spacing: 0.05em;
         }
 
         .plan-eyebrow {
-          display: inline-flex;
-
+          display: flex;
           align-items: center;
-
-          gap: 6px;
-
+          gap: 8px;
           color: #2563eb;
-
-          font-size: 8px;
-
-          font-weight: 950;
-
-          letter-spacing: 0.11em;
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: 0.1em;
         }
 
-        .plan-icon {
-          font-size: 11px;
+        .plan-symbol {
+          width: 27px;
+          height: 27px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 8px;
+          background: #eff6ff;
+          font-size: 14px;
         }
 
         .plan-name {
-          margin: 8px 0 0;
-
+          margin: 15px 0 15px;
           color: #0f172a;
-
-          font-size: 24px;
-
-          line-height: 1.1;
-
-          font-weight: 950;
-
-          letter-spacing: -0.025em;
+          font-size: 23px;
+          line-height: 1.2;
+          font-weight: 900;
+          overflow-wrap: anywhere;
         }
-
-        /* =====================================================
-           PLAN DESCRIPTION CARD
-        ===================================================== */
 
         .plan-description-card {
-          width: 100%;
-
-          margin-top: 15px;
-
-          padding: 16px 17px 17px;
-
-          border-radius: 16px;
-
-          background: linear-gradient(
-            135deg,
-            #f8fbff 0%,
-            #eef6ff 100%
-          );
-
-          border: 1px solid #d7e7fb;
-
-          box-shadow:
-            0 8px 22px
-              rgba(30, 64, 175, 0.07);
-
-          box-sizing: border-box;
-
-          position: relative;
-
-          overflow: hidden;
-        }
-
-        .plan-description-card::before {
-          content: "";
-
-          position: absolute;
-
-          top: 0;
-          left: 0;
-
-          width: 4px;
-          height: 100%;
-
-          background: linear-gradient(
-            180deg,
-            #2563eb,
-            #60a5fa
-          );
-
-          border-radius: 16px 0 0 16px;
-        }
-
-        .description-card-top {
-          position: relative;
-
-          z-index: 1;
-
+          min-height: 150px;
+          padding: 16px;
           display: flex;
+          flex-direction: column;
+          justify-content: flex-start;
+          border: 1px solid #dbe7f5;
+          border-radius: 15px;
+          background: linear-gradient(135deg, #fff, #f3f7ff);
+          color: #0f172a;
+        }
 
+        .description-card-heading {
+          display: flex;
           align-items: center;
-
           gap: 8px;
-
-          margin-bottom: 9px;
+          margin-bottom: 10px;
+          color: #1d4ed8;
+          font-size: 8px;
+          font-weight: 900;
+          letter-spacing: 0.1em;
         }
 
-        .description-card-icon {
-          width: 25px;
-          height: 25px;
-
-          flex: 0 0 auto;
-
+        .small-star {
+          width: 23px;
+          height: 23px;
+          flex-shrink: 0;
           display: flex;
-
           align-items: center;
           justify-content: center;
-
-          border-radius: 8px;
-
+          border-radius: 7px;
           background: #dbeafe;
-
-          color: #2563eb;
-
           font-size: 11px;
-
-          font-weight: 950;
-
-          border: 1px solid #bfdbfe;
         }
 
-        .description-card-label {
-          color: #1d4ed8;
-
-          font-size: 8px;
-
-          line-height: 1;
-
-          font-weight: 950;
-
-          letter-spacing: 0.12em;
-        }
-
-        .plan-description {
-          position: relative;
-
-          z-index: 1;
-
+        .plan-description-card p {
+          display: block;
+          width: 100%;
           margin: 0;
-
-          padding-left: 33px;
-
-          color: #334155;
-
-          font-size: 12.5px;
-
-          line-height: 1.65;
-
+          padding-left: 31px;
+          color: #1e293b;
+          font-size: 13px;
+          line-height: 1.75;
           font-weight: 600;
+          opacity: 1;
+          visibility: visible;
+          overflow-wrap: anywhere;
         }
-
-        /* =====================================================
-           PRICE
-        ===================================================== */
 
         .price-area {
-          margin-top: 19px;
+          min-height: 94px;
+          margin-top: 23px;
+          display: flex;
+          flex-wrap: wrap;
+          align-items: baseline;
+          gap: 7px;
         }
 
         .price {
           color: #0f172a;
-
-          font-size: 32px;
-
-          line-height: 1;
-
-          font-weight: 950;
-
-          letter-spacing: -0.04em;
+          font-size: 33px;
+          font-weight: 900;
+          letter-spacing: -1px;
+          overflow-wrap: anywhere;
         }
 
         .price-period {
-          margin-left: 5px;
-
           color: #64748b;
-
           font-size: 11px;
-
-          font-weight: 750;
+          font-weight: 700;
         }
 
         .annual-note {
-          margin-top: 7px;
-
-          color: #16a34a;
-
-          font-size: 10px;
-
-          font-weight: 850;
+          width: 100%;
+          color: #15803d;
+          font-size: 9px;
+          font-weight: 900;
         }
 
         .listing-badge {
-          display: inline-flex;
-
+          min-height: 42px;
+          padding: 10px 12px;
+          display: flex;
           align-items: center;
-
-          gap: 7px;
-
-          width: fit-content;
-
-          margin-top: 14px;
-
-          padding: 8px 10px;
-
+          gap: 9px;
+          border: 1px solid #dbeafe;
           border-radius: 10px;
-
-          background: #f1f5f9;
-
-          color: #334155;
-
-          font-size: 10px;
-
+          background: #eff6ff;
+          color: #1e40af;
+          font-size: 11px;
+          line-height: 1.5;
           font-weight: 800;
         }
 
-        .listing-badge-icon {
-          color: #2563eb;
-
-          font-size: 12px;
-        }
-
-        /* =====================================================
-           FEATURES
-        ===================================================== */
-
         .features-heading {
-          margin: 20px 0 11px;
-
+          margin: 23px 0 13px;
           color: #0f172a;
-
-          font-size: 10px;
-
-          font-weight: 950;
-
-          letter-spacing: 0.08em;
-
-          text-transform: uppercase;
+          font-size: 12px;
+          font-weight: 900;
         }
 
         .features {
-          margin: 0;
-
+          margin: 0 0 24px;
           padding: 0;
-
-          list-style: none;
-
           display: flex;
-
           flex-direction: column;
-
-          gap: 9px;
+          gap: 12px;
+          list-style: none;
         }
 
-        .feature {
+        .features li {
           display: flex;
-
           align-items: flex-start;
-
           gap: 9px;
-
           color: #475569;
-
-          font-size: 11px;
-
-          line-height: 1.4;
-
-          font-weight: 650;
+          font-size: 12px;
+          line-height: 1.55;
+          overflow-wrap: anywhere;
         }
 
         .check {
-          width: 18px;
-          height: 18px;
-
-          flex: 0 0 auto;
-
+          width: 19px;
+          height: 19px;
+          flex-shrink: 0;
           display: flex;
-
           align-items: center;
           justify-content: center;
-
-          border-radius: 6px;
-
-          background: #eff6ff;
-
-          color: #2563eb;
-
-          font-size: 10px;
-
-          font-weight: 950;
+          border-radius: 50%;
+          background: #dcfce7;
+          color: #15803d;
+          font-size: 11px;
+          font-weight: 900;
         }
-
-        /* =====================================================
-           PLAN BUTTON
-        ===================================================== */
 
         .plan-button {
           width: 100%;
-
-          min-height: 46px;
-
-          margin-top: 22px;
-
+          min-height: 47px;
+          margin-top: auto;
+          padding: 12px;
           border: 0;
-
-          border-radius: 12px;
-
-          background: linear-gradient(
-            135deg,
-            #2563eb,
-            #1d4ed8
-          );
-
-          color: #ffffff;
-
+          border-radius: 11px;
+          background: #2563eb;
+          color: white;
           font-size: 12px;
-
           font-weight: 900;
-
           cursor: pointer;
-
-          box-shadow:
-            0 8px 18px
-              rgba(37, 99, 235, 0.20);
-
-          transition: 0.2s ease;
+          transition: background 0.2s ease;
         }
 
-        .plan-button:hover {
-          transform: translateY(-1px);
-
-          box-shadow:
-            0 11px 23px
-              rgba(37, 99, 235, 0.25);
+        .plan-button:hover:not(:disabled) {
+          background: #1d4ed8;
         }
 
         .plan-button:disabled {
+          cursor: wait;
           opacity: 0.65;
-
-          cursor: not-allowed;
-
-          transform: none;
         }
 
-        .payfast-note {
-          margin-top: 11px;
-
+        .payment-note {
+          margin: 12px 0 0;
+          color: #64748b;
+          font-size: 10px;
+          line-height: 1.7;
           text-align: center;
-
-          color: #94a3b8;
-
-          font-size: 9px;
-
-          font-weight: 700;
         }
 
-        .payfast-note span {
-          color: #2563eb;
-
-          font-weight: 850;
+        .trust-section {
+          width: min(850px, calc(100% - 32px));
+          margin: 30px auto 0;
+          padding: 21px;
+          display: flex;
+          align-items: flex-start;
+          gap: 14px;
+          border: 1px solid #dbe3ef;
+          border-radius: 16px;
+          background: white;
         }
 
-        /* =====================================================
-           ERROR
-        ===================================================== */
-
-        .error-box {
-          width: min(
-            900px,
-            calc(100% - 32px)
-          );
-
-          margin: 0 auto 20px;
-
-          padding: 12px 15px;
-
-          border-radius: 12px;
-
-          background: #fef2f2;
-
-          border: 1px solid #fecaca;
-
-          color: #b91c1c;
-
-          font-size: 11px;
-
-          line-height: 1.5;
-
-          font-weight: 700;
+        .trust-icon {
+          width: 39px;
+          height: 39px;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 11px;
+          background: #eff6ff;
+          font-size: 17px;
         }
 
-        /* =====================================================
-           FOOTER TRUST
-        ===================================================== */
-
-        .trust {
-          width: min(
-            700px,
-            calc(100% - 32px)
-          );
-
-          margin: 38px auto 0;
-
-          padding: 20px;
-
-          text-align: center;
-
-          border-radius: 18px;
-
-          background: #ffffff;
-
-          border: 1px solid #e2e8f0;
-
-          box-shadow:
-            0 10px 28px
-              rgba(15, 23, 42, 0.04);
-        }
-
-        .trust-title {
-          margin: 0;
-
+        .trust-section h3 {
+          margin: 0 0 7px;
           color: #0f172a;
-
-          font-size: 12px;
-
+          font-size: 13px;
           font-weight: 900;
         }
 
-        .trust-text {
-          margin: 6px 0 0;
-
+        .trust-section p {
+          margin: 0;
           color: #64748b;
-
-          font-size: 10px;
-
-          line-height: 1.5;
-
-          font-weight: 650;
+          font-size: 12px;
+          line-height: 1.8;
         }
 
-        .trust-pill {
-          display: inline-flex;
-
+        .footer {
+          width: min(1120px, calc(100% - 32px));
+          margin: 30px auto 0;
+          padding-top: 19px;
+          display: flex;
+          flex-wrap: wrap;
           align-items: center;
-
-          gap: 6px;
-
-          margin-top: 11px;
-
-          padding: 7px 10px;
-
-          border-radius: 999px;
-
-          background: #eff6ff;
-
-          color: #2563eb;
-
-          font-size: 9px;
-
-          font-weight: 850;
+          justify-content: space-between;
+          gap: 10px;
+          border-top: 1px solid #e2e8f0;
+          color: #64748b;
+          font-size: 11px;
         }
-      `}</style>
-      
-            <main className="page">
 
-        {/* ====================================================
-            HEADER
-        ==================================================== */}
-
-        <header className="header">
-          <div className="header-inner">
-
-            <div className="brand">
-              <div className="brand-mark">
-                G
-              </div>
-
-              <div className="brand-copy">
-                <p className="brand-name">
-                  GradLink SA
-                </p>
-
-                <p className="brand-subtitle">
-                  Graduate Recruitment Platform
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className="dashboard-button"
-              onClick={() =>
-                router.push("/company-dashboard")
-              }
-            >
-              Dashboard
-              <span className="arrow">
-                →
-              </span>
-            </button>
-
-          </div>
-        </header>
-
-        {/* ====================================================
-            HERO
-        ==================================================== */}
-
-        <section className="hero">
-
-          <div className="hero-badge">
-            ✦ COMPANY RECRUITMENT PLANS
-          </div>
-
-          <h1 className="hero-title">
-            Find the right graduates.
-            <br />
-            <span>
-              Build your team.
-            </span>
-          </h1>
-
-          {/* PREMIUM HERO DESCRIPTION CARD */}
-
-          <div className="hero-description-card">
-
-            <div className="hero-description-top">
-
-              <span className="hero-description-icon">
-                ✦
-              </span>
-
-              <span className="hero-description-label">
-                RECRUIT WITH CONFIDENCE
-              </span>
-
-            </div>
-
-            <p className="hero-text">
-              Choose the GradLink SA plan that fits your
-              hiring needs. Access qualified graduate
-              talent, powerful applicant management
-              tools and smarter recruitment features.
-            </p>
-
-          </div>
-
-        </section>
-
-        {/* ====================================================
-            ACTIVE SUBSCRIPTION
-        ==================================================== */}
-
-        {isActive && (
-          <section className="active-banner">
-
-            <div className="active-copy">
-
-              <div className="active-label">
-                ACTIVE SUBSCRIPTION
-              </div>
-
-              <div className="active-title">
-                Your{" "}
-                {subscription?.plan
-                  ? String(subscription.plan)
-                      .charAt(0)
-                      .toUpperCase() +
-                    String(subscription.plan).slice(1)
-                  : "company"}{" "}
-                plan is active.
-              </div>
-
-            </div>
-
-            <button
-              type="button"
-              className="active-button"
-              onClick={() =>
-                router.push(
-                  "/company-dashboard"
-                )
-              }
-            >
-              Go to Dashboard
-              <span>
-                →
-              </span>
-            </button>
-
-          </section>
-        )}
-
-        {/* ====================================================
-            ERROR
-        ==================================================== */}
-
-        {error && (
-          <div className="error-box">
-            {error}
-          </div>
-        )}
-
-        {/* ====================================================
-            BILLING TOGGLE
-        ==================================================== */}
-
-        <div className="billing-area">
-
-          <div className="billing-switch">
-
-            <button
-              type="button"
-              className={`billing-option ${
-                billing === "monthly"
-                  ? "active"
-                  : ""
-              }`}
-              onClick={() =>
-                setBilling("monthly")
-              }
-            >
-              Monthly
-            </button>
-
-            <button
-              type="button"
-              className={`billing-option ${
-                billing === "annual"
-                  ? "active"
-                  : ""
-              }`}
-              onClick={() =>
-                setBilling("annual")
-              }
-            >
-              Annual
-
-              <span className="save-badge">
-                SAVE 2 MONTHS
-              </span>
-            </button>
-
-          </div>
-
-        </div>
-
-        {/* ====================================================
-            PLAN CARDS
-        ==================================================== */}
-
-        <section className="plans">
-
-          {Object.values(PLANS).map((plan) => {
-
-            const price =
-              getPlanPrice(plan);
-
-            const period =
-              getBillingLabel(plan);
-
-            return (
-              <article
-                key={plan.key}
-                className={`plan-card ${
-                  plan.popular
-                    ? "popular"
-                    : ""
-                }`}
-              >
-
-                {/* POPULAR */}
-
-                {plan.popular && (
-                  <div className="popular-ribbon">
-                    MOST POPULAR
-                  </div>
-                )}
-
-                {/* EYEBROW */}
-
-                <div className="plan-eyebrow">
-
-                  <span className="plan-icon">
-                    {plan.key === "listing" ? "◎" : "✦"}
-                  </span>
-
-                  {plan.eyebrow}
-
-                </div>
-
-                {/* PLAN NAME */}
-
-                <h2 className="plan-name">
-                  {plan.name}
-                </h2>
-
-                {/* =================================================
-                    PLAN DESCRIPTION
-                ================================================= */}
-
-                <div className="plan-description-card">
-
-                  <div className="description-card-top">
-
-                    <span className="description-card-icon">
-                      ✦
-                    </span>
-
-                    <span className="description-card-label">
-                      PLAN OVERVIEW
-                    </span>
-
-                  </div>
-
-                  <p className="plan-description">
-                    {plan.description}
-                  </p>
-
-                </div>
-
-                {/* =================================================
-                    PRICE
-                ================================================= */}
-
-                <div className="price-area">
-
-                  <span className="price">
-                    R{formatPrice(price)}
-                  </span>
-
-                  <span className="price-period">
-                    / {period}
-                  </span>
-
-                  {plan.key !== "listing" &&
-                    billing === "annual" && (
-                      <div className="annual-note">
-                        SAVE 2 MONTHS WITH
-                        ANNUAL BILLING
-                      </div>
-                    )}
-
-                </div>
-
-                {/* LISTING COUNT */}
-
-                <div className="listing-badge">
-
-                  <span className="listing-badge-icon">
-                    ▣
-                  </span>
-
-                  {plan.listingLabel}
-
-                </div>
-
-                {/* =================================================
-                    FEATURES
-                ================================================= */}
-
-                <div className="features-heading">
-                  What's included
-                </div>
-
-                <ul className="features">
-
-                  {plan.features.map(
-                    (feature, index) => (
-                      <li
-                        className="feature"
-                        key={`${plan.key}-${index}`}
-                      >
-
-                        <span className="check">
-                          ✓
-                        </span>
-
-                        <span>
-                          {feature}
-                        </span>
-
-                      </li>
-                    )
-                  )}
-
-                </ul>
-
-                {/* =================================================
-                    CTA
-                ================================================= */}
-
-                <button
-                  type="button"
-                  className="plan-button"
-                  disabled={
-                    processingPlan ===
-                    plan.key
-                  }
-                  onClick={() =>
-                    choosePlan(plan)
-                  }
-                >
-                  {processingPlan ===
-                  plan.key
-                    ? "Preparing Payment..."
-                    : plan.key ===
-                      "listing"
-                    ? "Choose Listing"
-                    : "Choose Plan"}
-                </button>
-
-                <div className="payfast-note">
-                  Manual bank transfer · activation after verification
-                </div>
-
-              </article>
-            );
-          })}
-
-        </section>
-
-        {/* ====================================================
-            TRUST AREA
-        ==================================================== */}
-
-        <section className="trust">
-
-          <p className="trust-title">
-            Secure company payments
-          </p>
-
-          <p className="trust-text">
-Pay by bank transfer and submit your payment reference and proof. Your company plan activates only after GradLink SA verifies the payment.
-          </p>
-
-          <div className="trust-pill">
-            🔒 Secure manual payment verification
-          </div>
-
-        </section>
-
-      </main>
-
-      {/* ======================================================
-          MOBILE STYLES
-      ====================================================== */}
-
-      <style jsx>{`
-        @media (max-width: 700px) {
-
+        .footer a {
+          color: #1d4ed8;
+          font-weight: 900;
+          text-decoration: none;
+        }
+
+        @media (max-width: 900px) {
+          .plans {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+
+          .plan-card:last-child {
+            grid-column: 1 / -1;
+          }
+
+          .plan-card:last-child .plan-description-card {
+            min-height: 120px;
+          }
+        }
+
+        @media (max-width: 650px) {
           .header-inner {
-            width: min(
-              100% - 22px,
-              1120px
-            );
-
+            width: calc(100% - 24px);
             min-height: 64px;
           }
 
           .brand-mark {
-            width: 38px;
-            height: 38px;
+            width: 37px;
+            height: 37px;
             border-radius: 11px;
           }
 
-          .brand-name {
+          .brand-copy strong {
             font-size: 13px;
           }
 
-          .brand-subtitle {
+          .brand-copy small {
+            max-width: 165px;
             font-size: 9px;
+            line-height: 1.4;
           }
 
           .dashboard-button {
             min-height: 37px;
-
-            padding: 0 11px;
-
+            padding: 0 10px;
             font-size: 10px;
           }
-
-          /* HERO */
 
           .hero {
             width: calc(100% - 26px);
-
             padding-top: 34px;
-
-            padding-bottom: 25px;
+            padding-bottom: 22px;
           }
 
-          .hero-title {
-            font-size: 32px;
-
-            line-height: 1.08;
+          .hero h1 {
+            font-size: 34px;
+            line-height: 1.1;
+            letter-spacing: -1.1px;
           }
 
-          .hero-description-card {
+          .hero-description {
             margin-top: 19px;
-
-            padding: 16px 17px;
-
-            border-radius: 16px;
+            padding: 16px;
           }
 
-          .hero-description-top {
-            margin-bottom: 8px;
-          }
-
-          .hero-description-icon {
-            width: 25px;
-            height: 25px;
-
-            border-radius: 7px;
-          }
-
-          .hero-description-label {
-            font-size: 7.5px;
-          }
-
-          .hero-text {
-            padding-left: 34px;
-
+          .hero-description p {
+            padding-left: 0;
             font-size: 12px;
-
-            line-height: 1.65;
+            line-height: 1.75;
           }
-
-          /* ACTIVE */
 
           .active-banner {
             width: calc(100% - 26px);
-
-            align-items: flex-start;
-
+            align-items: stretch;
             flex-direction: column;
           }
 
-          .active-button {
+          .active-banner button {
             width: 100%;
-
-            justify-content: center;
+            min-height: 42px;
           }
 
-          /* BILLING */
-
-          .billing-area {
-            padding-bottom: 23px;
+          .error-message {
+            width: calc(100% - 26px);
           }
 
-          .billing-option {
+          .billing-section {
+            margin-top: 8px;
+            margin-bottom: 22px;
+          }
+
+          .billing-toggle button {
+            min-height: 41px;
             padding: 0 12px;
-
-            font-size: 10px;
+            font-size: 11px;
           }
 
-          /* PLANS */
+          .save-badge {
+            font-size: 7px;
+          }
 
           .plans {
             width: calc(100% - 26px);
-
             grid-template-columns: 1fr;
-
             gap: 15px;
           }
 
-          .plan-card {
+          .plan-card,
+          .plan-card:last-child {
+            grid-column: auto;
             padding: 19px;
-
-            border-radius: 20px;
+            border-radius: 19px;
           }
 
           .plan-name {
             font-size: 23px;
           }
 
-          .plan-description-card {
+          .plan-description-card,
+          .plan-card:last-child .plan-description-card {
+            min-height: 125px;
             padding: 16px;
-
-            border-radius: 16px;
           }
 
-          .plan-description {
-            padding-left: 33px;
+          .plan-description-card p {
+            padding-left: 31px;
+            color: #1e293b;
+            font-size: 13px;
+            line-height: 1.75;
+            font-weight: 600;
+            opacity: 1;
+            visibility: visible;
+          }
 
-            font-size: 12.5px;
+          .price-area {
+            min-height: 82px;
+            margin-top: 19px;
           }
 
           .price {
-            font-size: 30px;
+            font-size: 31px;
           }
 
-          /* TRUST */
+          .features {
+            gap: 11px;
+          }
 
-          .trust {
+          .plan-button {
+            min-height: 49px;
+          }
+
+          .trust-section {
             width: calc(100% - 26px);
+            padding: 17px;
+          }
 
-            margin-top: 30px;
-
-            padding: 18px;
+          .footer {
+            width: calc(100% - 26px);
+            flex-direction: column;
+            align-items: flex-start;
           }
         }
 
         @media (max-width: 380px) {
-
-          .brand-subtitle {
+          .brand-copy small {
             display: none;
           }
 
-          .hero-title {
-            font-size: 29px;
+          .hero h1 {
+            font-size: 30px;
           }
 
-          .hero-description-card {
-            padding: 15px;
-          }
-
-          .hero-text {
-            padding-left: 33px;
-
-            font-size: 11.5px;
-          }
-
-          .billing-option {
+          .billing-toggle button {
             padding: 0 9px;
           }
 
@@ -1923,11 +1253,17 @@ Pay by bank transfer and submit your payment reference and proof. Your company p
             display: none;
           }
 
-          .plan-card {
-            padding: 17px;
+          .plan-card,
+          .plan-card:last-child {
+            padding: 16px;
+          }
+
+          .plan-description-card,
+          .plan-card:last-child .plan-description-card {
+            padding: 14px;
           }
         }
       `}</style>
-    </>
+    </main>
   );
 }
