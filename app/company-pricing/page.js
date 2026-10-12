@@ -1,4 +1,4 @@
-> {
+
     let mounted = true;
 
     async function loadCompanyData() {
