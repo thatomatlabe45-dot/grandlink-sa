@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "../../../lib/supabase";
@@ -15,52 +15,113 @@ export default function AdminPaymentsPage() {
   const [error, setError] = useState("");
   const [processingId, setProcessingId] = useState(null);
   const [filter, setFilter] = useState("pending");
+  const [search, setSearch] = useState("");
 
   const loadRequests = useCallback(async () => {
+    setLoading(true);
     setError("");
 
-    const { data: authData, error: authError } =
-      await supabase.auth.getUser();
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
 
-    if (authError || !authData?.user) {
-      router.replace("/login");
-      return;
-    }
+      if (authError || !user) {
+        router.replace("/login");
+        return;
+      }
 
-    const { data: adminRecord, error: adminError } = await supabase
-      .from("admin_users")
-      .select("user_id")
-      .eq("user_id", authData.user.id)
-      .maybeSingle();
+      const { data: admin, error: adminError } = await supabase
+        .from("admin_users")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-    if (adminError || !adminRecord) {
-      setAuthorized(false);
+      if (adminError) {
+        throw new Error(
+          "We could not verify administrator access. Please try again."
+        );
+      }
+
+      if (!admin) {
+        setAuthorized(false);
+        setRequests([]);
+        setError("Administrator access is required to view payment requests.");
+        return;
+      }
+
+      setAuthorized(true);
+
+      const { data: paymentRequests, error: requestsError } =
+        await supabase
+          .from("payment_requests")
+          .select(
+            "id, company_id, subscription_id, payment_amount, payment_reference, proof_path, status, submitted_at, reviewed_at, created_at"
+          )
+          .order("submitted_at", { ascending: false });
+
+      if (requestsError) {
+        throw new Error(
+          requestsError.message || "Could not load payment requests."
+        );
+      }
+
+      const rows = paymentRequests || [];
+
+      /*
+       * Look up the company profiles using:
+       * payment_requests.company_id -> companies.user_id
+       */
+      const companyIds = [
+        ...new Set(rows.map((row) => row.company_id).filter(Boolean)),
+      ];
+
+      let companyMap = {};
+
+      if (companyIds.length > 0) {
+        const { data: companies, error: companiesError } = await supabase
+          .from("companies")
+          .select("user_id, company_name, email, logo_url")
+          .in("user_id", companyIds);
+
+        if (companiesError) {
+          throw new Error(
+            "Payment requests loaded, but company details could not be loaded: " +
+              companiesError.message
+          );
+        }
+
+        companyMap = Object.fromEntries(
+          (companies || []).map((company) => [
+            company.user_id,
+            {
+              company_name: company.company_name,
+              email: company.email,
+              logo_url: company.logo_url,
+            },
+          ])
+        );
+      }
+
+      const enrichedRequests = rows.map((request) => {
+        const company = companyMap[request.company_id];
+
+        return {
+          ...request,
+          company_name:
+            company?.company_name?.trim() || "Company profile not found",
+          company_email: company?.email || "",
+          company_logo: company?.logo_url || "",
+        };
+      });
+
+      setRequests(enrichedRequests);
+    } catch (err) {
+      setError(err.message || "Something went wrong loading payments.");
+    } finally {
       setLoading(false);
-      setError(
-        "Administrator access required. Sign in using your registered administrator account."
-      );
-      return;
     }
-
-    setAuthorized(true);
-
-    const { data, error: requestsError } = await supabase
-      .from("payment_requests")
-      .select(
-        "id, company_id, subscription_id, payment_amount, payment_reference, proof_path, status, submitted_at, reviewed_at, created_at"
-      )
-      .order("submitted_at", { ascending: false });
-
-    if (requestsError) {
-      setError(
-        "Could not load payment requests. Please check your Supabase permissions and try again."
-      );
-      setRequests([]);
-    } else {
-      setRequests(data || []);
-    }
-
-    setLoading(false);
   }, [router]);
 
   useEffect(() => {
@@ -68,92 +129,204 @@ export default function AdminPaymentsPage() {
   }, [loadRequests]);
 
   async function reviewPayment(request, decision) {
-    const isApproval = decision === "approve";
+    setMessage("");
+    setError("");
 
-    const confirmed = window.confirm(
-      isApproval
-        ? "Have you verified in your Capitec Business account that this payment has arrived and the amount is correct? Only approve verified payments."
-        : "Are you sure you want to reject this payment request?"
+    const companyName = request.company_name || "this company";
+    const amount = Number(request.payment_amount || 0).toLocaleString(
+      "en-ZA"
     );
 
-    if (!confirmed) return;
+    if (decision === "approve") {
+      const confirmed = window.confirm(
+        `IMPORTANT: Have you confirmed that R${amount} has arrived in your Capitec business account?\n\nCompany: ${companyName}\nReference: ${request.payment_reference || "Not provided"}\n\nOnly approve if the money is confirmed in your account.`
+      );
+
+      if (!confirmed) return;
+    } else {
+      const confirmed = window.confirm(
+        `Reject this payment request from ${companyName}?\n\nThe subscription will not be activated.`
+      );
+
+      if (!confirmed) return;
+    }
 
     setProcessingId(request.id);
-    setError("");
-    setMessage("");
 
-    const { data, error: reviewError } = await supabase.rpc(
-      "admin_review_payment_request",
-      {
-        p_payment_request_id: request.id,
-        p_decision: decision,
+    try {
+      const { data, error: reviewError } = await supabase.rpc(
+        "admin_review_payment_request",
+        {
+          p_payment_request_id: request.id,
+          p_decision: decision,
+        }
+      );
+
+      if (reviewError) {
+        throw new Error(
+          reviewError.message || "The payment review could not be completed."
+        );
       }
-    );
 
-    setProcessingId(null);
+      if (data && data.success === false) {
+        throw new Error(
+          data.message || "The payment review was not successful."
+        );
+      }
 
-    if (reviewError) {
-      setError(reviewError.message || "The payment review failed.");
-      return;
+      setMessage(
+        decision === "approve"
+          ? `Payment approved for ${companyName}.`
+          : `Payment rejected for ${companyName}.`
+      );
+
+      await loadRequests();
+    } catch (err) {
+      setError(err.message || "Could not process this payment.");
+    } finally {
+      setProcessingId(null);
     }
-
-    if (!data?.success) {
-      setError(data?.message || "The payment review was not completed.");
-      return;
-    }
-
-    setMessage(
-      isApproval
-        ? "Payment approved. The associated subscription has been activated."
-        : "Payment request rejected. The subscription has not been activated."
-    );
-
-    await loadRequests();
   }
 
   async function openProof(path) {
-    if (!path) {
-      setError("No proof-of-payment file was provided.");
-      return;
-    }
-
     setError("");
 
-    const { data, error: proofError } = await supabase.storage
-      .from("payment-proofs")
-      .createSignedUrl(path, 600);
-
-    if (proofError || !data?.signedUrl) {
-      setError(
-        "Could not open the proof. Confirm the payment-proofs bucket exists and administrator read access is configured."
-      );
+    if (!path) {
+      setError("No proof of payment was attached to this request.");
       return;
     }
 
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    try {
+      const { data, error: storageError } = await supabase.storage
+        .from("payment-proofs")
+        .createSignedUrl(path, 600);
+
+      if (storageError || !data?.signedUrl) {
+        throw new Error(
+          storageError?.message ||
+            "Could not open the proof of payment. Check administrator storage permissions."
+        );
+      }
+
+      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setError(err.message || "Could not open proof of payment.");
+    }
   }
 
-  const filteredRequests = requests.filter((request) => {
-    if (filter === "all") return true;
-    return (request.status || "").toLowerCase() === filter;
-  });
+  async function signOut() {
+    const { error: signOutError } = await supabase.auth.signOut();
 
-  const pendingCount = requests.filter(
-    (request) => (request.status || "").toLowerCase() === "pending"
-  ).length;
+    if (signOutError) {
+      setError("Could not sign out. Please try again.");
+      return;
+    }
 
-  const approvedCount = requests.filter(
-    (request) => (request.status || "").toLowerCase() === "approved"
-  ).length;
+    router.replace("/login");
+  }
 
-  const rejectedCount = requests.filter(
-    (request) => (request.status || "").toLowerCase() === "rejected"
-  ).length;
+  const counts = useMemo(() => {
+    return {
+      all: requests.length,
+      pending: requests.filter(
+        (request) => request.status?.toLowerCase() === "pending"
+      ).length,
+      approved: requests.filter(
+        (request) =>
+          ["approved", "completed"].includes(
+            request.status?.toLowerCase()
+          )
+      ).length,
+      rejected: requests.filter(
+        (request) => request.status?.toLowerCase() === "rejected"
+      ).length,
+    };
+  }, [requests]);
+
+  const visibleRequests = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    return requests
+      .filter((request) => {
+        const status = request.status?.toLowerCase() || "";
+
+        if (filter === "pending" && status !== "pending") return false;
+
+        if (
+          filter === "approved" &&
+          !["approved", "completed"].includes(status)
+        ) {
+          return false;
+        }
+
+        if (filter === "rejected" && status !== "rejected") {
+          return false;
+        }
+
+        if (!term) return true;
+
+        return [
+          request.company_name,
+          request.company_email,
+          request.payment_reference,
+          request.subscription_id?.toString(),
+          request.id?.toString(),
+        ].some((value) => String(value || "").toLowerCase().includes(term));
+      })
+      .sort((a, b) => {
+        const nameA = (a.company_name || "").toLowerCase();
+        const nameB = (b.company_name || "").toLowerCase();
+
+        const nameOrder = nameA.localeCompare(nameB);
+
+        if (nameOrder !== 0) return nameOrder;
+
+        return (
+          new Date(b.submitted_at || b.created_at || 0).getTime() -
+          new Date(a.submitted_at || a.created_at || 0).getTime()
+        );
+      });
+  }, [requests, filter, search]);
+
+  function formatDate(value) {
+    if (!value) return "Not available";
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) return "Not available";
+
+    return date.toLocaleString("en-ZA", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function formatAmount(value) {
+    return `R${Number(value || 0).toLocaleString("en-ZA")}`;
+  }
+
+  function statusClass(status) {
+    const value = (status || "unknown").toLowerCase();
+
+    if (value === "pending") return "pending";
+    if (["approved", "completed", "active"].includes(value)) {
+      return "approved";
+    }
+    if (value === "rejected") return "rejected";
+
+    return "unknown";
+  }
 
   if (loading) {
     return (
-      <main className="admin-page">
-        <div className="admin-loading">Loading GradLink SA Admin…</div>
+      <main className="loadingPage">
+        <div className="loadingMark">G</div>
+        <h2>Loading payment reviews</h2>
+        <p>Checking administrator access and payment requests…</p>
+
         <style jsx>{styles}</style>
       </main>
     );
@@ -161,221 +334,343 @@ export default function AdminPaymentsPage() {
 
   if (!authorized) {
     return (
-      <main className="admin-page">
-        <section className="access-card">
-          <div className="brand-mark">GL</div>
+      <main className="accessPage">
+        <div className="accessCard">
+          <div className="brandMark">G</div>
           <p className="eyebrow">GRADLINK SA</p>
-          <h1>Administrator access</h1>
-          <p className="muted">
-            This area is restricted to authorized GradLink SA administrators.
+          <h1>Administrator access required</h1>
+          <p>
+            This area is restricted to authorised GradLink SA administrators.
           </p>
 
-          {error && <div className="alert error">{error}</div>}
+          {error && <div className="alert errorAlert">{error}</div>}
 
-          <Link className="primary-button" href="/login">
-            Sign in
+          <Link href="/" className="primaryButton">
+            Return to homepage
           </Link>
+        </div>
 
-          <Link className="back-link" href="/">
-            Back to home
-          </Link>
-        </section>
         <style jsx>{styles}</style>
       </main>
     );
   }
 
   return (
-    <main className="admin-page">
+    <main className="page">
       <header className="topbar">
         <Link href="/" className="brand">
-          <span className="brand-mark">GL</span>
-          <span>
+          <span className="brandMark">G</span>
+          <span className="brandWords">
             <strong>GradLink SA</strong>
-            <small>Administrator portal</small>
+            <small>Administration</small>
           </span>
         </Link>
 
-        <button
-          className="logout-button"
-          onClick={async () => {
-            await supabase.auth.signOut();
-            router.replace("/login");
-          }}
-        >
-          Sign out
-        </button>
+        <div className="topActions">
+          <span className="adminLabel">
+            <span className="onlineDot" />
+            Admin portal
+          </span>
+
+          <button className="signOutButton" onClick={signOut}>
+            Sign out
+          </button>
+        </div>
       </header>
 
       <div className="content">
-        <div className="intro">
-          <div>
-            <p className="eyebrow">PAYMENT MANAGEMENT</p>
+        <div className="breadcrumb">
+          <Link href="/">Home</Link>
+          <span>/</span>
+          <span>Payment reviews</span>
+        </div>
+
+        <section className="hero">
+          <div className="heroText">
+            <div className="eyebrow">FINANCE & SUBSCRIPTIONS</div>
             <h1>Bank payment reviews</h1>
-            <p className="muted">
-              Verify incoming transfers before activating company subscriptions.
+            <p>
+              Review company payments, verify deposits in your Capitec business
+              account, and activate subscriptions after confirmation.
             </p>
           </div>
 
-          <button className="refresh-button" onClick={loadRequests}>
-            Refresh
-          </button>
-        </div>
-
-        {message && <div className="alert success">{message}</div>}
-        {error && <div className="alert error">{error}</div>}
-
-        <section className="stats">
           <button
-            className={`stat ${filter === "pending" ? "selected" : ""}`}
-            onClick={() => setFilter("pending")}
+            className="refreshButton"
+            onClick={loadRequests}
+            disabled={loading}
           >
-            <span>Awaiting review</span>
-            <strong>{pendingCount}</strong>
-          </button>
-
-          <button
-            className={`stat ${filter === "approved" ? "selected" : ""}`}
-            onClick={() => setFilter("approved")}
-          >
-            <span>Approved</span>
-            <strong>{approvedCount}</strong>
-          </button>
-
-          <button
-            className={`stat ${filter === "rejected" ? "selected" : ""}`}
-            onClick={() => setFilter("rejected")}
-          >
-            <span>Rejected</span>
-            <strong>{rejectedCount}</strong>
+            <span className="refreshIcon">↻</span>
+            Refresh requests
           </button>
         </section>
 
-        <section className="list-section">
-          <div className="section-heading">
+        {message && (
+          <div className="alert successAlert">
+            <span className="alertIcon">✓</span>
+            {message}
+            <button
+              className="dismissButton"
+              onClick={() => setMessage("")}
+              aria-label="Dismiss message"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {error && (
+          <div className="alert errorAlert">
+            <span className="alertIcon">!</span>
+            {error}
+            <button
+              className="dismissButton"
+              onClick={() => setError("")}
+              aria-label="Dismiss message"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        <section className="stats">
+          <button
+            className={`statCard ${filter === "pending" ? "selected" : ""}`}
+            onClick={() => setFilter("pending")}
+          >
+            <span className="statIcon pendingIcon">◷</span>
+            <span className="statText">
+              <small>Awaiting review</small>
+              <strong>{counts.pending}</strong>
+              <span>Needs your attention</span>
+            </span>
+          </button>
+
+          <button
+            className={`statCard ${filter === "approved" ? "selected" : ""}`}
+            onClick={() => setFilter("approved")}
+          >
+            <span className="statIcon approvedIcon">✓</span>
+            <span className="statText">
+              <small>Approved</small>
+              <strong>{counts.approved}</strong>
+              <span>Reviewed successfully</span>
+            </span>
+          </button>
+
+          <button
+            className={`statCard ${filter === "rejected" ? "selected" : ""}`}
+            onClick={() => setFilter("rejected")}
+          >
+            <span className="statIcon rejectedIcon">×</span>
+            <span className="statText">
+              <small>Rejected</small>
+              <strong>{counts.rejected}</strong>
+              <span>Not approved</span>
+            </span>
+          </button>
+        </section>
+
+        <section className="requestsSection">
+          <div className="sectionHeading">
             <div>
-              <h2>Payment requests</h2>
-              <p className="muted">
-                Review the payment details and proof before making a decision.
+              <h2>Company payment requests</h2>
+              <p>
+                {visibleRequests.length}{" "}
+                {visibleRequests.length === 1 ? "request" : "requests"} shown
+                · Ordered alphabetically by company
               </p>
+            </div>
+
+            <span className="totalPill">
+              {counts.all} total
+            </span>
+          </div>
+
+          <div className="toolbar">
+            <div className="searchBox">
+              <span className="searchIcon">⌕</span>
+              <input
+                type="search"
+                placeholder="Search company, reference or ID…"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                aria-label="Search payment requests"
+              />
+
+              {search && (
+                <button
+                  className="clearSearch"
+                  onClick={() => setSearch("")}
+                  aria-label="Clear search"
+                >
+                  ×
+                </button>
+              )}
             </div>
 
             <select
-              aria-label="Filter payment requests"
+              className="filterSelect"
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
+              aria-label="Filter by payment status"
             >
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-              <option value="all">All requests</option>
+              <option value="pending">Pending payments</option>
+              <option value="approved">Approved payments</option>
+              <option value="rejected">Rejected payments</option>
+              <option value="all">All payments</option>
             </select>
           </div>
 
-          {filteredRequests.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">✓</div>
-              <h3>No payment requests here</h3>
-              <p className="muted">
-                Requests matching this filter will appear here after companies
-                submit payment details.
+          {visibleRequests.length === 0 ? (
+            <div className="emptyState">
+              <div className="emptyIcon">▤</div>
+              <h3>No payment requests found</h3>
+              <p>
+                {search
+                  ? "Try another company name, payment reference or ID."
+                  : filter === "pending"
+                    ? "There are no pending payments to review right now."
+                    : "There are no requests in this category yet."}
               </p>
+
+              {(search || filter !== "pending") && (
+                <button
+                  className="textButton"
+                  onClick={() => {
+                    setSearch("");
+                    setFilter("pending");
+                  }}
+                >
+                  Clear filters
+                </button>
+              )}
             </div>
           ) : (
-            <div className="request-list">
-              {filteredRequests.map((request) => {
-                const status = (request.status || "pending").toLowerCase();
-                const isPending = status === "pending";
+            <div className="requestList">
+              {visibleRequests.map((request) => {
+                const pending =
+                  request.status?.toLowerCase() === "pending";
 
                 return (
-                  <article className="request-card" key={request.id}>
-                    <div className="request-header">
-                      <div>
-                        <p className="request-number">
-                          PAYMENT REQUEST #{request.id}
-                        </p>
-                        <h3>
-                          R
-                          {Number(request.payment_amount || 0).toLocaleString(
-                            "en-ZA"
+                  <article className="requestCard" key={request.id}>
+                    <div className="requestTop">
+                      <div className="companyIdentity">
+                        {request.company_logo ? (
+                          <img
+                            src={request.company_logo}
+                            alt=""
+                            className="companyLogo"
+                          />
+                        ) : (
+                          <div className="companyLogoFallback">
+                            {(request.company_name || "C")
+                              .charAt(0)
+                              .toUpperCase()}
+                          </div>
+                        )}
+
+                        <div className="companyDetails">
+                          <h3>{request.company_name}</h3>
+                          {request.company_email && (
+                            <p className="companyEmail">
+                              {request.company_email}
+                            </p>
                           )}
-                        </h3>
+                          <span className="requestId">
+                            Request #{request.id}
+                          </span>
+                        </div>
                       </div>
 
-                      <span className={`status ${status}`}>{status}</span>
+                      <div className="amountAndStatus">
+                        <strong className="amount">
+                          {formatAmount(request.payment_amount)}
+                        </strong>
+
+                        <span
+                          className={`statusBadge ${statusClass(
+                            request.status
+                          )}`}
+                        >
+                          <span className="statusDot" />
+                          {request.status || "Unknown"}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="details">
-                      <div>
-                        <span>Company account ID</span>
-                        <strong className="break-text">
-                          {request.company_id}
+                    <div className="detailsGrid">
+                      <div className="detailItem">
+                        <span>Payment reference</span>
+                        <strong className="referenceValue">
+                          {request.payment_reference || "Not provided"}
                         </strong>
                       </div>
 
-                      <div>
+                      <div className="detailItem">
                         <span>Subscription ID</span>
-                        <strong>{request.subscription_id}</strong>
+                        <strong>#{request.subscription_id}</strong>
                       </div>
 
-                      <div>
-                        <span>Bank reference</span>
-                        <strong className="break-text">
-                          {request.payment_reference || "Not supplied"}
-                        </strong>
-                      </div>
-
-                      <div>
-                        <span>Submitted</span>
+                      <div className="detailItem">
+                        <span>Date submitted</span>
                         <strong>
-                          {request.submitted_at
-                            ? new Date(request.submitted_at).toLocaleString(
-                                "en-ZA"
-                              )
-                            : "Not recorded"}
+                          {formatDate(
+                            request.submitted_at || request.created_at
+                          )}
                         </strong>
                       </div>
 
-                      {request.reviewed_at && (
-                        <div>
-                          <span>Reviewed</span>
-                          <strong>
-                            {new Date(request.reviewed_at).toLocaleString(
-                              "en-ZA"
-                            )}
-                          </strong>
+                      <div className="detailItem">
+                        <span>Date reviewed</span>
+                        <strong>{formatDate(request.reviewed_at)}</strong>
+                      </div>
+                    </div>
+
+                    <div className="requestFooter">
+                      <button
+                        className="proofButton"
+                        onClick={() => openProof(request.proof_path)}
+                        disabled={!request.proof_path}
+                      >
+                        <span>↗</span>
+                        View proof of payment
+                      </button>
+
+                      {pending ? (
+                        <div className="reviewActions">
+                          <button
+                            className="rejectButton"
+                            onClick={() =>
+                              reviewPayment(request, "reject")
+                            }
+                            disabled={processingId === request.id}
+                          >
+                            Reject
+                          </button>
+
+                          <button
+                            className="approveButton"
+                            onClick={() =>
+                              reviewPayment(request, "approve")
+                            }
+                            disabled={processingId === request.id}
+                          >
+                            {processingId === request.id
+                              ? "Processing…"
+                              : "Approve payment"}
+                          </button>
                         </div>
+                      ) : (
+                        <span className="reviewedLabel">
+                          {request.status?.toLowerCase() === "approved"
+                            ? "✓ Payment approved"
+                            : request.status?.toLowerCase() === "rejected"
+                              ? "Payment rejected"
+                              : "No action available"}
+                        </span>
                       )}
                     </div>
-
-                    <button
-                      className="proof-button"
-                      onClick={() => openProof(request.proof_path)}
-                    >
-                      View proof of payment ↗
-                    </button>
-
-                    {isPending && (
-                      <div className="actions">
-                        <button
-                          className="reject-button"
-                          disabled={processingId === request.id}
-                          onClick={() => reviewPayment(request, "reject")}
-                        >
-                          Reject
-                        </button>
-
-                        <button
-                          className="approve-button"
-                          disabled={processingId === request.id}
-                          onClick={() => reviewPayment(request, "approve")}
-                        >
-                          {processingId === request.id
-                            ? "Processing…"
-                            : "Approve payment"}
-                        </button>
-                      </div>
-                    )}
                   </article>
                 );
               })}
@@ -383,9 +678,9 @@ export default function AdminPaymentsPage() {
           )}
         </section>
 
-        <footer className="admin-footer">
-          <span>GradLink SA</span>
-          <span>Manual bank verification enabled</span>
+        <footer className="pageFooter">
+          <span>GradLink SA Administration</span>
+          <span>Verify funds before approving any payment.</span>
         </footer>
       </div>
 
@@ -395,356 +690,1022 @@ export default function AdminPaymentsPage() {
 }
 
 const styles = `
-  .admin-page {
-    min-height: 100vh;
-    background: #f4f7fc;
-    color: #142744;
+  :global(*) {
+    box-sizing: border-box;
+  }
+
+  :global(body) {
+    margin: 0;
+    background: #f5f8fd;
+    color: #15233b;
     font-family: Arial, Helvetica, sans-serif;
   }
 
+  :global(button),
+  :global(input),
+  :global(select) {
+    font: inherit;
+  }
+
+  .page {
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse at 12% 0%, rgba(41, 108, 230, 0.06), transparent 32%),
+      #f5f8fd;
+  }
+
   .topbar {
-    min-height: 74px;
-    padding: 14px max(18px, calc((100% - 1120px) / 2));
-    background: #ffffff;
-    border-bottom: 1px solid #e5ebf4;
+    min-height: 76px;
+    padding: 14px 5.5%;
+    background: #fff;
+    border-bottom: 1px solid #e6edf6;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 16px;
   }
 
   .brand {
     display: flex;
     align-items: center;
     gap: 11px;
-    color: #142744;
     text-decoration: none;
+    color: #132747;
   }
 
-  .brand-mark {
+  .brandMark {
     width: 43px;
     height: 43px;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    flex-shrink: 0;
     border-radius: 13px;
-    background: #155eef;
-    color: white;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-size: 23px;
     font-weight: 800;
-    letter-spacing: -1px;
+    background: linear-gradient(145deg, #2875ef, #1646a9);
+    box-shadow: 0 5px 12px rgba(31, 94, 202, 0.22);
   }
 
-  .brand strong, .brand small {
-    display: block;
+  .brandWords {
+    display: grid;
+    gap: 4px;
   }
 
-  .brand strong { font-size: 15px; }
-  .brand small { margin-top: 4px; color: #72819a; font-size: 12px; }
+  .brandWords strong {
+    font-size: 16px;
+    letter-spacing: -0.3px;
+  }
 
-  .logout-button, .refresh-button {
-    border: 1px solid #dbe4f0;
-    background: white;
-    color: #334663;
-    padding: 10px 14px;
+  .brandWords small {
+    color: #7b8aa1;
+    font-size: 11px;
+  }
+
+  .topActions {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .adminLabel {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #5e6f86;
+  }
+
+  .onlineDot,
+  .statusDot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+    background: #16a36b;
+  }
+
+  .signOutButton {
+    border: 1px solid #dce5f1;
+    background: #fff;
+    color: #425570;
+    padding: 10px 15px;
     border-radius: 10px;
+    font-size: 12px;
     font-weight: 700;
     cursor: pointer;
   }
 
-  .content {
-    width: min(100% - 32px, 1120px);
-    margin: 0 auto;
-    padding: 34px 0 24px;
+  .signOutButton:hover,
+  .refreshButton:hover {
+    background: #f2f6fc;
   }
 
-  .intro {
+  .content {
+    max-width: 1160px;
+    width: 91%;
+    margin: 0 auto;
+    padding: 26px 0 20px;
+  }
+
+  .breadcrumb {
     display: flex;
+    gap: 9px;
     align-items: center;
+    font-size: 12px;
+    color: #8794a8;
+    margin-bottom: 27px;
+  }
+
+  .breadcrumb a {
+    color: #326ac5;
+    text-decoration: none;
+  }
+
+  .hero {
+    display: flex;
     justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 26px;
+    align-items: flex-end;
+    gap: 20px;
+    margin-bottom: 25px;
   }
 
   .eyebrow {
-    margin: 0 0 9px;
-    color: #155eef;
-    font-size: 11px;
+    color: #3973d0;
+    font-size: 10px;
+    font-weight: 800;
     letter-spacing: 1.5px;
+    margin-bottom: 11px;
+  }
+
+  .hero h1 {
+    margin: 0;
+    font-size: clamp(27px, 4vw, 36px);
+    line-height: 1.16;
+    letter-spacing: -1.1px;
+    color: #142947;
+  }
+
+  .hero p {
+    max-width: 620px;
+    margin: 11px 0 0;
+    color: #6e7e95;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  .refreshButton {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid #dbe5f2;
+    background: #fff;
+    color: #28466e;
+    border-radius: 11px;
+    padding: 12px 15px;
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  .refreshButton:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+
+  .refreshIcon {
+    font-size: 19px;
+    line-height: 12px;
+  }
+
+  .alert {
+    border-radius: 11px;
+    padding: 13px 15px;
+    margin: 0 0 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .successAlert {
+    color: #126b47;
+    background: #eaf8f1;
+    border: 1px solid #c8eddb;
+  }
+
+  .errorAlert {
+    color: #a12e3a;
+    background: #fff0f1;
+    border: 1px solid #f6d2d6;
+  }
+
+  .alertIcon {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.05);
     font-weight: 800;
   }
 
-  h1 {
-    margin: 0;
-    font-size: clamp(25px, 4vw, 34px);
-    letter-spacing: -1px;
+  .dismissButton {
+    margin-left: auto;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 21px;
+    cursor: pointer;
   }
-
-  .muted {
-    color: #71809a;
-    line-height: 1.6;
-    font-size: 14px;
-  }
-
-  .intro .muted { max-width: 570px; }
 
   .stats {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
-    margin-bottom: 28px;
+    gap: 15px;
+    margin-bottom: 31px;
   }
 
-  .stat {
+  .statCard {
     min-width: 0;
-    padding: 20px;
-    text-align: left;
-    background: white;
-    border: 1px solid #e3eaf4;
-    border-radius: 16px;
-    cursor: pointer;
-  }
-
-  .stat.selected {
-    border-color: #155eef;
-    box-shadow: 0 0 0 2px #155eef12;
-  }
-
-  .stat span, .stat strong { display: block; }
-  .stat span { color: #71809a; font-size: 13px; }
-  .stat strong { margin-top: 10px; font-size: 30px; }
-
-  .list-section {
-    background: white;
-    border: 1px solid #e3eaf4;
-    border-radius: 18px;
-    padding: 24px;
-  }
-
-  .section-heading {
     display: flex;
+    align-items: center;
+    gap: 15px;
+    text-align: left;
+    padding: 19px;
+    border-radius: 15px;
+    border: 1px solid #e5ebf4;
+    background: #fff;
+    box-shadow: 0 3px 12px rgba(29, 57, 96, 0.025);
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .statCard:hover,
+  .statCard.selected {
+    border-color: #a8c5f6;
+    box-shadow: 0 5px 18px rgba(34, 93, 188, 0.07);
+  }
+
+  .statIcon {
+    width: 43px;
+    height: 43px;
+    border-radius: 13px;
+    display: grid;
+    place-items: center;
+    font-size: 23px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .pendingIcon {
+    color: #a66a0a;
+    background: #fff5dc;
+  }
+
+  .approvedIcon {
+    color: #14835a;
+    background: #e5f8ef;
+  }
+
+  .rejectedIcon {
+    color: #bd3e4c;
+    background: #ffeaed;
+  }
+
+  .statText {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .statText small {
+    color: #72819a;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .statText strong {
+    color: #182d4b;
+    font-size: 27px;
+    line-height: 1;
+  }
+
+  .statText > span {
+    color: #94a0b1;
+    font-size: 10px;
+  }
+
+  .requestsSection {
+    background: #fff;
+    border: 1px solid #e5ebf4;
+    border-radius: 17px;
+    padding: 24px;
+    box-shadow: 0 5px 20px rgba(29, 57, 96, 0.025);
+  }
+
+  .sectionHeading {
+    display: flex;
+    align-items: center;
     justify-content: space-between;
-    align-items: flex-start;
-    gap: 16px;
+    gap: 15px;
+    margin-bottom: 22px;
+  }
+
+  .sectionHeading h2 {
+    margin: 0;
+    font-size: 19px;
+    letter-spacing: -0.4px;
+    color: #1a2e4b;
+  }
+
+  .sectionHeading p {
+    margin: 7px 0 0;
+    color: #8996a9;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .totalPill {
+    background: #eef4ff;
+    color: #2e61ad;
+    border-radius: 20px;
+    padding: 7px 11px;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 205px;
+    gap: 12px;
     margin-bottom: 20px;
   }
 
-  .section-heading h2 { margin: 0; font-size: 20px; }
-  .section-heading p { margin-bottom: 0; }
-
-  select {
-    max-width: 100%;
-    border: 1px solid #dbe4f0;
-    border-radius: 9px;
-    background: white;
-    padding: 10px;
-    color: #243954;
-  }
-
-  .request-list {
-    display: grid;
-    gap: 16px;
-  }
-
-  .request-card {
-    border: 1px solid #e3eaf4;
-    border-radius: 15px;
-    padding: 20px;
+  .searchBox {
     min-width: 0;
-  }
-
-  .request-header {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid #edf1f7;
+    align-items: center;
+    gap: 9px;
+    border: 1px solid #dfe7f1;
+    background: #fbfcfe;
+    border-radius: 10px;
+    padding: 0 12px;
   }
 
-  .request-number {
-    margin: 0 0 9px;
-    font-size: 10px;
-    letter-spacing: 1px;
-    font-weight: 800;
-    color: #71809a;
+  .searchIcon {
+    color: #8c9bb0;
+    font-size: 24px;
+    line-height: 1;
   }
 
-  .request-header h3 {
-    margin: 0;
-    font-size: 27px;
-    letter-spacing: -0.5px;
-  }
-
-  .status {
-    flex-shrink: 0;
-    border-radius: 999px;
-    padding: 7px 10px;
-    background: #edf1f7;
-    color: #53647d;
-    font-size: 11px;
-    font-weight: 800;
-    text-transform: capitalize;
-  }
-
-  .status.pending { background: #fff4d9; color: #8b5b00; }
-  .status.approved { background: #e2f8ec; color: #14733c; }
-  .status.rejected { background: #ffe8e8; color: #a62d2d; }
-
-  .details {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 17px;
-    padding: 20px 0;
-  }
-
-  .details div { min-width: 0; }
-
-  .details span, .details strong { display: block; }
-  .details span { margin-bottom: 6px; color: #71809a; font-size: 12px; }
-  .details strong { font-size: 13px; line-height: 1.5; }
-  .break-text { overflow-wrap: anywhere; }
-
-  .proof-button {
+  .searchBox input {
     width: 100%;
-    padding: 12px;
-    border-radius: 10px;
-    border: 1px solid #cddcf7;
-    background: #f5f8ff;
-    color: #155eef;
-    font-weight: 800;
-    cursor: pointer;
-  }
-
-  .actions {
-    display: grid;
-    grid-template-columns: 1fr 1.6fr;
-    gap: 10px;
-    margin-top: 12px;
-  }
-
-  .actions button {
     min-width: 0;
-    padding: 13px 10px;
-    border-radius: 10px;
-    font-weight: 800;
+    height: 43px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #203550;
+    font-size: 12px;
+  }
+
+  .searchBox input::placeholder {
+    color: #9aa6b7;
+  }
+
+  .clearSearch {
+    border: 0;
+    background: transparent;
+    color: #75849b;
+    font-size: 20px;
     cursor: pointer;
   }
 
-  .actions button:disabled { opacity: 0.6; cursor: wait; }
-
-  .reject-button {
-    border: 1px solid #f0caca;
-    background: white;
-    color: #a62d2d;
+  .filterSelect {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid #dfe7f1;
+    border-radius: 10px;
+    background: #fff;
+    color: #334a69;
+    padding: 0 11px;
+    height: 45px;
+    font-size: 12px;
+    font-weight: 700;
+    outline-color: #7ba7ef;
   }
 
-  .approve-button, .primary-button {
-    border: 0;
-    background: #155eef;
-    color: white;
+  .requestList {
+    display: grid;
+    gap: 14px;
   }
 
-  .empty-state {
-    text-align: center;
-    padding: 45px 16px;
-    border: 1px dashed #d6e0ee;
+  .requestCard {
+    min-width: 0;
+    border: 1px solid #e5ebf4;
     border-radius: 14px;
+    padding: 20px;
+    background: #fff;
+    transition: border-color 0.15s, box-shadow 0.15s;
   }
 
-  .empty-icon {
-    width: 46px;
-    height: 46px;
-    margin: 0 auto 14px;
+  .requestCard:hover {
+    border-color: #cbdcf5;
+    box-shadow: 0 5px 16px rgba(31, 73, 133, 0.045);
+  }
+
+  .requestTop {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 15px;
+  }
+
+  .companyIdentity {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    min-width: 0;
+  }
+
+  .companyLogo,
+  .companyLogoFallback {
+    width: 51px;
+    height: 51px;
+    border-radius: 13px;
+    border: 1px solid #e5ebf4;
+    flex-shrink: 0;
+    object-fit: contain;
+    background: #f7faff;
+  }
+
+  .companyLogoFallback {
     display: grid;
     place-items: center;
-    border-radius: 50%;
-    background: #e8f7ee;
-    color: #14733c;
+    background: linear-gradient(145deg, #e9f1ff, #f5f8ff);
+    color: #2b60b5;
     font-size: 22px;
     font-weight: 800;
   }
 
-  .empty-state h3 { margin: 0; }
-  .empty-state p { max-width: 400px; margin: 10px auto 0; }
-
-  .admin-footer {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 23px 4px;
-    color: #8290a5;
-    font-size: 12px;
+  .companyDetails {
+    min-width: 0;
   }
 
-  .alert {
-    padding: 13px 15px;
-    margin-bottom: 18px;
-    border-radius: 11px;
-    font-size: 13px;
-    line-height: 1.5;
+  .companyDetails h3 {
+    margin: 0;
+    color: #1b3150;
+    font-size: 15px;
+    line-height: 1.45;
     overflow-wrap: anywhere;
   }
 
-  .alert.success { background: #e7f8ee; color: #176c3b; }
-  .alert.error { background: #fff0f0; color: #a62d2d; }
-
-  .access-card {
-    width: min(100% - 32px, 430px);
-    margin: 12vh auto 0;
-    padding: 30px;
-    background: white;
-    border: 1px solid #e3eaf4;
-    border-radius: 20px;
-    box-shadow: 0 15px 50px #16335c0d;
+  .companyEmail {
+    margin: 4px 0 0;
+    color: #74849a;
+    font-size: 11px;
+    overflow-wrap: anywhere;
   }
 
-  .access-card .brand-mark { margin-bottom: 22px; }
-  .access-card h1 { font-size: 27px; }
-  .primary-button {
-    display: block;
-    padding: 13px;
+  .requestId {
+    display: inline-block;
+    margin-top: 6px;
+    color: #98a3b3;
+    font-size: 10px;
+  }
+
+  .amountAndStatus {
+    flex-shrink: 0;
+    display: grid;
+    justify-items: end;
+    gap: 9px;
+  }
+
+  .amount {
+    font-size: 22px;
+    letter-spacing: -0.5px;
+    color: #193d72;
+  }
+
+  .statusBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 20px;
+    padding: 6px 9px;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: capitalize;
+  }
+
+  .statusBadge.pending {
+    color: #9b670d;
+    background: #fff4d9;
+  }
+
+  .statusBadge.pending .statusDot {
+    background: #d89b22;
+  }
+
+  .statusBadge.approved {
+    color: #11734d;
+    background: #e4f7ed;
+  }
+
+  .statusBadge.approved .statusDot {
+    background: #16a36b;
+  }
+
+  .statusBadge.rejected {
+    color: #a12e3a;
+    background: #ffeaed;
+  }
+
+  .statusBadge.rejected .statusDot {
+    background: #d74c5a;
+  }
+
+  .statusBadge.unknown {
+    color: #66768d;
+    background: #eef2f7;
+  }
+
+  .statusBadge.unknown .statusDot {
+    background: #8a98aa;
+  }
+
+  .detailsGrid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 17px 24px;
+    padding: 19px 0;
+    margin-top: 18px;
+    border-top: 1px solid #edf1f7;
+    border-bottom: 1px solid #edf1f7;
+  }
+
+  .detailItem {
+    min-width: 0;
+    display: grid;
+    gap: 7px;
+  }
+
+  .detailItem > span {
+    color: #8a98aa;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.55px;
+  }
+
+  .detailItem strong {
+    color: #344964;
+    font-size: 12px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+    line-height: 1.5;
+  }
+
+  .referenceValue {
+    color: #2d5eaa !important;
+  }
+
+  .requestFooter {
+    padding-top: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 13px;
+  }
+
+  .proofButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: 0;
+    background: transparent;
+    color: #326ac5;
+    padding: 8px 0;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .proofButton span {
+    font-size: 16px;
+  }
+
+  .proofButton:disabled {
+    color: #a5afbd;
+    cursor: not-allowed;
+  }
+
+  .reviewActions {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+
+  .rejectButton,
+  .approveButton {
+    min-height: 39px;
+    border-radius: 9px;
+    padding: 0 13px;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .rejectButton {
+    background: #fff;
+    color: #b33948;
+    border: 1px solid #f0cdd2;
+  }
+
+  .rejectButton:hover {
+    background: #fff5f6;
+  }
+
+  .approveButton {
+    background: linear-gradient(135deg, #276fe1, #1c54b5);
+    border: 1px solid #2764c7;
+    color: #fff;
+    box-shadow: 0 3px 8px rgba(35, 94, 193, 0.14);
+  }
+
+  .approveButton:hover {
+    background: #194da8;
+  }
+
+  .rejectButton:disabled,
+  .approveButton:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+
+  .reviewedLabel {
+    color: #72839a;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .emptyState {
+    padding: 46px 18px;
     text-align: center;
-    text-decoration: none;
-    border-radius: 10px;
+    border: 1px dashed #dbe4f0;
+    border-radius: 13px;
+    background: #fbfcff;
+  }
+
+  .emptyIcon {
+    margin: 0 auto 12px;
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    color: #4275c5;
+    background: #eaf1ff;
+    font-size: 25px;
+  }
+
+  .emptyState h3 {
+    margin: 0;
+    color: #263d5c;
+    font-size: 16px;
+  }
+
+  .emptyState p {
+    max-width: 360px;
+    margin: 9px auto 0;
+    color: #8290a4;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+
+  .textButton {
+    margin-top: 15px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 8px;
+    color: #2d63b5;
+    background: #edf4ff;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .pageFooter {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 22px 3px;
+    color: #94a0b1;
+    font-size: 10px;
+    line-height: 1.6;
+  }
+
+  .loadingPage,
+  .accessPage {
+    min-height: 100vh;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    background: #f5f8fd;
+  }
+
+  .loadingMark {
+    width: 52px;
+    height: 52px;
+    display: grid;
+    place-items: center;
+    border-radius: 16px;
+    background: linear-gradient(145deg, #2875ef, #1646a9);
+    color: #fff;
+    font-size: 26px;
     font-weight: 800;
   }
 
-  .back-link {
-    display: block;
-    margin-top: 18px;
-    color: #155eef;
-    text-align: center;
-    text-decoration: none;
+  .loadingPage h2 {
+    margin: 20px 0 7px;
+    color: #1b3150;
+    font-size: 19px;
+  }
+
+  .loadingPage p {
+    color: #7889a0;
     font-size: 13px;
+    line-height: 1.6;
   }
 
-  .admin-loading {
-    padding: 80px 20px;
-    text-align: center;
-    color: #71809a;
+  .accessCard {
+    width: 100%;
+    max-width: 440px;
+    padding: 34px;
+    border: 1px solid #e2eaf4;
+    border-radius: 18px;
+    background: #fff;
+    box-shadow: 0 12px 35px rgba(27, 59, 105, 0.06);
   }
 
-  @media (max-width: 600px) {
-    .topbar { min-height: 68px; padding: 12px 16px; }
-    .content { width: calc(100% - 24px); padding-top: 25px; }
-    .intro { align-items: flex-start; }
-    .intro h1 { font-size: 27px; }
-    .intro .muted { font-size: 13px; }
-    .refresh-button { padding: 10px; }
-    .stats { gap: 8px; }
-    .stat { padding: 13px 11px; border-radius: 12px; }
-    .stat span { font-size: 11px; line-height: 1.4; }
-    .stat strong { font-size: 25px; }
-    .list-section { padding: 15px; border-radius: 15px; }
-    .section-heading { flex-direction: column; }
-    .section-heading select { width: 100%; }
-    .request-card { padding: 15px; }
-    .request-header h3 { font-size: 24px; }
-    .details { gap: 15px 12px; }
-    .details strong { font-size: 12px; }
-    .actions { grid-template-columns: 1fr 1.4fr; }
-    .actions button { font-size: 12px; }
-    .admin-footer { flex-direction: column; }
+  .accessCard .brandMark {
+    margin: 0 auto 20px;
+  }
+
+  .accessCard .eyebrow {
+    margin-bottom: 10px;
+  }
+
+  .accessCard h1 {
+    margin: 0;
+    color: #1b3150;
+    font-size: 23px;
+    line-height: 1.35;
+  }
+
+  .accessCard > p:not(.eyebrow) {
+    color: #74849a;
+    font-size: 13px;
+    line-height: 1.7;
+    margin: 12px 0 22px;
+  }
+
+  .primaryButton {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 43px;
+    padding: 0 18px;
+    border-radius: 10px;
+    color: #fff;
+    background: #235fc2;
+    font-size: 12px;
+    font-weight: 800;
+    text-decoration: none;
+  }
+
+  @media (max-width: 760px) {
+    .topbar {
+      padding: 13px 4.5%;
+    }
+
+    .topActions {
+      gap: 9px;
+    }
+
+    .adminLabel {
+      display: none;
+    }
+
+    .content {
+      width: 92%;
+      padding-top: 20px;
+    }
+
+    .hero {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 17px;
+    }
+
+    .hero p {
+      font-size: 13px;
+    }
+
+    .stats {
+      gap: 9px;
+    }
+
+    .statCard {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 13px;
+      border-radius: 12px;
+    }
+
+    .statIcon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      font-size: 20px;
+    }
+
+    .statText strong {
+      font-size: 24px;
+    }
+
+    .statText small {
+      font-size: 10px;
+      line-height: 1.4;
+    }
+
+    .statText > span {
+      font-size: 9px;
+      line-height: 1.4;
+    }
+
+    .requestsSection {
+      padding: 15px;
+      border-radius: 14px;
+    }
+
+    .sectionHeading h2 {
+      font-size: 17px;
+    }
+
+    .sectionHeading p {
+      font-size: 11px;
+    }
+
+    .toolbar {
+      grid-template-columns: 1fr;
+      gap: 9px;
+    }
+
+    .filterSelect {
+      height: 42px;
+    }
+
+    .requestCard {
+      padding: 14px;
+    }
+
+    .requestTop {
+      gap: 8px;
+    }
+
+    .companyIdentity {
+      gap: 9px;
+    }
+
+    .companyLogo,
+    .companyLogoFallback {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+    }
+
+    .companyDetails h3 {
+      font-size: 13px;
+    }
+
+    .companyEmail {
+      font-size: 10px;
+    }
+
+    .amount {
+      font-size: 17px;
+    }
+
+    .statusBadge {
+      padding: 5px 7px;
+      font-size: 9px;
+    }
+
+    .detailsGrid {
+      gap: 15px 12px;
+      padding: 16px 0;
+      margin-top: 15px;
+    }
+
+    .detailItem > span {
+      font-size: 9px;
+    }
+
+    .detailItem strong {
+      font-size: 11px;
+    }
+
+    .requestFooter {
+      align-items: stretch;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .proofButton {
+      align-self: flex-start;
+    }
+
+    .reviewActions {
+      display: grid;
+      grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+      width: 100%;
+      gap: 8px;
+    }
+
+    .rejectButton,
+    .approveButton {
+      width: 100%;
+      min-width: 0;
+      padding: 0 7px;
+      font-size: 10px;
+      white-space: normal;
+    }
+
+    .reviewedLabel {
+      align-self: flex-start;
+    }
+
+    .pageFooter {
+      flex-direction: column;
+      gap: 5px;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .brandWords strong {
+      font-size: 14px;
+    }
+
+    .brandMark {
+      width: 38px;
+      height: 38px;
+    }
+
+    .signOutButton {
+      padding: 9px 10px;
+      font-size: 11px;
+    }
+
+    .stats {
+      gap: 6px;
+    }
+
+    .statCard {
+      padding: 10px;
+    }
+
+    .statText > span {
+      display: none;
+    }
+
+    .companyLogo,
+    .companyLogoFallback {
+      width: 34px;
+      height: 34px;
+    }
+
+    .companyIdentity {
+      gap: 7px;
+    }
+
+    .amount {
+      font-size: 15px;
+    }
+
+    .statusBadge {
+      font-size: 8px;
+    }
   }
 `;
