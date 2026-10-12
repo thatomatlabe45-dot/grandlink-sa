@@ -1,4 +1,98 @@
+"use client";
 
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+
+// ============================================================
+// GRADLINK SA COMPANY PLANS
+// ============================================================
+
+const PLANS = {
+  starter: {
+    key: "starter",
+    name: "Starter",
+    eyebrow: "GET STARTED",
+    description:
+      "Everything you need to start discovering promising graduates.",
+    monthly: 500,
+    annual: 5000,
+    listings: 5,
+    listingLabel: "Up to 5 active internship listings",
+    features: [
+      "Up to 5 active internship listings",
+      "Graduate applications",
+      "Applicant management",
+      "Candidate profiles",
+      "CV access",
+      "Basic hiring tools",
+    ],
+  },
+
+  professional: {
+    key: "professional",
+    name: "Professional",
+    eyebrow: "MOST POPULAR",
+    description:
+      "Powerful recruitment tools for companies growing their graduate pipeline.",
+    monthly: 1000,
+    annual: 10000,
+    listings: 15,
+    listingLabel: "Up to 15 active internship listings",
+    popular: true,
+    features: [
+      "Up to 15 active internship listings",
+      "Everything in Starter",
+      "AI applicant matching",
+      "Advanced applicant screening",
+      "Document verification",
+      "Smarter candidate discovery",
+    ],
+  },
+
+
+  listing: {
+    key: "listing",
+    name: "Pay Per Listing",
+    eyebrow: "FLEXIBLE OPTION",
+    description:
+      "Advertise one opportunity for 30 days, with no monthly commitment.",
+    monthly: 350,
+    annual: 350,
+    listings: 1,
+    listingLabel: "1 active internship listing",
+    features: [
+      "1 active internship listing",
+      "Graduate applications",
+      "Applicant management",
+      "Candidate profiles",
+      "CV access",
+      "Listing remains active for 30 days",
+      "No monthly commitment",
+    ],
+  },
+};
+
+export default function CompanyPricingPage() {
+  const router = useRouter();
+
+  const [billing, setBilling] = useState("monthly");
+  const [loading, setLoading] = useState(true);
+  const [processingPlan, setProcessingPlan] = useState(null);
+  const [user, setUser] = useState(null);
+  const [subscription, setSubscription] = useState(null);
+  const [error, setError] = useState("");
+
+  // ============================================================
+  // LOAD USER + SUBSCRIPTION
+  // ============================================================
+
+  useEffect(() => {
     let mounted = true;
 
     async function loadCompanyData() {
@@ -119,7 +213,7 @@
 
       const selectedBilling = plan.key === "listing" ? "listing" : billing;
       const amount = getPlanPrice(plan);
-      const monthlyEquivalent = selectedBilling === "annual" ? Math.round(amount / 12) : amount;
+      const monthlyEquivalent = selectedBilling === "annual" ? Math.round(amount / 10) : amount;
 
       // Always create a NEW pending subscription request. Never overwrite an
       // existing active subscription before a new payment has been approved.
@@ -130,8 +224,6 @@
           plan: plan.key,
           status: "pending",
           monthly_price: monthlyEquivalent,
-          payment_amount: amount,
-          billing_cycle: selectedBilling,
           payment_provider: "bank_transfer",
           payment_reference: null,
         })
