@@ -1,116 +1,4 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
-// ============================================================
-// GRADLINK SA COMPANY PLANS
-// ============================================================
-
-const PLANS = {
-  starter: {
-    key: "starter",
-    name: "Starter",
-    eyebrow: "GET STARTED",
-    description:
-      "Everything you need to start discovering promising graduates.",
-    monthly: 500,
-    annual: 5000,
-    listings: 5,
-    listingLabel: "Up to 5 active internship listings",
-    features: [
-      "Up to 5 active internship listings",
-      "Graduate applications",
-      "Applicant management",
-      "Candidate profiles",
-      "CV access",
-      "Basic hiring tools",
-    ],
-  },
-
-  professional: {
-    key: "professional",
-    name: "Professional",
-    eyebrow: "MOST POPULAR",
-    description:
-      "Powerful recruitment tools for companies growing their graduate pipeline.",
-    monthly: 950,
-    annual: 9500,
-    listings: 15,
-    listingLabel: "Up to 15 active internship listings",
-    popular: true,
-    features: [
-      "Up to 15 active internship listings",
-      "Everything in Starter",
-      "AI applicant matching",
-      "Advanced applicant screening",
-      "Document verification",
-      "Smarter candidate discovery",
-    ],
-  },
-
-  enterprise: {
-    key: "enterprise",
-    name: "Enterprise",
-    eyebrow: "HIGH-VOLUME HIRING",
-    description:
-      "Designed for organisations recruiting graduates at scale.",
-    monthly: 1500,
-    annual: 15000,
-    listings: 30,
-    listingLabel: "Up to 30 active internship listings",
-    features: [
-      "Up to 30 active internship listings",
-      "Everything in Professional",
-      "AI applicant matching",
-      "Document verification",
-      "Advanced candidate screening",
-      "Priority recruitment capacity",
-    ],
-  },
-
-  listing: {
-    key: "listing",
-    name: "Pay Per Listing",
-    eyebrow: "FLEXIBLE OPTION",
-    description:
-      "Need to advertise just one opportunity? Pay only for the listing you need.",
-    monthly: 250,
-    annual: 250,
-    listings: 1,
-    listingLabel: "1 active internship listing",
-    features: [
-      "1 active internship listing",
-      "Graduate applications",
-      "Applicant management",
-      "Candidate profiles",
-      "CV access",
-      "No monthly commitment",
-    ],
-  },
-};
-
-export default function CompanyPricingPage() {
-  const router = useRouter();
-
-  const [billing, setBilling] = useState("monthly");
-  const [loading, setLoading] = useState(true);
-  const [processingPlan, setProcessingPlan] = useState(null);
-  const [user, setUser] = useState(null);
-  const [subscription, setSubscription] = useState(null);
-  const [error, setError] = useState("");
-
-  // ============================================================
-  // LOAD USER + SUBSCRIPTION
-  // ============================================================
-
-  useEffect(() => {
+> {
     let mounted = true;
 
     async function loadCompanyData() {
@@ -197,7 +85,7 @@ export default function CompanyPricingPage() {
 
   function getPlanPrice(plan) {
     if (plan.key === "listing") {
-      return 250;
+      return 350;
     }
 
     return billing === "annual"
@@ -221,9 +109,7 @@ export default function CompanyPricingPage() {
 
   async function choosePlan(plan) {
     if (!user) {
-      router.push(
-        "/signup?role=company&redirect=/company-pricing"
-      );
+      router.push("/signup?role=company&redirect=/company-pricing");
       return;
     }
 
@@ -231,129 +117,34 @@ export default function CompanyPricingPage() {
       setProcessingPlan(plan.key);
       setError("");
 
-      const selectedBilling =
-        plan.key === "listing"
-          ? "listing"
-          : billing;
-
+      const selectedBilling = plan.key === "listing" ? "listing" : billing;
       const amount = getPlanPrice(plan);
+      const monthlyEquivalent = selectedBilling === "annual" ? Math.round(amount / 12) : amount;
 
-      // --------------------------------------------------------
-      // Find latest subscription
-      // --------------------------------------------------------
-
-      const {
-        data: existingSubscription,
-        error: existingError,
-      } = await supabase
+      // Always create a NEW pending subscription request. Never overwrite an
+      // existing active subscription before a new payment has been approved.
+      const { data: newSubscription, error: insertError } = await supabase
         .from("company_subscriptions")
-        .select("*")
-        .eq("company_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .insert({
+          company_id: user.id,
+          plan: plan.key,
+          status: "pending",
+          monthly_price: monthlyEquivalent,
+          payment_amount: amount,
+          billing_cycle: selectedBilling,
+          payment_provider: "bank_transfer",
+          payment_reference: null,
+        })
+        .select("id")
+        .single();
 
-      if (existingError) {
-        console.error(
-          "Existing subscription lookup:",
-          existingError
-        );
-      }
+      if (insertError) throw insertError;
+      if (!newSubscription?.id) throw new Error("Could not create your payment request.");
 
-      let subscriptionId =
-        existingSubscription?.id;
-
-      // --------------------------------------------------------
-      // Update existing subscription
-      // --------------------------------------------------------
-
-      if (subscriptionId) {
-        const { error: updateError } =
-          await supabase
-            .from("company_subscriptions")
-            .update({
-              plan: plan.key,
-              amount,
-              billing_cycle: selectedBilling,
-              payment_provider: "payfast",
-              status: isActive
-                ? "active"
-                : "inactive",
-            })
-            .eq("id", subscriptionId);
-
-        if (updateError) {
-          console.error(
-            "Subscription update:",
-            updateError
-          );
-
-          throw updateError;
-        }
-      } else {
-        // ------------------------------------------------------
-        // Create new inactive subscription
-        // ------------------------------------------------------
-
-        const {
-          data: newSubscription,
-          error: insertError,
-        } = await supabase
-          .from("company_subscriptions")
-          .insert({
-            company_id: user.id,
-            plan: plan.key,
-            amount,
-            billing_cycle: selectedBilling,
-            payment_provider: "payfast",
-            status: "inactive",
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error(
-            "Subscription insert:",
-            insertError
-          );
-
-          throw insertError;
-        }
-
-        subscriptionId =
-          newSubscription?.id;
-      }
-
-      if (!subscriptionId) {
-        throw new Error(
-          "Could not create subscription."
-        );
-      }
-
-      // --------------------------------------------------------
-      // PayFast payment page
-      // --------------------------------------------------------
-
-      router.push(
-        `/company/payment?plan=${encodeURIComponent(
-          plan.key
-        )}&billing=${encodeURIComponent(
-          selectedBilling
-        )}&subscription=${encodeURIComponent(
-          subscriptionId
-        )}`
-      );
+      router.push(`/company/payment?plan=${encodeURIComponent(plan.key)}&billing=${encodeURIComponent(selectedBilling)}&subscription=${encodeURIComponent(newSubscription.id)}`);
     } catch (err) {
-      console.error(
-        "Choose plan error:",
-        err
-      );
-
-      setError(
-        err?.message ||
-          "Unable to continue with this plan. Please try again."
-      );
-
+      console.error("Choose plan error:", err);
+      setError(err?.message || "Unable to continue. Please try again.");
       setProcessingPlan(null);
     }
   }
@@ -1692,13 +1483,7 @@ export default function CompanyPricingPage() {
                 <div className="plan-eyebrow">
 
                   <span className="plan-icon">
-                    {plan.key ===
-                    "enterprise"
-                      ? "◆"
-                      : plan.key ===
-                        "listing"
-                      ? "◎"
-                      : "✦"}
+                    {plan.key === "listing" ? "◎" : "✦"}
                   </span>
 
                   {plan.eyebrow}
@@ -1827,10 +1612,7 @@ export default function CompanyPricingPage() {
                 </button>
 
                 <div className="payfast-note">
-                  Secure payment via{" "}
-                  <span>
-                    PayFast
-                  </span>
+                  Manual bank transfer · activation after verification
                 </div>
 
               </article>
@@ -1850,14 +1632,11 @@ export default function CompanyPricingPage() {
           </p>
 
           <p className="trust-text">
-            Complete your subscription securely
-            through PayFast. Your company plan
-            becomes active after successful
-            payment verification.
+Pay by bank transfer and submit your payment reference and proof. Your company plan activates only after GradLink SA verifies the payment.
           </p>
 
           <div className="trust-pill">
-            🔒 Secure payment via PayFast
+            🔒 Secure manual payment verification
           </div>
 
         </section>
