@@ -13,10 +13,16 @@ export default function Navbar() {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
   const [profileType, setProfileType] = useState(null);
+  const [profileChecked, setProfileChecked] = useState(false);
+
+  // ----------------------------------------
+  // SCREEN SIZE
+  // ----------------------------------------
 
   useEffect(() => {
     function updateScreen() {
       const isMobile = window.innerWidth <= 768;
+
       setMobile(isMobile);
 
       if (!isMobile) {
@@ -25,36 +31,122 @@ export default function Navbar() {
     }
 
     updateScreen();
+
     window.addEventListener("resize", updateScreen);
 
-    return () => window.removeEventListener("resize", updateScreen);
+    return () => {
+      window.removeEventListener("resize", updateScreen);
+    };
   }, []);
+
+  // ----------------------------------------
+  // DETECT USER PROFILE TYPE
+  // ----------------------------------------
+
+  async function detectProfileType(currentUser) {
+    if (!currentUser) {
+      setProfileType(null);
+      setProfileChecked(true);
+      return;
+    }
+
+    // First use the profile selected during login.
+    const savedProfile =
+      typeof window !== "undefined"
+        ? localStorage.getItem("gradlink_profile")
+        : null;
+
+    if (
+      savedProfile === "graduate" ||
+      savedProfile === "company"
+    ) {
+      setProfileType(savedProfile);
+      setProfileChecked(true);
+      return;
+    }
+
+    // If no saved profile exists, check the database.
+    try {
+      const { data: graduate } = await supabase
+        .from("graduates")
+        .select("id")
+        .eq("user_id", currentUser.id)
+        .limit(1);
+
+      const { data: company } = await supabase
+        .from("companies")
+        .select("id")
+        .eq("user_id", currentUser.id)
+        .limit(1);
+
+      let detectedProfile = null;
+
+      if (graduate && graduate.length > 0) {
+        detectedProfile = "graduate";
+      } else if (company && company.length > 0) {
+        detectedProfile = "company";
+      }
+
+      if (detectedProfile) {
+        localStorage.setItem(
+          "gradlink_profile",
+          detectedProfile
+        );
+
+        setProfileType(detectedProfile);
+      } else {
+        setProfileType(null);
+      }
+    } catch (error) {
+      console.error(
+        "Could not detect profile type:",
+        error
+      );
+
+      setProfileType(null);
+    } finally {
+      setProfileChecked(true);
+    }
+  }
+
+  // ----------------------------------------
+  // LOAD SESSION AND AUTH CHANGES
+  // ----------------------------------------
 
   useEffect(() => {
     let mounted = true;
 
     async function loadSession() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
 
-      if (!mounted) return;
+        if (!mounted) return;
 
-      setUser(session?.user ?? null);
+        if (error) {
+          console.error("Session error:", error);
+          setProfileChecked(true);
+          return;
+        }
 
-      if (session?.user) {
-        const savedProfile =
-          typeof window !== "undefined"
-            ? localStorage.getItem("gradlink_profile")
-            : null;
+        const currentUser = session?.user ?? null;
 
-        if (savedProfile) {
-          setProfileType(savedProfile);
+        setUser(currentUser);
+
+        if (currentUser) {
+          await detectProfileType(currentUser);
         } else {
           setProfileType(null);
+          setProfileChecked(true);
         }
-      } else {
-        setProfileType(null);
+      } catch (error) {
+        console.error("Navbar session error:", error);
+
+        if (mounted) {
+          setProfileChecked(true);
+        }
       }
     }
 
@@ -62,24 +154,57 @@ export default function Navbar() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!mounted) return;
+    } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (!mounted) return;
 
-      setUser(session?.user ?? null);
+        const currentUser = session?.user ?? null;
 
-      if (!session?.user) {
-        setProfileType(null);
-      } else {
-        const savedProfile = localStorage.getItem("gradlink_profile");
-        setProfileType(savedProfile || null);
+        setUser(currentUser);
+
+        if (!currentUser) {
+          setProfileType(null);
+          setProfileChecked(true);
+
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("gradlink_profile");
+          }
+
+          return;
+        }
+
+        // Use the selected account type immediately when available.
+        const savedProfile =
+          localStorage.getItem("gradlink_profile");
+
+        if (
+          savedProfile === "graduate" ||
+          savedProfile === "company"
+        ) {
+          setProfileType(savedProfile);
+          setProfileChecked(true);
+        } else {
+          setProfileChecked(false);
+
+          // Defer database queries until after the auth callback.
+          setTimeout(() => {
+            if (mounted) {
+              detectProfileType(currentUser);
+            }
+          }, 0);
+        }
       }
-    });
+    );
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
     };
   }, []);
+
+  // ----------------------------------------
+  // GET STARTED / DASHBOARD
+  // ----------------------------------------
 
   async function handleGetStarted() {
     if (loading) return;
@@ -93,35 +218,50 @@ export default function Navbar() {
         error,
       } = await supabase.auth.getSession();
 
-      if (error) {
-        router.push("/login");
-        return;
-      }
-
-      if (!session?.user) {
+      if (error || !session?.user) {
         router.push("/choose-profile");
         return;
       }
 
-      const savedProfile = localStorage.getItem("gradlink_profile");
+      let currentProfile =
+        localStorage.getItem("gradlink_profile");
 
-      if (savedProfile === "company") {
+      if (
+        currentProfile !== "graduate" &&
+        currentProfile !== "company"
+      ) {
+        await detectProfileType(session.user);
+
+        currentProfile =
+          localStorage.getItem("gradlink_profile");
+      }
+
+      if (currentProfile === "company") {
         router.push("/company-dashboard");
-      } else if (savedProfile === "graduate") {
+      } else if (currentProfile === "graduate") {
         router.push("/graduate");
       } else {
         router.push("/choose-profile");
       }
     } catch (error) {
+      console.error("Navigation error:", error);
       router.push("/login");
     } finally {
       setLoading(false);
     }
   }
 
+  // ----------------------------------------
+  // CLOSE MENU
+  // ----------------------------------------
+
   function closeMenu() {
     setMenuOpen(false);
   }
+
+  // ----------------------------------------
+  // STYLES
+  // ----------------------------------------
 
   const navLink = {
     textDecoration: "none",
@@ -149,6 +289,21 @@ export default function Navbar() {
       ? "Graduate Dashboard"
       : "Get Started";
 
+  // ----------------------------------------
+  // MENU PERMISSIONS
+  // ----------------------------------------
+
+  // Graduates should never see the Companies link.
+  // Companies and visitors may still see it.
+  const showCompaniesLink =
+    !user ||
+    !profileChecked ||
+    profileType === "company";
+
+  // ----------------------------------------
+  // NAVBAR
+  // ----------------------------------------
+
   return (
     <nav
       style={{
@@ -170,6 +325,8 @@ export default function Navbar() {
           gap: "16px",
         }}
       >
+        {/* LOGO */}
+
         <Link
           href="/"
           onClick={closeMenu}
@@ -183,6 +340,8 @@ export default function Navbar() {
         >
           GradLink SA
         </Link>
+
+        {/* DESKTOP MENU */}
 
         {!mobile ? (
           <div
@@ -201,16 +360,17 @@ export default function Navbar() {
               Internships
             </Link>
 
-            <Link href="/graduate" style={navLink}>
-              Graduates
-            </Link>
-
-            <Link href="/company" style={navLink}>
-              Companies
-            </Link>
+            {showCompaniesLink && (
+              <Link href="/company" style={navLink}>
+                Companies
+              </Link>
+            )}
 
             {user && profileType === "company" && (
-              <Link href="/company-dashboard" style={navLink}>
+              <Link
+                href="/company-dashboard"
+                style={navLink}
+              >
                 Dashboard
               </Link>
             )}
@@ -235,14 +395,20 @@ export default function Navbar() {
               disabled={loading}
               style={buttonStyle}
             >
-              {loading ? "Please wait..." : accountLabel}
+              {loading
+                ? "Please wait..."
+                : accountLabel}
             </button>
           </div>
         ) : (
+          /* MOBILE MENU BUTTON */
+
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
-            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-label={
+              menuOpen ? "Close menu" : "Open menu"
+            }
             aria-expanded={menuOpen}
             style={{
               border: "none",
@@ -258,6 +424,8 @@ export default function Navbar() {
         )}
       </div>
 
+      {/* MOBILE MENU */}
+
       {mobile && menuOpen && (
         <div
           style={{
@@ -269,21 +437,31 @@ export default function Navbar() {
             gap: "18px",
           }}
         >
-          <Link href="/" onClick={closeMenu} style={navLink}>
+          <Link
+            href="/"
+            onClick={closeMenu}
+            style={navLink}
+          >
             Home
           </Link>
 
-          <Link href="/jobs" onClick={closeMenu} style={navLink}>
+          <Link
+            href="/jobs"
+            onClick={closeMenu}
+            style={navLink}
+          >
             Internships
           </Link>
 
-          <Link href="/graduate" onClick={closeMenu} style={navLink}>
-            Graduates
-          </Link>
-
-          <Link href="/company" onClick={closeMenu} style={navLink}>
-            Companies
-          </Link>
+          {showCompaniesLink && (
+            <Link
+              href="/company"
+              onClick={closeMenu}
+              style={navLink}
+            >
+              Companies
+            </Link>
+          )}
 
           {user && profileType === "company" && (
             <Link
@@ -296,16 +474,28 @@ export default function Navbar() {
           )}
 
           {user && profileType === "graduate" && (
-            <Link href="/graduate" onClick={closeMenu} style={navLink}>
+            <Link
+              href="/graduate"
+              onClick={closeMenu}
+              style={navLink}
+            >
               My Profile
             </Link>
           )}
 
-          <Link href="/terms" onClick={closeMenu} style={navLink}>
+          <Link
+            href="/terms"
+            onClick={closeMenu}
+            style={navLink}
+          >
             Terms & Conditions
           </Link>
 
-          <Link href="/privacy" onClick={closeMenu} style={navLink}>
+          <Link
+            href="/privacy"
+            onClick={closeMenu}
+            style={navLink}
+          >
             Privacy Policy
           </Link>
 
@@ -319,7 +509,9 @@ export default function Navbar() {
               padding: "14px",
             }}
           >
-            {loading ? "Please wait..." : accountLabel}
+            {loading
+              ? "Please wait..."
+              : accountLabel}
           </button>
         </div>
       )}
