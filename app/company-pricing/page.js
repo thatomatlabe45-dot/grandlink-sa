@@ -34,8 +34,8 @@ const PLANS = [
     label: "FOR GROWING TEAMS",
     description:
       "A more powerful recruitment experience for businesses looking to attract emerging talent.",
-    monthly: 1000,
-    annual: 10000,
+    monthly: 950,
+    annual: 9500,
     listings: "15 active internship listings",
     popular: true,
     features: [
@@ -48,13 +48,31 @@ const PLANS = [
     ],
   },
   {
+    key: "enterprise",
+    name: "Enterprise",
+    label: "FOR LARGE TEAMS",
+    description:
+      "Support a larger recruitment pipeline with more room to advertise and manage graduate opportunities.",
+    monthly: 1500,
+    annual: 15000,
+    listings: "30 active internship listings",
+    features: [
+      "Up to 30 active internship listings",
+      "Everything in Professional",
+      "AI applicant matching",
+      "Advanced applicant screening",
+      "Document verification",
+      "Priority recruitment support",
+    ],
+  },
+  {
     key: "listing",
     name: "Pay Per Listing",
     label: "FOR ONE OPPORTUNITY",
     description:
       "Advertise a single opportunity without committing to a monthly subscription.",
-    monthly: 350,
-    annual: 350,
+    monthly: 250,
+    annual: 250,
     listings: "1 active internship listing",
     features: [
       "1 active internship listing",
@@ -629,8 +647,8 @@ export default function CompanyPricingPage() {
                     </div>
                   )}
                 </div>
-
-                <div className="listing-limit">
+                
+                                <div className="listing-limit">
                   <span className="limit-icon">✓</span>
 
                   <span>{plan.listings}</span>
@@ -1330,7 +1348,7 @@ export default function CompanyPricingPage() {
           background: #edf4ff;
           color: #2563eb;
           font-size: 13px;
-          font-weight: 900;
+                    font-weight: 900;
         }
 
         .benefit-card h3 {
@@ -2030,7 +2048,7 @@ export default function CompanyPricingPage() {
           .header-inner {
             width: calc(100% - 26px);
             min-height: 66px;
-            gap: 10px;
+                        gap: 10px;
           }
 
           .brand {
@@ -2415,6 +2433,208 @@ export default function CompanyPricingPage() {
 
           .price {
             font-size: 32px;
+          }
+        }
+
+        /* Accessibility and mobile contrast refinements */
+        .hero {
+          position: relative;
+          isolation: isolate;
+          background: #ffffff;
+          color: #10213d;
+        }
+
+        .hero h1,
+        .hero h1 span {
+          color: #10213d;
+          opacity: 1;
+        }
+
+        .hero h1 span {
+          color: #245bd6;
+        }
+
+        .hero-text {
+          color: #475569;
+          opacity: 1;
+        }
+
+        .hero-note {
+          color: #475569;
+        }
+
+        .eyebrow {
+          color: #1746a2;
+          background: #f2f7ff;
+          border-color: #cbdcff;
+        }
+
+        .primary-button,
+        .closing-button,
+        .plan-button-primary {
+          background: #1d4ed8;
+          color: #ffffff;
+          border-color: #1d4ed8;
+        }
+
+        .secondary-button {
+          color: #183052;
+          background: #ffffff;
+          border-color: #cbd5e1;
+        }
+
+        .plan-description,
+        .features li,
+        .benefit-card p,
+        .section-heading > p,
+        .pricing-heading > p,
+        .faq-heading > p,
+        .payment-content p {
+          color: #52627a;
+        }
+
+        .plan-footnote,
+        .pricing-disclaimer {
+          color: #5f6d82;
+        }
+
+        .plan-card {
+          box-shadow: 0 8px 28px rgba(16, 33, 61, 0.07);
+        }
+
+        .plan-card.popular {
+          border: 2px solid #2563eb;
+          box-shadow: 0 14px 34px rgba(37, 99, 235, 0.14);
+        }
+
+        .hero-actions a,
+        .plan-button,
+        .header-button,
+        .billing-toggle button,
+        .faq-question {
+          min-height: 46px;
+        }
+
+        @media (max-width: 650px) {
+          .hero {
+            width: calc(100% - 30px);
+            margin: 14px auto 24px;
+            padding: 30px 22px 28px;
+            border: 1px solid #e0e8f5;
+            border-radius: 22px;
+            box-shadow: 0 12px 35px rgba(16, 33, 61, 0.06);
+            grid-template-columns: minmax(0, 1fr);
+            gap: 8px;
+          }
+
+          .hero h1 {
+            font-size: clamp(34px, 8.8vw, 43px);
+            line-height: 1.12;
+            letter-spacing: -1.5px;
+            overflow-wrap: anywhere;
+          }
+
+          .hero-text {
+            max-width: 100%;
+            font-size: 14px;
+            line-height: 1.8;
+          }
+
+          .eyebrow {
+            max-width: 100%;
+            font-size: 9px;
+            letter-spacing: 0.04em;
+            line-height: 1.6;
+          }
+
+          .hero-actions {
+            gap: 11px;
+          }
+
+          .primary-button,
+          .secondary-button {
+            min-height: 52px;
+            padding: 12px 15px;
+            font-size: 13px;
+            line-height: 1.4;
+            text-align: center;
+          }
+
+          .hero-note {
+            margin-top: 18px;
+            font-size: 12px;
+            line-height: 1.7;
+          }
+
+          .hero-visual {
+            min-height: 300px;
+            margin-top: 14px;
+          }
+
+          .visual-card {
+            width: min(320px, 90%);
+          }
+
+          .floating-top {
+            right: -2px;
+          }
+
+          .floating-bottom {
+            left: -2px;
+          }
+
+          .benefits,
+          .pricing-section {
+            scroll-margin-top: 76px;
+          }
+
+          .billing-panel {
+            align-items: stretch;
+            flex-direction: column;
+            gap: 14px;
+          }
+
+          .billing-toggle {
+            width: 100%;
+          }
+
+          .billing-toggle button {
+            flex: 1;
+            padding: 0 10px;
+            font-size: 12px;
+          }
+
+          .plans-grid {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 18px;
+          }
+
+          .plan-card {
+            padding: 25px 22px 21px;
+          }
+
+          .plan-description {
+            min-height: 0;
+            font-size: 14px;
+            line-height: 1.75;
+          }
+
+          .price {
+            font-size: 38px;
+          }
+
+          .price-period,
+          .features li {
+            font-size: 12px;
+          }
+
+          .plan-button {
+            min-height: 50px;
+            font-size: 13px;
+          }
+
+          .plan-footnote {
+            font-size: 10px;
           }
         }
 
