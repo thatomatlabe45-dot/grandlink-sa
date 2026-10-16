@@ -15,17 +15,17 @@ const PLANS = [
     name: "Starter",
     label: "FOR SMALL TEAMS",
     description:
-      "Start building your talent pipeline with essential recruitment tools.",
+      "Get started with the essential tools to connect your company with emerging talent.",
     monthly: 500,
     annual: 5000,
-    listings: 5,
+    listings: "5 active internship listings",
     features: [
       "Up to 5 active internship listings",
       "Graduate applications",
       "Applicant management",
       "Candidate profiles",
       "CV access",
-      "Basic hiring tools",
+      "Essential recruitment tools",
     ],
   },
   {
@@ -33,18 +33,18 @@ const PLANS = [
     name: "Professional",
     label: "FOR GROWING TEAMS",
     description:
-      "A more powerful recruitment experience for growing businesses.",
+      "A powerful recruitment solution for businesses ready to grow their talent pipeline.",
     monthly: 1000,
     annual: 10000,
-    listings: 15,
+    listings: "15 active internship listings",
     popular: true,
     features: [
       "Up to 15 active internship listings",
       "Everything in Starter",
       "AI applicant matching",
       "Advanced applicant screening",
-      "Document verification",
-      "Smarter candidate discovery",
+      "Candidate discovery tools",
+      "Document access",
     ],
   },
   {
@@ -52,16 +52,16 @@ const PLANS = [
     name: "Enterprise",
     label: "FOR LARGE TEAMS",
     description:
-      "More recruitment capacity for organisations building larger talent pipelines.",
+      "More room to advertise opportunities and manage a growing recruitment pipeline.",
     monthly: 1500,
     annual: 15000,
-    listings: 30,
+    listings: "30 active internship listings",
     features: [
       "Up to 30 active internship listings",
       "Everything in Professional",
-      "AI applicant matching",
-      "Advanced applicant screening",
-      "Document verification",
+      "Advanced candidate matching",
+      "Applicant screening tools",
+      "Candidate management",
       "Priority recruitment support",
     ],
   },
@@ -70,18 +70,18 @@ const PLANS = [
     name: "Pay Per Listing",
     label: "FOR ONE OPPORTUNITY",
     description:
-      "Advertise one internship opportunity without a recurring subscription.",
+      "Advertise one opportunity with a once-off payment and no monthly subscription.",
     monthly: 350,
-    annual: null,
-    listings: 1,
+    annual: 350,
+    listings: "1 active internship listing",
     features: [
-      "One active internship listing",
+      "1 active internship listing",
       "Graduate applications",
       "Applicant management",
       "Candidate profiles",
       "CV access",
       "30-day listing period",
-      "No recurring subscription",
+      "No monthly commitment",
     ],
   },
 ];
@@ -90,32 +90,27 @@ const FAQS = [
   {
     question: "How do company payments work?",
     answer:
-      "Choose your plan and continue to the payment page. Follow the bank-transfer instructions, make the payment and submit your payment reference and proof of payment. Your subscription remains pending until GradLink SA verifies receipt.",
+      "Choose a plan, follow the bank-transfer instructions and submit your payment reference and proof of payment. Your subscription remains pending until GradLink SA verifies your payment.",
   },
   {
-    question: "How much can I save with annual billing?",
+    question: "Can I pay annually?",
     answer:
-      "Starter costs R5,000 per year instead of R6,000 when paid monthly. Professional costs R10,000 instead of R12,000, and Enterprise costs R15,000 instead of R18,000. Each annual plan saves the equivalent of two monthly payments.",
-  },
-  {
-    question: "What is included in Enterprise?",
-    answer:
-      "Enterprise is R1,500 per month or R15,000 per year, with up to 30 active internship listings. It is designed for larger recruitment needs and includes the listed Professional features plus priority recruitment support. Advanced features should only be relied upon once they are operational.",
-  },
-  {
-    question: "Can I pay for just one listing?",
-    answer:
-      "Yes. Pay Per Listing costs R350 once-off for one internship listing for 30 days. It does not renew as a monthly subscription.",
+      "Yes. Starter, Professional and Enterprise offer annual billing. Pay upfront and save the equivalent of two months compared with paying monthly for twelve months.",
   },
   {
     question: "When will my company account be activated?",
     answer:
-      "Your subscription stays pending until your payment has been verified. Selecting a plan or submitting proof of payment does not automatically activate your paid company access.",
+      "Your company subscription must be verified before paid access is activated. Selecting a plan or submitting payment details does not automatically activate your subscription.",
+  },
+  {
+    question: "Can I advertise just one opportunity?",
+    answer:
+      "Yes. Choose Pay Per Listing for a once-off payment of R350 for one listing for 30 days.",
   },
   {
     question: "Is there a free company plan?",
     answer:
-      "No. Company recruitment plans are paid. Individuals looking for opportunities can use GradLink SA without purchasing a company subscription.",
+      "No. Company recruitment plans are paid. People looking for opportunities can use GradLink SA without purchasing a company subscription.",
   },
 ];
 
@@ -133,7 +128,7 @@ export default function CompanyPricingPage() {
   useEffect(() => {
     let mounted = true;
 
-    async function loadData() {
+    async function loadCompanyData() {
       try {
         const {
           data: { user: currentUser },
@@ -141,6 +136,7 @@ export default function CompanyPricingPage() {
         } = await supabase.auth.getUser();
 
         if (authError) throw authError;
+
         if (!mounted) return;
 
         setUser(currentUser || null);
@@ -165,7 +161,7 @@ export default function CompanyPricingPage() {
 
         if (mounted) {
           setError(
-            "We could not load your account details. You can still view the plans. Please refresh if the problem continues."
+            "We could not load your account details. You can still view the plans. Please refresh if necessary."
           );
         }
       } finally {
@@ -173,7 +169,7 @@ export default function CompanyPricingPage() {
       }
     }
 
-    loadData();
+    loadCompanyData();
 
     return () => {
       mounted = false;
@@ -228,11 +224,6 @@ export default function CompanyPricingPage() {
 
       const amount = getPrice(plan);
 
-      // Keep the existing database structure.
-      // Annual prices are stored as their monthly equivalent.
-      // The actual selected billing period and amount are
-      // passed to the payment page through the URL.
-
       const storedMonthlyPrice =
         selectedBilling === "annual"
           ? Math.round(amount / 10)
@@ -262,13 +253,15 @@ export default function CompanyPricingPage() {
         );
       }
 
-      const paymentUrl =
-        `/company/payment?plan=${encodeURIComponent(plan.key)}` +
-        `&billing=${encodeURIComponent(selectedBilling)}` +
-        `&subscription=${encodeURIComponent(newSubscription.id)}` +
-        `&amount=${encodeURIComponent(amount)}`;
-
-      router.push(paymentUrl);
+      router.push(
+        `/company/payment?plan=${encodeURIComponent(
+          plan.key
+        )}&billing=${encodeURIComponent(
+          selectedBilling
+        )}&subscription=${encodeURIComponent(
+          newSubscription.id
+        )}&amount=${encodeURIComponent(amount)}`
+      );
     } catch (err) {
       console.error("Choose plan error:", err);
 
@@ -284,7 +277,7 @@ export default function CompanyPricingPage() {
   if (loading) {
     return (
       <main className="loading-page">
-        <div className="brand-mark">G</div>
+        <div className="loading-mark">G</div>
         <h2>GradLink SA</h2>
         <p>Preparing your experience...</p>
 
@@ -295,21 +288,27 @@ export default function CompanyPricingPage() {
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            background: #f7f9fd;
+            padding: 24px;
+            background: #f5f8ff;
             color: #10213d;
-            font-family: Arial, sans-serif;
+            font-family: Arial, Helvetica, sans-serif;
+            text-align: center;
           }
 
-          .brand-mark {
-            width: 54px;
-            height: 54px;
+          .loading-mark {
+            width: 58px;
+            height: 58px;
             display: grid;
             place-items: center;
-            border-radius: 15px;
-            background: #1d4ed8;
+            border-radius: 17px;
+            background: linear-gradient(135deg, #3984ff, #1747b8);
             color: white;
-            font-size: 26px;
+            font-size: 27px;
             font-weight: 900;
+          }
+
+          h2 {
+            margin: 16px 0 0;
           }
 
           p {
@@ -327,7 +326,8 @@ export default function CompanyPricingPage() {
         <div className="header-inner">
           <a href="/" className="brand">
             <span className="brand-mark">G</span>
-            <span>
+
+            <span className="brand-text">
               <strong>GradLink SA</strong>
               <small>Connecting talent with opportunity</small>
             </span>
@@ -342,9 +342,7 @@ export default function CompanyPricingPage() {
               <button
                 type="button"
                 className="header-button"
-                onClick={() =>
-                  router.push("/company-dashboard")
-                }
+                onClick={() => router.push("/company-dashboard")}
               >
                 Dashboard →
               </button>
@@ -362,10 +360,11 @@ export default function CompanyPricingPage() {
       </header>
 
       <section className="hero">
-        <div className="hero-copy">
-          <span className="eyebrow">
+        <div className="hero-content">
+          <div className="eyebrow">
+            <span className="eyebrow-dot" />
             THE FUTURE OF RECRUITMENT
-          </span>
+          </div>
 
           <h1>
             Great talent.
@@ -373,16 +372,15 @@ export default function CompanyPricingPage() {
             <span>Greater possibilities.</span>
           </h1>
 
-          <p>
-            Connect your organisation with South African talent.
-            Advertise internship opportunities, discover
-            candidates and build your future workforce with
-            GradLink SA.
+          <p className="hero-text">
+            Discover emerging South African talent, advertise
+            internship opportunities and build your future workforce
+            with GradLink SA.
           </p>
 
           <div className="hero-actions">
             <a href="#plans" className="primary-button">
-              Explore company plans →
+              Explore our plans <span>→</span>
             </a>
 
             <a href="#benefits" className="secondary-button">
@@ -390,71 +388,64 @@ export default function CompanyPricingPage() {
             </a>
           </div>
 
-          <div className="trust-note">
+          <div className="hero-note">
             <span>✓</span>
-            Transparent pricing · Bank transfer · Verified payments
+            Paid recruitment plans for your business
           </div>
         </div>
 
-        <div className="hero-visual">
-          <div className="visual-glow" />
-
+        <div className="hero-visual" aria-hidden="true">
           <div className="visual-card">
             <div className="visual-brand">
               <span className="visual-mark">G</span>
               <div>
                 <strong>GradLink SA</strong>
-                <small>Talent and opportunity</small>
+                <small>Talent connection platform</small>
               </div>
             </div>
 
             <div className="visual-divider" />
 
-            <span className="visual-kicker">
-              BUILD YOUR FUTURE TEAM
-            </span>
+            <span className="visual-label">YOUR NEXT OPPORTUNITY</span>
 
             <h2>
-              The right opportunity.
+              Talent meets
               <br />
-              The right connection.
+              opportunity.
             </h2>
 
             <div className="visual-tags">
               <span>Internships</span>
-              <span>Applications</span>
-              <span>Talent discovery</span>
+              <span>Emerging talent</span>
             </div>
 
-            <div className="visual-footer">
-              <span className="status-dot" />
-              Connecting opportunity with potential
+            <div className="visual-bottom">
+              <span className="visual-check">✓</span>
+              <span>Build your talent pipeline</span>
             </div>
           </div>
 
-          <div className="floating-card floating-one">
+          <div className="floating-card floating-top">
             <span className="floating-icon">✦</span>
             <div>
               <strong>Discover talent</strong>
-              <small>Find your next candidate</small>
+              <small>Find your next great fit</small>
             </div>
           </div>
 
-          <div className="floating-card floating-two">
-            <span className="floating-icon green">✓</span>
+          <div className="floating-card floating-bottom">
+            <span className="floating-check">✓</span>
             <div>
               <strong>Recruit with purpose</strong>
-              <small>Grow your organisation</small>
+              <small>Grow your future workforce</small>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="benefits section" id="benefits">
+      <section className="benefits" id="benefits">
         <div className="section-heading">
-          <span className="section-kicker">
-            WHY GRADLINK SA?
-          </span>
+          <span className="section-kicker">WHY GRADLINK SA?</span>
 
           <h2>
             Recruitment built around
@@ -463,8 +454,8 @@ export default function CompanyPricingPage() {
           </h2>
 
           <p>
-            Find opportunities to introduce your organisation
-            to emerging talent and manage your recruitment process.
+            Connect your organisation with people ready to take
+            their next career step.
           </p>
         </div>
 
@@ -473,8 +464,8 @@ export default function CompanyPricingPage() {
             <span className="benefit-number">01</span>
             <h3>Reach emerging talent</h3>
             <p>
-              Advertise opportunities and connect with people
-              taking their next career step.
+              Advertise opportunities and reach people entering
+              the professional world.
             </p>
           </article>
 
@@ -482,8 +473,8 @@ export default function CompanyPricingPage() {
             <span className="benefit-number">02</span>
             <h3>Manage applications</h3>
             <p>
-              Review candidate applications and organise
-              your recruitment activity.
+              Review applications and organise your recruitment
+              process in one place.
             </p>
           </article>
 
@@ -491,57 +482,55 @@ export default function CompanyPricingPage() {
             <span className="benefit-number">03</span>
             <h3>Discover candidates</h3>
             <p>
-              Use available candidate information and matching
-              tools according to your plan.
+              Use the candidate information and recruitment tools
+              available with your plan.
             </p>
           </article>
 
           <article className="benefit-card">
             <span className="benefit-number">04</span>
-            <h3>Build your presence</h3>
+            <h3>Grow your presence</h3>
             <p>
-              Introduce your organisation through your
-              company profile and internship listings.
+              Introduce your organisation through your company
+              profile and advertised opportunities.
             </p>
           </article>
         </div>
       </section>
 
-      <section className="pricing section" id="plans">
-        <div className="section-heading">
+      <section className="pricing-section" id="plans">
+        <div className="pricing-heading">
           <span className="section-kicker">
             SIMPLE, TRANSPARENT PRICING
           </span>
 
           <h2>
-            Choose the plan
+            Choose the right plan
             <br />
-            <span>that moves you forward.</span>
+            <span>for your business.</span>
           </h2>
 
           <p>
-            From a single opportunity to a larger recruitment
-            pipeline, choose the option that fits your business.
+            Compare our plans and choose the recruitment option
+            that works for your organisation.
           </p>
         </div>
 
         {isActive && (
           <div className="active-banner">
-            <div>
-              <strong>
-                Your company has an active subscription
-              </strong>
+            <span className="active-indicator" />
+
+            <div className="active-copy">
+              <strong>Your company has an active subscription</strong>
               <p>
-                Review your existing subscription before
-                requesting another plan.
+                You can view the available plans below. Check your
+                existing subscription before requesting a change.
               </p>
             </div>
 
             <button
               type="button"
-              onClick={() =>
-                router.push("/company-dashboard")
-              }
+              onClick={() => router.push("/company-dashboard")}
             >
               Go to dashboard →
             </button>
@@ -555,20 +544,17 @@ export default function CompanyPricingPage() {
         )}
 
         <div className="billing-panel">
-          <div>
+          <div className="billing-copy">
             <strong>Choose your billing option</strong>
-            <p>
-              Annual plans save the equivalent of two months.
-            </p>
+            <span>
+              Annual subscriptions save the equivalent of two months.
+            </span>
           </div>
 
           <div className="billing-toggle">
             <button
               type="button"
-              className={
-                billing === "monthly" ? "selected" : ""
-              }
-              aria-pressed={billing === "monthly"}
+              className={billing === "monthly" ? "selected" : ""}
               onClick={() => setBilling("monthly")}
             >
               Monthly
@@ -576,14 +562,10 @@ export default function CompanyPricingPage() {
 
             <button
               type="button"
-              className={
-                billing === "annual" ? "selected" : ""
-              }
-              aria-pressed={billing === "annual"}
+              className={billing === "annual" ? "selected" : ""}
               onClick={() => setBilling("annual")}
             >
-              Annual
-              <span className="save-badge">SAVE 2 MONTHS</span>
+              Annual <span className="save-badge">SAVE 2 MONTHS</span>
             </button>
           </div>
         </div>
@@ -598,31 +580,15 @@ export default function CompanyPricingPage() {
                 key={plan.key}
                 className={`plan-card ${
                   plan.popular ? "popular" : ""
-                } ${
-                  plan.key === "enterprise"
-                    ? "enterprise"
-                    : ""
                 }`}
               >
                 {plan.popular && (
-                  <div className="popular-label">
-                    MOST POPULAR
-                  </div>
-                )}
-
-                {plan.key === "enterprise" && (
-                  <div className="enterprise-label">
-                    PREMIUM PLAN
-                  </div>
+                  <div className="popular-label">MOST POPULAR</div>
                 )}
 
                 <div className="plan-top">
-                  <span className="plan-label">
-                    {plan.label}
-                  </span>
-
+                  <span className="plan-label">{plan.label}</span>
                   <h3>{plan.name}</h3>
-
                   <p className="plan-description">
                     {plan.description}
                   </p>
@@ -631,39 +597,26 @@ export default function CompanyPricingPage() {
                 <div className="price-block">
                   <div className="price-line">
                     <span className="currency">R</span>
-                    <span className="price">
-                      {formatPrice(price)}
-                    </span>
+                    <span className="price">{formatPrice(price)}</span>
                   </div>
 
-                  <span className="price-period">
-                    {period}
-                  </span>
+                  <span className="price-period">{period}</span>
 
-                  {plan.key !== "listing" &&
-                    billing === "annual" && (
-                      <p className="saving-note">
-                        ✓ Save R
-                        {formatPrice(
-                          plan.monthly * 12 - plan.annual
-                        )}{" "}
-                        per year
-                      </p>
-                    )}
+                  {plan.key !== "listing" && billing === "annual" && (
+                    <div className="saving-note">
+                      ✓ Annual savings included
+                    </div>
+                  )}
                 </div>
 
                 <div className="listing-limit">
-                  <span className="limit-check">✓</span>
-                  <span>
-                    {plan.key === "listing"
-                      ? "1 listing for 30 days"
-                      : `Up to ${plan.listings} active listings`}
-                  </span>
+                  <span className="limit-icon">✓</span>
+                  <span>{plan.listings}</span>
                 </div>
 
-                <h4 className="features-heading">
+                <div className="features-heading">
                   What's included
-                </h4>
+                </div>
 
                 <ul className="features">
                   {plan.features.map((feature, index) => (
@@ -677,30 +630,23 @@ export default function CompanyPricingPage() {
                 <button
                   type="button"
                   className={`plan-button ${
-                    plan.popular
-                      ? "plan-button-primary"
-                      : ""
-                  } ${
-                    plan.key === "enterprise"
-                      ? "enterprise-button"
-                      : ""
+                    plan.popular ? "plan-button-primary" : ""
                   }`}
                   disabled={processingPlan !== null}
                   onClick={() => choosePlan(plan)}
                 >
                   {processingPlan === plan.key
-                    ? "Preparing request..."
+                    ? "Preparing your request..."
                     : plan.key === "listing"
                     ? "Choose this listing"
                     : isActive
                     ? "Request this plan"
                     : "Get started"}
-
                   <span>→</span>
                 </button>
 
                 <p className="plan-footnote">
-                  Bank transfer · Verification required
+                  Bank transfer · Payment verification required
                 </p>
               </article>
             );
@@ -708,35 +654,30 @@ export default function CompanyPricingPage() {
         </div>
 
         <p className="pricing-disclaimer">
-          All prices are in South African rand (ZAR).
-          Annual subscriptions are payable upfront.
-          Pay Per Listing is a once-off payment for a
-          30-day listing period.
+          All prices are in South African rand (ZAR). Annual
+          subscriptions are payable upfront. Pay Per Listing is a
+          once-off payment for a 30-day listing period.
         </p>
       </section>
 
       <section className="payment-section">
-        <div className="payment-icon">✓</div>
+        <div className="payment-icon">↗</div>
 
         <div className="payment-content">
-          <span className="section-kicker">
-            STRAIGHTFORWARD PAYMENTS
-          </span>
-
+          <span className="section-kicker">STRAIGHTFORWARD PAYMENTS</span>
           <h2>Clear pricing. Verified payments.</h2>
 
           <p>
-            Choose your plan, follow the bank-transfer
-            instructions and submit your payment reference
-            and proof of payment. Your subscription stays
-            pending until we verify receipt.
+            Choose your plan, follow the bank-transfer instructions
+            and submit your proof of payment. Your subscription stays
+            pending until GradLink SA verifies receipt of payment.
           </p>
         </div>
 
         <div className="payment-steps">
           <div>
             <span>01</span>
-            <strong>Select your plan</strong>
+            <strong>Select a plan</strong>
           </div>
 
           <div>
@@ -752,15 +693,11 @@ export default function CompanyPricingPage() {
       </section>
 
       <section className="faq-section">
-        <div className="section-heading">
-          <span className="section-kicker">
-            NEED TO KNOW MORE?
-          </span>
-
+        <div className="faq-heading">
+          <span className="section-kicker">NEED TO KNOW MORE?</span>
           <h2>Frequently asked questions</h2>
-
           <p>
-            Find answers about pricing, payment and company plans.
+            Important information to help your company choose a plan.
           </p>
         </div>
 
@@ -772,9 +709,7 @@ export default function CompanyPricingPage() {
                 className="faq-question"
                 aria-expanded={openFaq === index}
                 onClick={() =>
-                  setOpenFaq(
-                    openFaq === index ? -1 : index
-                  )
+                  setOpenFaq(openFaq === index ? -1 : index)
                 }
               >
                 <span>{faq.question}</span>
@@ -784,9 +719,7 @@ export default function CompanyPricingPage() {
               </button>
 
               {openFaq === index && (
-                <p className="faq-answer">
-                  {faq.answer}
-                </p>
+                <p className="faq-answer">{faq.answer}</p>
               )}
             </article>
           ))}
@@ -806,13 +739,13 @@ export default function CompanyPricingPage() {
           </h2>
 
           <p>
-            Start connecting your organisation with
-            South Africa's emerging talent.
+            Connect your organisation with South Africa's emerging
+            talent through GradLink SA.
           </p>
         </div>
 
         <a href="#plans" className="closing-button">
-          Explore company plans →
+          Explore plans <span>→</span>
         </a>
       </section>
 
@@ -822,9 +755,7 @@ export default function CompanyPricingPage() {
           <strong>GradLink SA</strong>
         </a>
 
-        <p>
-          Connecting South African talent with opportunity.
-        </p>
+        <p>Connecting South African talent with opportunity.</p>
 
         <div className="footer-links">
           <a href="/">Home</a>
@@ -833,8 +764,7 @@ export default function CompanyPricingPage() {
         </div>
 
         <small>
-          © {new Date().getFullYear()} GradLink SA.
-          All rights reserved.
+          © {new Date().getFullYear()} GradLink SA. All rights reserved.
         </small>
       </footer>
 
@@ -853,7 +783,6 @@ export default function CompanyPricingPage() {
 
         button,
         a {
-          font-family: inherit;
           -webkit-tap-highlight-color: transparent;
         }
 
@@ -862,6 +791,7 @@ export default function CompanyPricingPage() {
         }
 
         button {
+          font-family: inherit;
           cursor: pointer;
         }
 
@@ -869,63 +799,66 @@ export default function CompanyPricingPage() {
           position: sticky;
           top: 0;
           z-index: 30;
-          border-bottom: 1px solid #e5ebf4;
+          border-bottom: 1px solid #e5eaf3;
           background: rgba(255, 255, 255, 0.97);
           backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
         }
 
         .header-inner {
-          width: min(1160px, calc(100% - 36px));
-          min-height: 74px;
+          width: min(1160px, calc(100% - 40px));
+          min-height: 76px;
           margin: auto;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 15px;
+          gap: 20px;
         }
 
-        .brand,
-        .footer-brand {
+        .brand {
           display: flex;
           align-items: center;
-          gap: 10px;
+          gap: 11px;
+          min-width: 0;
           color: #10213d;
         }
 
         .brand-mark,
         .footer-mark {
-          width: 42px;
-          height: 42px;
+          width: 44px;
+          height: 44px;
           display: grid;
           place-items: center;
           flex-shrink: 0;
-          border-radius: 12px;
+          border-radius: 13px;
           background: linear-gradient(135deg, #3984ff, #1747b8);
-          color: white;
-          font-size: 21px;
+          box-shadow: 0 6px 16px rgba(37, 99, 235, 0.2);
+          color: #ffffff;
+          font-size: 22px;
           font-weight: 900;
         }
 
-        .brand > span:last-child {
+        .brand-text {
           display: flex;
           flex-direction: column;
           gap: 4px;
         }
 
-        .brand strong {
-          font-size: 15px;
+        .brand-text strong {
+          font-size: 16px;
           font-weight: 900;
+          letter-spacing: -0.3px;
         }
 
-        .brand small {
-          color: #64748b;
+        .brand-text small {
+          color: #728098;
           font-size: 10px;
         }
 
         .header-actions {
           display: flex;
           align-items: center;
-          gap: 20px;
+          gap: 22px;
         }
 
         .nav-link {
@@ -934,20 +867,28 @@ export default function CompanyPricingPage() {
           font-weight: 800;
         }
 
+        .nav-link:hover {
+          color: #2563eb;
+        }
+
         .header-button {
-          min-height: 42px;
-          padding: 0 15px;
+          min-height: 43px;
+          padding: 0 16px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           border: 0;
-          border-radius: 9px;
+          border-radius: 10px;
           background: #1d4ed8;
-          color: white;
-          font-size: 11px;
+          color: #ffffff;
+          font-size: 12px;
           font-weight: 800;
         }
 
         .header-button:hover,
         .primary-button:hover,
-        .plan-button-primary:hover:not(:disabled) {
+        .plan-button:hover:not(:disabled),
+        .closing-button:hover {
           background: #163ca8;
         }
 
@@ -955,139 +896,142 @@ export default function CompanyPricingPage() {
           width: min(1160px, calc(100% - 40px));
           min-height: 520px;
           margin: auto;
-          padding: 62px 0;
+          padding: 68px 0;
           display: grid;
-          grid-template-columns: 1.05fr 0.95fr;
+          grid-template-columns: 1fr 0.9fr;
           align-items: center;
-          gap: 36px;
+          gap: 50px;
         }
 
-        .hero-copy {
-          min-width: 0;
+        .hero-content {
+          position: relative;
+          z-index: 1;
         }
 
         .eyebrow,
         .section-kicker {
+          display: inline-flex;
+          align-items: center;
+          gap: 9px;
           color: #2457c5;
           font-size: 10px;
           font-weight: 900;
-          letter-spacing: 0.12em;
+          letter-spacing: 0.11em;
           line-height: 1.7;
         }
 
         .eyebrow {
-          display: inline-block;
           padding: 9px 12px;
-          border: 1px solid #d5e4ff;
-          border-radius: 7px;
-          background: #f1f6ff;
+          border: 1px solid #d9e7ff;
+          border-radius: 8px;
+          background: #f2f7ff;
+        }
+
+        .eyebrow-dot {
+          width: 7px;
+          height: 7px;
+          flex-shrink: 0;
+          border-radius: 50%;
+          background: #3478ef;
         }
 
         .hero h1 {
-          margin: 24px 0 0;
+          margin: 25px 0 0;
           color: #10213d;
-          font-size: clamp(39px, 5vw, 61px);
+          font-size: clamp(40px, 5vw, 62px);
           font-weight: 900;
-          line-height: 1.1;
+          line-height: 1.08;
           letter-spacing: -2.5px;
         }
 
         .hero h1 span,
-        .section-heading h2 span {
-          color: #2563eb;
+        .section-heading h2 span,
+        .pricing-heading h2 span {
+          color: #2864dd;
         }
 
-        .hero-copy > p {
+        .hero-text {
           max-width: 480px;
-          margin: 20px 0 0;
-          color: #52627a;
-          font-size: 14px;
+          margin: 22px 0 0;
+          color: #607089;
+          font-size: 15px;
           line-height: 1.9;
         }
 
         .hero-actions {
-          margin-top: 27px;
           display: flex;
           flex-wrap: wrap;
-          gap: 11px;
+          gap: 12px;
+          margin-top: 28px;
         }
 
         .primary-button,
         .secondary-button,
         .closing-button {
           min-height: 48px;
-          padding: 0 16px;
+          padding: 0 18px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          border-radius: 9px;
-          font-size: 11px;
-          font-weight: 900;
-          line-height: 1.5;
-          text-align: center;
+          gap: 13px;
+          border-radius: 10px;
+          font-size: 12px;
+          font-weight: 800;
+          transition: background 0.2s ease;
         }
 
-        .primary-button {
+        .primary-button,
+        .closing-button {
           background: #1d4ed8;
-          color: white;
+          color: #ffffff;
         }
 
         .secondary-button {
-          border: 1px solid #d5deeb;
-          background: white;
-          color: #1e3658;
+          border: 1px solid #dbe3ef;
+          background: #ffffff;
+          color: #253858;
         }
 
         .secondary-button:hover {
           background: #f4f7fc;
         }
 
-        .trust-note {
-          margin-top: 21px;
+        .hero-note {
           display: flex;
-          align-items: flex-start;
+          align-items: center;
           gap: 9px;
-          color: #52627a;
-          font-size: 11px;
-          line-height: 1.8;
+          margin-top: 24px;
+          color: #64748b;
+          font-size: 12px;
         }
 
-        .trust-note span {
-          color: #16834c;
+        .hero-note span {
+          color: #16865b;
           font-weight: 900;
         }
 
         .hero-visual {
-          min-width: 0;
-          min-height: 390px;
           position: relative;
+          min-width: 0;
+          min-height: 360px;
           display: flex;
           align-items: center;
           justify-content: center;
-          isolation: isolate;
-        }
-
-        .visual-glow {
-          position: absolute;
-          z-index: -1;
-          width: 320px;
-          height: 320px;
-          border-radius: 50%;
-          background: radial-gradient(
-            circle,
-            #dce9ff,
-            #eff5ff 53%,
-            transparent 73%
-          );
+          border-radius: 30px;
+          background:
+            radial-gradient(circle at 70% 20%, #dce9ff 0, transparent 45%),
+            linear-gradient(145deg, #f3f7ff, #eaf1ff);
         }
 
         .visual-card {
-          width: min(360px, 86%);
-          padding: 25px;
-          border: 1px solid #e2e9f4;
-          border-radius: 20px;
-          background: white;
-          box-shadow: 0 24px 65px rgba(30, 64, 125, 0.12);
+          position: relative;
+          z-index: 1;
+          width: min(340px, calc(100% - 56px));
+          padding: 26px;
+          border: 1px solid rgba(255, 255, 255, 0.9);
+          border-radius: 23px;
+          background: #ffffff;
+          box-shadow: 0 24px 60px rgba(35, 66, 120, 0.15);
         }
 
         .visual-brand {
@@ -1101,17 +1045,17 @@ export default function CompanyPricingPage() {
           height: 42px;
           display: grid;
           place-items: center;
-          border-radius: 11px;
+          flex-shrink: 0;
+          border-radius: 12px;
           background: linear-gradient(135deg, #3984ff, #1747b8);
-          color: white;
-          font-size: 20px;
+          color: #ffffff;
+          font-size: 21px;
           font-weight: 900;
         }
 
-        .visual-brand div {
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
+        .visual-brand strong,
+        .visual-brand small {
+          display: block;
         }
 
         .visual-brand strong {
@@ -1119,29 +1063,30 @@ export default function CompanyPricingPage() {
         }
 
         .visual-brand small {
-          color: #64748b;
+          margin-top: 5px;
+          color: #748198;
           font-size: 10px;
         }
 
         .visual-divider {
           height: 1px;
           margin: 22px 0;
-          background: #e8edf5;
+          background: #edf1f7;
         }
 
-        .visual-kicker {
-          color: #3764b4;
+        .visual-label {
+          color: #2864dd;
           font-size: 9px;
           font-weight: 900;
-          letter-spacing: 0.1em;
+          letter-spacing: 0.13em;
         }
 
         .visual-card h2 {
-          margin: 12px 0 19px;
-          color: #142b4b;
-          font-size: 27px;
-          line-height: 1.3;
-          letter-spacing: -0.8px;
+          margin: 12px 0 18px;
+          color: #10213d;
+          font-size: 31px;
+          line-height: 1.15;
+          letter-spacing: -1px;
         }
 
         .visual-tags {
@@ -1151,110 +1096,105 @@ export default function CompanyPricingPage() {
         }
 
         .visual-tags span {
-          padding: 8px 9px;
-          border: 1px solid #dce8fc;
+          padding: 8px 10px;
           border-radius: 7px;
-          background: #f2f7ff;
-          color: #2858b4;
-          font-size: 9px;
+          background: #eef4ff;
+          color: #2457c5;
+          font-size: 10px;
           font-weight: 800;
         }
 
-        .visual-footer {
-          margin-top: 22px;
-          padding-top: 16px;
+        .visual-bottom {
           display: flex;
           align-items: center;
           gap: 9px;
-          border-top: 1px solid #e8edf5;
-          color: #52627a;
+          margin-top: 22px;
+          padding-top: 17px;
+          border-top: 1px solid #edf1f7;
+          color: #64748b;
           font-size: 10px;
-          line-height: 1.6;
         }
 
-        .status-dot {
-          width: 8px;
-          height: 8px;
+        .visual-check,
+        .floating-check {
+          width: 25px;
+          height: 25px;
+          display: grid;
+          place-items: center;
           flex-shrink: 0;
           border-radius: 50%;
-          background: #16a34a;
+          background: #e6f8ef;
+          color: #16865b;
+          font-weight: 900;
         }
 
         .floating-card {
           position: absolute;
           z-index: 2;
-          max-width: 215px;
-          padding: 12px;
           display: flex;
           align-items: center;
-          gap: 9px;
-          border: 1px solid #e1e8f3;
-          border-radius: 12px;
-          background: white;
-          box-shadow: 0 12px 35px rgba(30, 64, 125, 0.1);
+          gap: 11px;
+          max-width: calc(100% - 24px);
+          padding: 13px 15px;
+          border: 1px solid #e7edf7;
+          border-radius: 13px;
+          background: #ffffff;
+          box-shadow: 0 12px 35px rgba(35, 66, 120, 0.12);
         }
 
-        .floating-one {
-          top: 25px;
-          right: -2px;
+        .floating-top {
+          top: 23px;
+          right: 12px;
         }
 
-        .floating-two {
+        .floating-bottom {
           bottom: 22px;
-          left: -4px;
+          left: 12px;
         }
 
         .floating-icon {
-          width: 33px;
-          height: 33px;
+          width: 30px;
+          height: 30px;
           display: grid;
           place-items: center;
           flex-shrink: 0;
           border-radius: 9px;
-          background: #edf4ff;
-          color: #2563eb;
-          font-size: 15px;
+          background: #eef4ff;
+          color: #2864dd;
         }
 
-        .floating-icon.green {
-          background: #e5f8ed;
-          color: #16834c;
-        }
-
-        .floating-card > div {
-          display: flex;
-          flex-direction: column;
-          gap: 5px;
+        .floating-card strong,
+        .floating-card small {
+          display: block;
         }
 
         .floating-card strong {
-          font-size: 10px;
+          color: #10213d;
+          font-size: 11px;
         }
 
         .floating-card small {
-          color: #64748b;
+          margin-top: 5px;
+          color: #748198;
           font-size: 9px;
-          line-height: 1.5;
-        }
-
-        .section {
-          padding: 76px 20px;
         }
 
         .benefits {
-          border-top: 1px solid #e9eef7;
-          border-bottom: 1px solid #e9eef7;
+          padding: 76px 20px;
           background: #f7f9fd;
         }
 
-        .section-heading {
-          max-width: 680px;
-          margin: auto;
+        .section-heading,
+        .pricing-heading,
+        .faq-heading {
+          max-width: 700px;
+          margin: 0 auto;
           text-align: center;
         }
 
-        .section-heading h2 {
-          margin: 14px 0 0;
+        .section-heading h2,
+        .pricing-heading h2 {
+          margin: 16px 0 0;
           color: #10213d;
           font-size: clamp(30px, 4vw, 43px);
           font-weight: 900;
@@ -1262,28 +1202,30 @@ export default function CompanyPricingPage() {
           letter-spacing: -1.3px;
         }
 
-        .section-heading > p {
-          max-width: 570px;
-          margin: 15px auto 0;
-          color: #52627a;
-          font-size: 13px;
-          line-height: 1.9;
+        .section-heading > p,
+        .pricing-heading > p,
+        .faq-heading > p {
+          max-width: 580px;
+          margin: 16px auto 0;
+          color: #64748b;
+          font-size: 14px;
+          line-height: 1.8;
         }
 
         .benefit-grid {
-          width: min(1100px, 100%);
-          margin: 36px auto 0;
+          width: min(1080px, 100%);
+          margin: 40px auto 0;
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
-          gap: 14px;
+          gap: 17px;
         }
 
         .benefit-card {
           min-width: 0;
-          padding: 23px 19px;
-          border: 1px solid #e2e9f4;
-          border-radius: 14px;
-          background: white;
+          padding: 25px 21px;
+          border: 1px solid #e6ebf4;
+          border-radius: 15px;
+          background: #ffffff;
         }
 
         .benefit-number {
@@ -1292,122 +1234,140 @@ export default function CompanyPricingPage() {
           display: grid;
           place-items: center;
           border-radius: 11px;
-          background: #eaf1ff;
-          color: #245bd6;
+          background: #edf4ff;
+          color: #2457c5;
           font-size: 12px;
           font-weight: 900;
         }
 
         .benefit-card h3 {
-          margin: 18px 0 9px;
-          color: #183052;
-          font-size: 14px;
-          line-height: 1.6;
+          margin: 21px 0 0;
+          color: #10213d;
+          font-size: 15px;
+          line-height: 1.45;
         }
 
         .benefit-card p {
-          margin: 0;
-          color: #52627a;
+          margin: 10px 0 0;
+          color: #64748b;
           font-size: 12px;
-          line-height: 1.9;
+          line-height: 1.8;
         }
 
-        .pricing {
-          scroll-margin-top: 80px;
-          background: linear-gradient(
-            180deg,
-            #f8faff 0%,
-            #ffffff 35%
-          );
+        .pricing-section {
+          width: min(1180px, calc(100% - 40px));
+          margin: auto;
+          padding: 86px 0 76px;
+          scroll-margin-top: 90px;
+        }
+
+        .pricing-heading {
+          margin-bottom: 35px;
         }
 
         .active-banner {
-          width: min(1050px, 100%);
-          margin: 28px auto 0;
-          padding: 16px;
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          gap: 15px;
-          border: 1px solid #bfdbfe;
-          border-radius: 12px;
-          background: #eff6ff;
+          gap: 14px;
+          margin: 0 0 22px;
+          padding: 18px;
+          border: 1px solid #bfe8d1;
+          border-radius: 13px;
+          background: #f0fbf5;
         }
 
-        .active-banner strong {
+        .active-indicator {
+          width: 11px;
+          height: 11px;
+          flex-shrink: 0;
+          border-radius: 50%;
+          background: #16865b;
+        }
+
+        .active-copy {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .active-copy strong {
+          color: #12633f;
+          font-size: 13px;
+        }
+
+        .active-copy p {
+          margin: 5px 0 0;
+          color: #43745b;
           font-size: 12px;
-        }
-
-        .active-banner p {
-          margin: 6px 0 0;
-          color: #52627a;
-          font-size: 11px;
-          line-height: 1.7;
+          line-height: 1.6;
         }
 
         .active-banner button {
           min-height: 40px;
           padding: 0 12px;
           flex-shrink: 0;
-          border: 0;
+          border: 1px solid #b8dfc9;
           border-radius: 8px;
-          background: #1d4ed8;
-          color: white;
-          font-size: 10px;
+          background: #ffffff;
+          color: #12633f;
+          font-size: 11px;
           font-weight: 800;
         }
 
         .error-message {
-          width: min(1050px, 100%);
-          margin: 20px auto 0;
-          padding: 13px;
+          margin-bottom: 18px;
+          padding: 14px 16px;
           border: 1px solid #fecaca;
-          border-radius: 9px;
-          background: #fef2f2;
+          border-radius: 10px;
+          background: #fff1f2;
           color: #991b1b;
-          font-size: 12px;
-          line-height: 1.7;
+          font-size: 13px;
+          line-height: 1.6;
           overflow-wrap: anywhere;
         }
 
         .billing-panel {
-          width: min(1050px, 100%);
-          margin: 32px auto 23px;
-          padding: 16px 18px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 16px;
-          border: 1px solid #e0e7f1;
-          border-radius: 12px;
-          background: white;
+          gap: 20px;
+          margin-bottom: 27px;
+          padding: 20px;
+          border: 1px solid #e5eaf3;
+          border-radius: 14px;
+          background: #f8faff;
         }
 
-        .billing-panel > div:first-child strong {
-          color: #193152;
-          font-size: 12px;
+        .billing-copy {
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 7px;
         }
 
-        .billing-panel p {
-          margin: 6px 0 0;
+        .billing-copy strong {
+          color: #10213d;
+          font-size: 13px;
+        }
+
+        .billing-copy span {
           color: #64748b;
-          font-size: 10px;
-          line-height: 1.7;
+          font-size: 11px;
+          line-height: 1.6;
         }
 
         .billing-toggle {
-          padding: 4px;
           display: flex;
-          gap: 4px;
           flex-shrink: 0;
-          border: 1px solid #e0e7f1;
-          border-radius: 9px;
-          background: #f0f3f8;
+          gap: 5px;
+          padding: 5px;
+          border: 1px solid #e0e7f2;
+          border-radius: 10px;
+          background: #edf2f9;
         }
 
         .billing-toggle button {
-          min-height: 39px;
-          padding: 0 12px;
+          min-height: 38px;
+          padding: 0 13px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
@@ -1416,440 +1376,417 @@ export default function CompanyPricingPage() {
           border-radius: 7px;
           background: transparent;
           color: #52627a;
-          font-size: 10px;
+          font-size: 11px;
           font-weight: 800;
         }
 
         .billing-toggle button.selected {
-          background: white;
-          color: #1d4ed8;
-          box-shadow: 0 2px 7px rgba(15, 23, 42, 0.07);
+          background: #ffffff;
+          color: #1747b8;
+          box-shadow: 0 2px 7px rgba(20, 45, 90, 0.1);
         }
 
         .save-badge {
           padding: 5px 6px;
           border-radius: 5px;
-          background: #dcfce7;
-          color: #166534;
-          font-size: 7px;
+          background: #e4f8ed;
+          color: #147548;
+          font-size: 8px;
           font-weight: 900;
           white-space: nowrap;
         }
 
         .plans-grid {
-          width: min(1050px, 100%);
-          margin: auto;
           display: grid;
           grid-template-columns: repeat(4, minmax(0, 1fr));
           align-items: stretch;
-          gap: 13px;
+          gap: 17px;
         }
 
         .plan-card {
-          min-width: 0;
           position: relative;
-          padding: 24px 17px 19px;
+          min-width: 0;
+          min-height: 100%;
           display: flex;
           flex-direction: column;
-          border: 1px solid #dfe7f2;
-          border-radius: 15px;
-          background: white;
-          box-shadow: 0 8px 28px rgba(16, 33, 61, 0.05);
-          transition:
-            transform 0.2s ease,
-            box-shadow 0.2s ease;
-        }
-
-        .plan-card:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 15px 35px rgba(16, 33, 61, 0.09);
+          padding: 25px 20px 20px;
+          border: 1px solid #e0e7f1;
+          border-radius: 16px;
+          background: #ffffff;
+          box-shadow: 0 7px 25px rgba(23, 46, 88, 0.045);
+          overflow: hidden;
         }
 
         .plan-card.popular {
-          border: 2px solid #2563eb;
-          box-shadow: 0 13px 34px rgba(37, 99, 235, 0.12);
+          border: 2px solid #2864dd;
+          padding: 24px 19px 19px;
+          box-shadow: 0 12px 35px rgba(37, 99, 235, 0.11);
         }
 
-        .plan-card.enterprise {
-          border-color: #183a70;
-          background: linear-gradient(
-            180deg,
-            #f2f6ff 0%,
-            #ffffff 28%
-          );
-        }
-
-        .popular-label,
-        .enterprise-label {
-          margin: -24px -17px 18px;
-          padding: 9px 5px;
-          border-radius: 12px 12px 0 0;
-          background: #2563eb;
-          color: white;
-          font-size: 8px;
-          font-weight: 900;
-          letter-spacing: 0.08em;
+        .popular-label {
+          margin: -24px -19px 20px;
+          padding: 11px 8px;
+          background: #1d4ed8;
+          color: #ffffff;
           text-align: center;
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: 0.1em;
         }
 
-        .enterprise-label {
-          background: #183a70;
+        .plan-top {
+          min-width: 0;
         }
 
         .plan-label {
           display: inline-block;
-          color: #4167ad;
-          font-size: 8px;
+          color: #2864dd;
+          font-size: 9px;
           font-weight: 900;
-          letter-spacing: 0.08em;
-          line-height: 1.7;
+          letter-spacing: 0.09em;
+          line-height: 1.6;
+          overflow-wrap: anywhere;
         }
 
         .plan-top h3 {
-          margin: 12px 0 9px;
-          color: #152944;
-          font-size: 21px;
-          line-height: 1.3;
-          letter-spacing: -0.5px;
+          margin: 12px 0 0;
+          color: #10213d;
+          font-size: 23px;
+          font-weight: 900;
+          line-height: 1.25;
+          letter-spacing: -0.6px;
           overflow-wrap: anywhere;
         }
 
         .plan-description {
-          min-height: 105px;
-          margin: 0;
-          color: #52627a;
-          font-size: 11px;
+          min-height: 92px;
+          margin: 12px 0 0;
+          color: #64748b;
+          font-size: 12px;
           line-height: 1.8;
           overflow-wrap: anywhere;
         }
 
         .price-block {
-          min-height: 108px;
-          margin-top: 15px;
+          min-height: 112px;
+          margin-top: 17px;
           padding: 17px 0;
-          border-top: 1px solid #e7edf5;
-          border-bottom: 1px solid #e7edf5;
+          border-top: 1px solid #edf1f7;
+          border-bottom: 1px solid #edf1f7;
         }
 
         .price-line {
           display: flex;
           align-items: baseline;
-          gap: 2px;
+          gap: 4px;
+          min-width: 0;
+          white-space: nowrap;
         }
 
         .currency {
-          color: #183052;
-          font-size: 15px;
+          color: #10213d;
+          font-size: 19px;
           font-weight: 800;
         }
 
         .price {
           color: #10213d;
-          font-size: clamp(25px, 2.3vw, 32px);
+          font-size: clamp(27px, 2.5vw, 35px);
           font-weight: 900;
-          line-height: 1.3;
-          letter-spacing: -1px;
-          overflow-wrap: anywhere;
+          line-height: 1.2;
+          letter-spacing: -1.2px;
         }
 
         .price-period {
           display: block;
-          margin-top: 4px;
-          color: #52627a;
-          font-size: 10px;
+          margin-top: 6px;
+          color: #64748b;
+          font-size: 11px;
         }
 
         .saving-note {
-          margin: 8px 0 0;
-          color: #16834c;
-          font-size: 9px;
+          margin-top: 9px;
+          color: #147548;
+          font-size: 10px;
           font-weight: 800;
-          line-height: 1.6;
+          line-height: 1.5;
         }
 
         .listing-limit {
-          min-height: 44px;
-          margin-top: 15px;
-          padding: 9px;
+          min-height: 56px;
           display: flex;
           align-items: center;
-          gap: 8px;
-          border: 1px solid #d8e5ff;
-          border-radius: 8px;
-          background: #f2f6ff;
-          color: #234b93;
-          font-size: 10px;
+          gap: 9px;
+          padding: 14px 0;
+          color: #263b5b;
+          font-size: 11px;
           font-weight: 800;
           line-height: 1.6;
           overflow-wrap: anywhere;
         }
 
-        .limit-check {
-          width: 19px;
-          height: 19px;
-          display: grid;
-          place-items: center;
+        .limit-icon,
+        .feature-check {
           flex-shrink: 0;
-          border-radius: 50%;
-          background: #dce8ff;
-          color: #2458c2;
+          color: #16865b;
+          font-weight: 900;
         }
 
         .features-heading {
-          margin: 20px 0 13px;
-          color: #203653;
+          margin-top: 12px;
+          color: #10213d;
           font-size: 11px;
           font-weight: 900;
         }
 
         .features {
-          margin: 0 0 22px;
+          flex: 1;
+          margin: 15px 0 22px;
           padding: 0;
           display: flex;
           flex-direction: column;
-          gap: 11px;
+          gap: 12px;
           list-style: none;
         }
 
         .features li {
           display: flex;
           align-items: flex-start;
-          gap: 7px;
+          gap: 9px;
           color: #52627a;
-          font-size: 10px;
-          line-height: 1.7;
+          font-size: 11px;
+          line-height: 1.65;
           overflow-wrap: anywhere;
         }
 
         .feature-check {
-          width: 17px;
-          height: 17px;
-          display: grid;
-          place-items: center;
-          flex-shrink: 0;
-          border-radius: 50%;
-          background: #e5f7ed;
-          color: #16834c;
-          font-size: 9px;
-          font-weight: 900;
+          margin-top: 1px;
         }
 
         .plan-button {
           width: 100%;
-          min-height: 46px;
-          margin-top: auto;
-          padding: 10px 8px;
+          min-height: 47px;
+          padding: 11px 12px;
           display: flex;
           align-items: center;
-          justify-content: center;
-          gap: 7px;
-          border: 1px solid #d5e1f1;
-          border-radius: 8px;
-          background: #f2f6ff;
-          color: #214b99;
-          font-size: 10px;
+          justify-content: space-between;
+          gap: 8px;
+          border: 1px solid #d7e3f8;
+          border-radius: 9px;
+          background: #f0f5ff;
+          color: #1747b8;
+          font-size: 11px;
           font-weight: 900;
           line-height: 1.5;
+          text-align: left;
+          overflow-wrap: anywhere;
         }
 
         .plan-button-primary {
           border-color: #1d4ed8;
           background: #1d4ed8;
-          color: white;
-        }
-
-        .enterprise-button {
-          border-color: #183a70;
-          background: #183a70;
-          color: white;
-        }
-
-        .enterprise-button:hover:not(:disabled) {
-          background: #10284f;
+          color: #ffffff;
         }
 
         .plan-button:disabled {
-          cursor: wait;
           opacity: 0.65;
+          cursor: wait;
         }
 
         .plan-footnote {
-          margin: 11px 0 0;
-          color: #52627a;
+          margin: 12px 0 0;
+          color: #7b8799;
           font-size: 9px;
           line-height: 1.7;
           text-align: center;
         }
 
         .pricing-disclaimer {
-          max-width: 850px;
-          margin: 21px auto 0;
-          color: #52627a;
-          font-size: 10px;
-          line-height: 1.9;
+          margin: 22px 0 0;
+          color: #748198;
+          font-size: 11px;
+          line-height: 1.8;
           text-align: center;
         }
 
         .payment-section {
-          width: min(1050px, calc(100% - 40px));
+          width: min(1080px, calc(100% - 40px));
           margin: 0 auto 75px;
-          padding: 27px;
+          padding: 30px;
           display: grid;
-          grid-template-columns: auto minmax(0, 1fr);
+          grid-template-columns: auto 1fr;
           align-items: start;
-          gap: 16px;
-          border: 1px solid #dfe7f2;
-          border-radius: 16px;
-          background: #f7faff;
+          gap: 20px;
+          border: 1px solid #dce7fb;
+          border-radius: 18px;
+          background: linear-gradient(135deg, #f3f7ff, #ffffff);
         }
 
         .payment-icon {
-          width: 45px;
-          height: 45px;
+          width: 48px;
+          height: 48px;
           display: grid;
           place-items: center;
-          border-radius: 12px;
-          background: #e4eeff;
-          color: #245bd6;
-          font-size: 20px;
-          font-weight: 900;
+          border-radius: 13px;
+          background: #1d4ed8;
+          color: #ffffff;
+          font-size: 24px;
         }
 
         .payment-content h2 {
-          margin: 9px 0;
-          color: #183052;
-          font-size: 22px;
-          line-height: 1.4;
-          letter-spacing: -0.5px;
+          margin: 10px 0 0;
+          color: #10213d;
+          font-size: 25px;
+          line-height: 1.3;
         }
 
         .payment-content p {
           max-width: 650px;
-          margin: 0;
-          color: #52627a;
-          font-size: 12px;
+          margin: 12px 0 0;
+          color: #64748b;
+          font-size: 13px;
           line-height: 1.9;
         }
 
         .payment-steps {
           grid-column: 2;
-          margin-top: 7px;
           display: grid;
           grid-template-columns: repeat(3, minmax(0, 1fr));
-          gap: 9px;
+          gap: 12px;
+          margin-top: 8px;
         }
 
-        .payment-steps > div {
-          padding: 12px;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          border: 1px solid #e2e9f4;
-          border-radius: 9px;
-          background: white;
+        .payment-steps div {
+          min-width: 0;
+          padding: 15px;
+          border: 1px solid #e1e9f7;
+          border-radius: 10px;
+          background: #ffffff;
+        }
+
+        .payment-steps span,
+        .payment-steps strong {
+          display: block;
         }
 
         .payment-steps span {
-          color: #2563eb;
+          color: #2864dd;
           font-size: 10px;
           font-weight: 900;
         }
 
         .payment-steps strong {
-          color: #314763;
-          font-size: 10px;
-          line-height: 1.6;
+          margin-top: 8px;
+          color: #263b5b;
+          font-size: 11px;
+          line-height: 1.5;
         }
 
         .faq-section {
-          width: min(780px, calc(100% - 40px));
+          width: min(850px, calc(100% - 40px));
           margin: 0 auto;
-          padding-bottom: 75px;
+          padding: 0 0 80px;
         }
 
-        .faq-section .section-heading {
-          margin-bottom: 28px;
+        .faq-heading {
+          margin-bottom: 30px;
+        }
+
+        .faq-heading h2 {
+          margin: 13px 0 0;
+          color: #10213d;
+          font-size: clamp(27px, 4vw, 36px);
+          line-height: 1.3;
+          letter-spacing: -0.8px;
         }
 
         .faq-list {
-          border-top: 1px solid #e1e8f2;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
         }
 
         .faq-item {
-          border-bottom: 1px solid #e1e8f2;
+          border: 1px solid #e3e9f3;
+          border-radius: 11px;
+          background: #ffffff;
+          overflow: hidden;
         }
 
         .faq-question {
           width: 100%;
-          min-height: 61px;
-          padding: 14px 2px;
+          min-height: 58px;
+          padding: 16px 18px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 14px;
+          gap: 15px;
           border: 0;
-          background: transparent;
-          color: #243956;
-          font-size: 12px;
+          background: #ffffff;
+          color: #10213d;
+          font-size: 13px;
           font-weight: 800;
-          line-height: 1.7;
+          line-height: 1.6;
           text-align: left;
         }
 
         .faq-toggle {
-          width: 28px;
-          height: 28px;
+          width: 27px;
+          height: 27px;
           display: grid;
           place-items: center;
           flex-shrink: 0;
           border-radius: 8px;
           background: #edf4ff;
-          color: #2563eb;
-          font-size: 18px;
+          color: #2457c5;
+          font-size: 19px;
         }
 
         .faq-answer {
-          margin: 0 32px 19px 2px;
-          color: #52627a;
+          margin: 0;
+          padding: 0 18px 19px;
+          color: #64748b;
           font-size: 12px;
           line-height: 1.9;
+          overflow-wrap: anywhere;
         }
 
         .closing-cta {
-          width: min(1050px, calc(100% - 40px));
+          width: min(1080px, calc(100% - 40px));
           margin: 0 auto 70px;
           padding: 35px;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 22px;
-          border-radius: 17px;
-          background: #112c56;
-          color: white;
+          gap: 25px;
+          border-radius: 19px;
+          background: linear-gradient(125deg, #102d66, #1d4ed8);
+          color: #ffffff;
         }
 
         .closing-cta .section-kicker {
-          color: #b6d1ff;
+          color: #c7dcff;
         }
 
         .closing-cta h2 {
-          margin: 12px 0 0;
-          font-size: clamp(25px, 3vw, 35px);
-          line-height: 1.3;
-          letter-spacing: -0.8px;
+          margin: 13px 0 0;
+          color: #ffffff;
+          font-size: clamp(27px, 4vw, 38px);
+          line-height: 1.2;
+          letter-spacing: -1px;
         }
 
         .closing-cta p {
-          max-width: 480px;
-          margin: 12px 0 0;
-          color: #d0dcef;
+          max-width: 520px;
+          margin: 13px 0 0;
+          color: #d7e5ff;
           font-size: 12px;
-          line-height: 1.9;
+          line-height: 1.8;
         }
 
         .closing-button {
           flex-shrink: 0;
-          background: white;
+          background: #ffffff;
           color: #1747b8;
         }
 
@@ -1858,29 +1795,34 @@ export default function CompanyPricingPage() {
         }
 
         .footer {
-          padding: 26px 20px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 13px;
-          border-top: 1px solid #e5ebf4;
+          padding: 35px 20px;
+          border-top: 1px solid #e7edf5;
+          background: #f8faff;
           text-align: center;
         }
 
         .footer-brand {
-          font-size: 13px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          color: #10213d;
         }
 
         .footer-mark {
-          width: 31px;
-          height: 31px;
-          border-radius: 9px;
-          font-size: 15px;
+          width: 34px;
+          height: 34px;
+          border-radius: 10px;
+          font-size: 17px;
+        }
+
+        .footer-brand strong {
+          font-size: 14px;
         }
 
         .footer > p {
-          margin: 0;
-          color: #52627a;
+          margin: 13px 0;
+          color: #64748b;
           font-size: 11px;
           line-height: 1.7;
         }
@@ -1890,68 +1832,82 @@ export default function CompanyPricingPage() {
           flex-wrap: wrap;
           justify-content: center;
           gap: 20px;
+          margin: 20px 0;
         }
 
         .footer-links a {
-          color: #52627a;
-          font-size: 10px;
-          font-weight: 800;
+          color: #475569;
+          font-size: 11px;
+          font-weight: 700;
         }
 
         .footer-links a:hover {
-          color: #2563eb;
+          color: #2457c5;
         }
 
         .footer > small {
-          color: #64748b;
-          font-size: 9px;
+          color: #8490a3;
+          font-size: 10px;
           line-height: 1.7;
         }
 
-        @media (max-width: 1000px) {
-          .hero {
+        @media (min-width: 1500px) {
+          .plans-grid {
             gap: 20px;
           }
 
-          .hero h1 {
-            font-size: 46px;
+          .plan-card {
+            padding-right: 23px;
+            padding-left: 23px;
+          }
+
+          .plan-card.popular {
+            padding-right: 22px;
+            padding-left: 22px;
+          }
+        }
+
+        @media (max-width: 1050px) {
+          .plans-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+          }
+
+          .plan-card,
+          .plan-card.popular {
+            padding: 25px;
+          }
+
+          .popular-label {
+            margin: -25px -25px 20px;
+          }
+
+          .plan-description {
+            min-height: 60px;
+          }
+
+          .price {
+            font-size: 35px;
           }
 
           .benefit-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
           }
 
-          .plans-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 16px;
+          .hero {
+            gap: 28px;
           }
 
-          .plan-card {
-            padding: 24px 20px 19px;
-          }
-
-          .plan-description {
-            min-height: 70px;
-          }
-
-          .price {
-            font-size: 34px;
-          }
-
-          .plan-top h3 {
-            font-size: 23px;
-          }
-
-          .features li {
-            font-size: 11px;
+          .hero h1 {
+            font-size: clamp(38px, 5vw, 53px);
           }
         }
 
-        @media (max-width: 650px) {
+        @media (max-width: 700px) {
           .header-inner {
-            width: calc(100% - 26px);
-            min-height: 65px;
-            gap: 8px;
+            width: calc(100% - 28px);
+            min-height: 68px;
+            gap: 10px;
           }
 
           .brand {
@@ -1959,23 +1915,24 @@ export default function CompanyPricingPage() {
           }
 
           .brand-mark {
-            width: 35px;
-            height: 35px;
-            font-size: 18px;
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
+            font-size: 19px;
           }
 
-          .brand strong {
-            font-size: 12px;
+          .brand-text strong {
+            font-size: 14px;
           }
 
-          .brand small {
-            max-width: 150px;
-            font-size: 8px;
-            line-height: 1.5;
+          .brand-text small {
+            max-width: 155px;
+            font-size: 9px;
+            line-height: 1.4;
           }
 
           .header-actions {
-            gap: 8px;
+            gap: 0;
           }
 
           .nav-link {
@@ -1983,22 +1940,17 @@ export default function CompanyPricingPage() {
           }
 
           .header-button {
-            min-height: 38px;
-            padding: 0 10px;
-            font-size: 9px;
-            white-space: nowrap;
+            min-height: 39px;
+            padding: 0 11px;
+            font-size: 10px;
           }
 
           .hero {
-            width: calc(100% - 28px);
+            width: calc(100% - 36px);
             min-height: auto;
-            margin: 14px auto 25px;
-            padding: 26px 19px;
-            grid-template-columns: minmax(0, 1fr);
-            gap: 12px;
-            border: 1px solid #e0e8f5;
-            border-radius: 18px;
-            box-shadow: 0 10px 30px rgba(16, 33, 61, 0.05);
+            padding: 48px 0 55px;
+            grid-template-columns: 1fr;
+            gap: 34px;
           }
 
           .eyebrow {
@@ -2008,132 +1960,112 @@ export default function CompanyPricingPage() {
 
           .hero h1 {
             margin-top: 20px;
-            font-size: clamp(33px, 8.5vw, 44px);
-            line-height: 1.13;
-            letter-spacing: -1.6px;
-            overflow-wrap: anywhere;
+            font-size: clamp(37px, 10vw, 50px);
+            letter-spacing: -1.8px;
           }
 
-          .hero-copy > p {
-            margin-top: 16px;
-            font-size: 13px;
+          .hero-text {
+            font-size: 14px;
             line-height: 1.85;
           }
 
           .hero-actions {
-            margin-top: 21px;
-            flex-direction: column;
+            display: grid;
+            grid-template-columns: 1fr;
           }
 
           .primary-button,
           .secondary-button {
             width: 100%;
             min-height: 48px;
-            font-size: 12px;
-          }
-
-          .trust-note {
-            font-size: 10px;
           }
 
           .hero-visual {
-            min-height: 325px;
-            margin-top: 5px;
-          }
-
-          .visual-glow {
-            width: 260px;
-            height: 260px;
+            min-height: 350px;
           }
 
           .visual-card {
-            width: 88%;
-            padding: 18px;
+            width: min(320px, calc(100% - 40px));
+            padding: 21px;
           }
 
           .visual-card h2 {
-            font-size: 23px;
+            font-size: 28px;
           }
 
           .floating-card {
-            max-width: 175px;
-            padding: 9px;
-            gap: 7px;
+            padding: 10px 11px;
           }
 
-          .floating-one {
-            top: 3px;
-            right: 0;
+          .floating-top {
+            top: 10px;
+            right: 7px;
           }
 
-          .floating-two {
-            bottom: 2px;
-            left: 0;
+          .floating-bottom {
+            bottom: 10px;
+            left: 7px;
           }
 
-          .floating-icon {
-            width: 27px;
-            height: 27px;
+          .benefits {
+            padding: 58px 18px;
           }
 
-          .floating-card strong {
-            font-size: 9px;
-          }
-
-          .floating-card small {
-            font-size: 8px;
-          }
-
-          .section {
-            padding: 52px 15px;
-          }
-
-          .section-heading h2 {
-            font-size: 30px;
+          .section-heading h2,
+          .pricing-heading h2 {
+            font-size: 31px;
             letter-spacing: -0.8px;
           }
 
-          .section-heading > p {
-            font-size: 12px;
-            line-height: 1.85;
+          .section-heading > p,
+          .pricing-heading > p,
+          .faq-heading > p {
+            font-size: 13px;
           }
 
           .benefit-grid {
-            margin-top: 25px;
-            grid-template-columns: minmax(0, 1fr);
-            gap: 11px;
+            margin-top: 27px;
+            grid-template-columns: 1fr;
+            gap: 12px;
           }
 
           .benefit-card {
-            padding: 19px;
+            padding: 21px;
           }
 
           .benefit-card h3 {
-            margin-top: 13px;
+            margin-top: 15px;
           }
 
-          .pricing {
-            padding-top: 53px;
-            padding-bottom: 50px;
+          .pricing-section {
+            width: calc(100% - 28px);
+            padding: 60px 0;
+          }
+
+          .pricing-heading {
+            margin-bottom: 25px;
           }
 
           .active-banner {
-            align-items: stretch;
-            flex-direction: column;
-            gap: 12px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            padding: 15px;
+          }
+
+          .active-copy {
+            flex: 1 1 calc(100% - 30px);
           }
 
           .active-banner button {
             width: 100%;
-            min-height: 42px;
+            min-height: 43px;
           }
 
           .billing-panel {
-            margin-top: 25px;
-            padding: 14px;
             align-items: stretch;
             flex-direction: column;
-            gap: 13px;
+            gap: 15px;
+            padding: 16px;
           }
 
           .billing-toggle {
@@ -2143,7 +2075,7 @@ export default function CompanyPricingPage() {
           .billing-toggle button {
             flex: 1;
             min-width: 0;
-            padding: 0 8px;
+            padding: 0 7px;
             font-size: 10px;
           }
 
@@ -2152,50 +2084,57 @@ export default function CompanyPricingPage() {
           }
 
           .plans-grid {
-            grid-template-columns: minmax(0, 1fr);
-            gap: 17px;
+            grid-template-columns: 1fr;
+            gap: 18px;
           }
 
-          .plan-card {
-            padding: 23px 20px 19px;
-            border-radius: 14px;
+          .plan-card,
+          .plan-card.popular {
+            min-height: auto;
+            padding: 24px 22px;
           }
 
-          .popular-label,
-          .enterprise-label {
-            margin: -23px -20px 18px;
+          .popular-label {
+            margin: -24px -22px 20px;
           }
 
           .plan-top h3 {
-            font-size: 24px;
+            font-size: 25px;
           }
 
           .plan-description {
-            min-height: 0;
+            min-height: auto;
             font-size: 13px;
-            line-height: 1.8;
           }
 
           .price-block {
-            min-height: 100px;
-            margin-top: 17px;
+            min-height: auto;
+            margin-top: 19px;
+            padding: 18px 0;
           }
 
           .price {
             font-size: 37px;
           }
 
-          .price-period {
-            font-size: 11px;
+          .listing-limit {
+            min-height: auto;
+            padding: 17px 0;
+            font-size: 12px;
           }
 
-          .listing-limit {
-            font-size: 11px;
+          .features-heading {
+            margin-top: 8px;
+            font-size: 12px;
+          }
+
+          .features {
+            gap: 13px;
+            margin: 15px 0 22px;
           }
 
           .features li {
             font-size: 12px;
-            line-height: 1.75;
           }
 
           .plan-button {
@@ -2213,116 +2152,121 @@ export default function CompanyPricingPage() {
 
           .payment-section {
             width: calc(100% - 28px);
-            margin-bottom: 52px;
-            padding: 19px;
-            grid-template-columns: minmax(0, 1fr);
-            gap: 13px;
+            margin-bottom: 58px;
+            padding: 22px 18px;
+            grid-template-columns: 1fr;
+            gap: 14px;
+          }
+
+          .payment-icon {
+            width: 43px;
+            height: 43px;
           }
 
           .payment-content h2 {
-            font-size: 20px;
+            font-size: 23px;
           }
 
           .payment-content p {
-            font-size: 11px;
+            font-size: 12px;
           }
 
           .payment-steps {
             grid-column: 1;
-            grid-template-columns: minmax(0, 1fr);
+            grid-template-columns: 1fr;
+            gap: 9px;
+            margin-top: 4px;
           }
 
-          .payment-steps > div {
-            padding: 12px;
-            flex-direction: row;
+          .payment-steps div {
+            display: flex;
             align-items: center;
             gap: 12px;
+            padding: 12px;
           }
 
           .payment-steps strong {
-            font-size: 11px;
+            margin-top: 0;
           }
 
           .faq-section {
-            width: calc(100% - 30px);
-            padding-bottom: 53px;
+            width: calc(100% - 32px);
+            padding-bottom: 58px;
           }
 
-          .faq-section .section-heading {
-            margin-bottom: 22px;
-          }
-
-          .faq-section .section-heading h2 {
-            font-size: 26px;
+          .faq-heading h2 {
+            font-size: 28px;
           }
 
           .faq-question {
-            min-height: 59px;
-            font-size: 11px;
+            padding: 15px 13px;
+            font-size: 12px;
           }
 
           .faq-answer {
-            margin-right: 8px;
-            font-size: 11px;
+            padding: 0 13px 16px;
+            font-size: 12px;
           }
 
           .closing-cta {
             width: calc(100% - 28px);
-            margin-bottom: 45px;
-            padding: 24px 19px;
+            margin-bottom: 48px;
+            padding: 25px 20px;
             align-items: stretch;
             flex-direction: column;
-            gap: 21px;
+            gap: 23px;
           }
 
           .closing-cta h2 {
-            font-size: 28px;
-          }
-
-          .closing-cta p {
-            font-size: 11px;
+            font-size: 30px;
           }
 
           .closing-button {
             width: 100%;
-            min-height: 47px;
           }
 
           .footer {
-            padding: 24px 15px;
+            padding: 30px 18px;
           }
         }
 
-        @media (max-width: 370px) {
-          .brand small {
-            max-width: 120px;
+        @media (max-width: 360px) {
+          .brand-text small {
+            max-width: 125px;
+          }
+
+          .header-button {
+            padding: 0 8px;
+            font-size: 9px;
           }
 
           .hero h1 {
-            font-size: 32px;
+            font-size: 35px;
           }
 
-          .eyebrow {
-            font-size: 7px;
+          .billing-toggle button {
+            gap: 4px;
+            padding: 0 5px;
           }
 
           .save-badge {
-            display: none;
+            padding: 4px;
+            font-size: 6px;
+          }
+
+          .plan-card,
+          .plan-card.popular {
+            padding-right: 17px;
+            padding-left: 17px;
+          }
+
+          .popular-label {
+            margin-right: -17px;
+            margin-left: -17px;
           }
 
           .price {
-            font-size: 34px;
-          }
-
-          .plan-card {
-            padding-right: 16px;
-            padding-left: 16px;
-          }
-
-          .popular-label,
-          .enterprise-label {
-            margin-right: -16px;
-            margin-left: -16px;
+            font-size: 33px;
           }
         }
 
@@ -2331,7 +2275,8 @@ export default function CompanyPricingPage() {
           *::before,
           *::after {
             scroll-behavior: auto !important;
-            transition: none !important;
+            transition-duration: 0.01ms !important;
+            animation-duration: 0.01ms !important;
           }
         }
       `}</style>
