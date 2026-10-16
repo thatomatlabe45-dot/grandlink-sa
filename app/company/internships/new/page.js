@@ -10,6 +10,173 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
+const PLAN_LIMITS = {
+  starter: 5,
+  professional: 15,
+  enterprise: 30,
+  listing: 1,
+  pay_per_listing: 1,
+};
+
+const PLAN_NAMES = {
+  starter: "Starter",
+  professional: "Professional",
+  enterprise: "Enterprise",
+  listing: "Pay Per Listing",
+  pay_per_listing: "Pay Per Listing",
+};
+
+function getToday() {
+  const date = new Date();
+
+  return new Date(
+    date.getTime() - date.getTimezoneOffset() * 60000
+  )
+    .toISOString()
+    .slice(0, 10);
+}
+
+function normalizePlan(plan) {
+  return String(plan || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function isPayPerListing(plan) {
+  const normalized = normalizePlan(plan);
+
+  return (
+    normalized === "listing" ||
+    normalized === "pay_per_listing"
+  );
+}
+
+function isSubscriptionValid(subscription) {
+  if (
+    String(subscription.status || "").toLowerCase() !==
+    "active"
+  ) {
+    return false;
+  }
+
+  const plan = normalizePlan(subscription.plan);
+
+  if (!Object.prototype.hasOwnProperty.call(PLAN_LIMITS, plan)) {
+    return false;
+  }
+
+  const now = Date.now();
+
+  if (subscription.current_period_end) {
+    const end = new Date(
+      subscription.current_period_end
+    ).getTime();
+
+    if (!Number.isFinite(end) || end <= now) {
+      return false;
+    }
+  } else if (isPayPerListing(plan)) {
+    const startValue =
+      subscription.current_period_start ||
+      subscription.started_at;
+
+    if (!startValue) {
+      return false;
+    }
+
+    const start = new Date(startValue).getTime();
+
+    if (!Number.isFinite(start)) {
+      return false;
+    }
+
+    const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+
+    if (now >= start + thirtyDays) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+async function getPostingAccess(userId) {
+  const { data: subscriptions, error: subscriptionError } =
+    await supabase
+      .from("company_subscriptions")
+      .select(
+        "id, plan, status, started_at, current_period_start, current_period_end, created_at"
+      )
+      .eq("company_id", userId);
+
+  if (subscriptionError) {
+    throw new Error(
+      "We could not verify your subscription. Please try again."
+    );
+  }
+
+  const validSubscriptions = (subscriptions || [])
+    .filter(isSubscriptionValid)
+    .sort((a, b) => {
+      const dateA = new Date(
+        a.current_period_start ||
+          a.started_at ||
+          a.created_at ||
+          0
+      ).getTime();
+
+      const dateB = new Date(
+        b.current_period_start ||
+          b.started_at ||
+          b.created_at ||
+          0
+      ).getTime();
+
+      return dateB - dateA;
+    });
+
+  if (validSubscriptions.length === 0) {
+    throw new Error(
+      "No valid active subscription was found. If you have paid, please wait for payment verification or contact GradLink SA."
+    );
+  }
+
+  const activeSubscription = validSubscriptions[0];
+  const plan = normalizePlan(activeSubscription.plan);
+  const limit = PLAN_LIMITS[plan];
+
+  const { count, error: countError } = await supabase
+    .from("internships")
+    .select("id", {
+      count: "exact",
+      head: true,
+    })
+    .eq("user_id", userId)
+    .gte("deadline", getToday());
+
+  if (countError) {
+    throw new Error(
+      "We could not count your current internship listings. Please try again."
+    );
+  }
+
+  const activeListings = count || 0;
+
+  return {
+    ...activeSubscription,
+    plan_key: plan,
+    plan_name: PLAN_NAMES[plan],
+    listing_limit: limit,
+    active_listings: activeListings,
+    remaining_listings: Math.max(
+      0,
+      limit - activeListings
+    ),
+    can_post: activeListings < limit,
+  };
+}
+
 export default function NewInternshipPage() {
   const router = useRouter();
 
@@ -35,6 +202,8 @@ export default function NewInternshipPage() {
 
   useEffect(() => {
     checkAccess();
+    // Initial access check only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function checkAccess() {
@@ -77,30 +246,15 @@ export default function NewInternshipPage() {
         login_email: user.email,
       });
 
-      const { data: subscriptions, error: subscriptionError } =
-        await supabase
-          .from("company_subscriptions")
-          .select("id, plan, status")
-          .eq("company_id", user.id);
+      const access = await getPostingAccess(user.id);
 
-      if (subscriptionError) {
-        throw new Error(
-          "We could not verify your active subscription. Please try again."
+      setSubscription(access);
+
+      if (!access.can_post) {
+        setError(
+          `Your ${access.plan_name} plan allows ${access.listing_limit} active listing${access.listing_limit === 1 ? "" : "s"}. You currently have ${access.active_listings}. Close or let an existing listing expire, or upgrade your plan to publish another.`
         );
       }
-
-      const activeSubscription = (subscriptions || []).find(
-        (item) =>
-          String(item.status || "").toLowerCase() === "active"
-      );
-
-      if (!activeSubscription) {
-        throw new Error(
-          "An active paid subscription is required to post internships."
-        );
-      }
-
-      setSubscription(activeSubscription);
     } catch (err) {
       setError(err.message || "Something went wrong.");
     } finally {
@@ -130,8 +284,12 @@ export default function NewInternshipPage() {
       return;
     }
 
+    if (!form.job_title.trim()) {
+      setError("Please enter an internship title.");
+      return;
+    }
+
     if (
-      !form.job_title.trim() ||
       !form.province ||
       !form.location.trim() ||
       !form.qualification.trim() ||
@@ -143,14 +301,7 @@ export default function NewInternshipPage() {
       return;
     }
 
-    const today = new Date();
-    const localToday = new Date(
-      today.getTime() - today.getTimezoneOffset() * 60000
-    )
-      .toISOString()
-      .slice(0, 10);
-
-    if (form.deadline < localToday) {
+    if (form.deadline < getToday()) {
       setError("The application deadline cannot be in the past.");
       return;
     }
@@ -169,38 +320,46 @@ export default function NewInternshipPage() {
         );
       }
 
-      // Recheck the subscription before inserting the listing.
-      const { data: subscriptions, error: subscriptionError } =
+      // Verify the company profile again.
+      const { data: companyData, error: companyError } =
         await supabase
-          .from("company_subscriptions")
-          .select("id, plan, status")
-          .eq("company_id", user.id);
+          .from("companies")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle();
 
-      if (subscriptionError) {
+      if (companyError || !companyData) {
         throw new Error(
-          "We could not verify your active subscription. Your internship was not posted."
+          "We could not verify your company profile. Your internship was not published."
         );
       }
 
-      const activeSubscription = (subscriptions || []).find(
-        (item) =>
-          String(item.status || "").toLowerCase() === "active"
-      );
+      // Recheck subscription validity and listing limits immediately
+      // before attempting to insert the internship.
+      const access = await getPostingAccess(user.id);
 
-      if (!activeSubscription) {
-        setSubscription(null);
+      setCompany({
+        ...companyData,
+        user_id: user.id,
+        login_email: user.email,
+      });
+
+      setSubscription(access);
+
+      if (!access.can_post) {
         throw new Error(
-          "Your subscription is not active. Please check your company plans."
+          `You have reached your ${access.plan_name} plan limit of ${access.listing_limit} active listing${access.listing_limit === 1 ? "" : "s"}. You currently have ${access.active_listings}. Upgrade your plan or wait until an existing listing expires.`
         );
       }
 
       const internshipData = {
         user_id: user.id,
         job_title: form.job_title.trim(),
-        company_name: company.company_name,
+        company_name: companyData.company_name,
         company_email:
-          company.company_email || user.email || "",
-        company_website: company.company_website || "",
+          companyData.company_email || user.email || "",
+        company_website:
+          companyData.company_website || "",
         province: form.province,
         location: form.location.trim(),
         internship_type: form.internship_type,
@@ -217,7 +376,10 @@ export default function NewInternshipPage() {
         .insert([internshipData]);
 
       if (insertError) {
-        console.error("Internship insert error:", insertError);
+        console.error(
+          "Internship insert error:",
+          insertError
+        );
 
         if (insertError.code === "42501") {
           throw new Error(
@@ -248,12 +410,7 @@ export default function NewInternshipPage() {
     }
   }
 
-  const today = new Date();
-  const minimumDeadline = new Date(
-    today.getTime() - today.getTimezoneOffset() * 60000
-  )
-    .toISOString()
-    .slice(0, 10);
+  const minimumDeadline = getToday();
 
   if (loading) {
     return (
@@ -262,7 +419,8 @@ export default function NewInternshipPage() {
           <div className="spinner" />
           <h2>Preparing your workspace</h2>
           <p>
-            Checking your company profile and subscription...
+            Checking your company profile, subscription and
+            listing allowance...
           </p>
         </div>
 
@@ -272,11 +430,16 @@ export default function NewInternshipPage() {
   }
 
   if (error && (!company || !subscription)) {
+    const message = error.toLowerCase();
+
     const subscriptionProblem =
-      error.toLowerCase().includes("subscription");
+      message.includes("subscription") ||
+      message.includes("payment verification") ||
+      message.includes("active subscription") ||
+      message.includes("valid active");
 
     const profileProblem =
-      error.toLowerCase().includes("company profile");
+      message.includes("company profile");
 
     return (
       <main className="page loading-page">
@@ -325,6 +488,10 @@ export default function NewInternshipPage() {
       </main>
     );
   }
+
+  const limitReached =
+    subscription &&
+    subscription.active_listings >= subscription.listing_limit;
 
   return (
     <main className="page">
@@ -385,6 +552,17 @@ export default function NewInternshipPage() {
           {error && (
             <div className="message error-message">
               {error}
+
+              {limitReached && (
+                <div className="limit-actions">
+                  <Link
+                    href="/company-pricing"
+                    className="limit-link"
+                  >
+                    View plans and upgrade →
+                  </Link>
+                </div>
+              )}
             </div>
           )}
 
@@ -593,12 +771,14 @@ export default function NewInternshipPage() {
 
               <button
                 type="submit"
-                disabled={saving}
+                disabled={saving || limitReached}
                 className="publish-button"
               >
                 {saving
                   ? "Publishing internship..."
-                  : "Publish Internship →"}
+                  : limitReached
+                    ? "Listing Limit Reached"
+                    : "Publish Internship →"}
               </button>
 
               <Link
@@ -614,11 +794,16 @@ export default function NewInternshipPage() {
         <aside className="side-panel">
           <div className="plan-icon">✓</div>
 
-          <h3>Subscription active</h3>
+          <h3>
+            {limitReached
+              ? "Listing limit reached"
+              : "Subscription active"}
+          </h3>
 
           <p>
-            Your company subscription is active.
-            You can submit an internship listing.
+            {limitReached
+              ? "Your current plan has reached its active listing allowance."
+              : "Your subscription is active. Your listing allowance is shown below."}
           </p>
 
           <div className="divider" />
@@ -626,12 +811,58 @@ export default function NewInternshipPage() {
           <span className="small-label">CURRENT PLAN</span>
 
           <strong className="plan-name">
-            {subscription?.plan || "Company plan"}
+            {subscription?.plan_name || "Company plan"}
           </strong>
 
           <span className="active-status">
             ● Active
           </span>
+
+          <div className="usage-box">
+            <div className="usage-heading">
+              <span>Active listings</span>
+              <strong>
+                {subscription?.active_listings ?? 0}/
+                {subscription?.listing_limit ?? 0}
+              </strong>
+            </div>
+
+            <div
+              className="usage-track"
+              role="progressbar"
+              aria-label="Active internship listings used"
+              aria-valuemin={0}
+              aria-valuemax={subscription?.listing_limit ?? 1}
+              aria-valuenow={Math.min(
+                subscription?.active_listings ?? 0,
+                subscription?.listing_limit ?? 0
+              )}
+            >
+              <div
+                className="usage-fill"
+                style={{
+                  width: `${
+                    subscription?.listing_limit
+                      ? Math.min(
+                          100,
+                          (subscription.active_listings /
+                            subscription.listing_limit) *
+                            100
+                        )
+                      : 0
+                  }%`,
+                }}
+              />
+            </div>
+
+            <p>
+              {subscription?.remaining_listings ?? 0} listing
+              {(subscription?.remaining_listings ?? 0) === 1
+                ? ""
+                : "s"}{" "}
+              remaining on your current plan.
+            </p>
+          </div>
 
           <div className="tip-box">
             <strong>Tips for a strong listing</strong>
@@ -643,6 +874,13 @@ export default function NewInternshipPage() {
               to apply.
             </p>
           </div>
+
+          <Link
+            href="/company-pricing"
+            className="panel-link"
+          >
+            View plans and upgrade →
+          </Link>
 
           <Link
             href="/company-dashboard"
@@ -962,7 +1200,7 @@ const globalStyles = `
 
   .publish-button:disabled {
     opacity: .65;
-    cursor: wait;
+    cursor: not-allowed;
   }
 
   .secondary-button {
@@ -999,6 +1237,7 @@ const globalStyles = `
   .side-panel h3 {
     margin: 16px 0 8px;
     font-size: 18px;
+    line-height: 1.4;
   }
 
   .side-panel > p {
@@ -1041,6 +1280,50 @@ const globalStyles = `
     font-weight: 800;
   }
 
+  .usage-box {
+    margin-top: 18px;
+    padding: 13px;
+    border: 1px solid #e1eaf5;
+    border-radius: 11px;
+    background: #f8faff;
+  }
+
+  .usage-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: #526781;
+    font-size: 12px;
+  }
+
+  .usage-heading strong {
+    color: #173d76;
+    white-space: nowrap;
+  }
+
+  .usage-track {
+    height: 8px;
+    margin-top: 12px;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #e2eaf5;
+  }
+
+  .usage-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #1767d8, #0c438f);
+    transition: width .2s ease;
+  }
+
+  .usage-box > p {
+    margin: 10px 0 0;
+    color: #687b94;
+    font-size: 11px;
+    line-height: 1.6;
+  }
+
   .tip-box {
     margin-top: 22px;
     padding: 14px;
@@ -1056,7 +1339,8 @@ const globalStyles = `
     margin: 7px 0 0;
   }
 
-  .panel-link {
+  .panel-link,
+  .limit-link {
     display: block;
     margin-top: 18px;
     color: #1758ad;
@@ -1065,6 +1349,14 @@ const globalStyles = `
     line-height: 1.7;
     text-decoration: none;
     overflow-wrap: anywhere;
+  }
+
+  .limit-actions {
+    margin-top: 4px;
+  }
+
+  .limit-link {
+    margin-top: 8px;
   }
 
   .message {
