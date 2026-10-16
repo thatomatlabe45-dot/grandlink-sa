@@ -2535,6 +2535,73 @@ export default function CompanyPricingPage() {
     font-size: 30px !important;
   }
 }
+
+   /* IMPROVE BLUE BUTTON AND HERO TEXT VISIBILITY */
+
+.primary-button {
+  background: #155eef !important;
+  color: #ffffff !important;
+  border: 2px solid #155eef !important;
+  font-weight: 800 !important;
+  opacity: 1 !important;
+}
+
+.primary-button span {
+  color: #ffffff !important;
+}
+
+.secondary-button {
+  background: #ffffff !important;
+  color: #155eef !important;
+  border: 2px solid #155eef !important;
+  font-weight: 800 !important;
+  opacity: 1 !important;
+}
+
+.eyebrow {
+  color: #155eef !important;
+  opacity: 1 !important;
+}
+
+.hero h1 {
+  color: #10213d !important;
+}
+
+.hero h1 span {
+  color: #155eef !important;
+}
+
+.hero-text {
+  color: #35445d !important;
+  opacity: 1 !important;
+}
+
+.hero-note {
+  color: #35445d !important;
+}
+
+.visual-card {
+  background: #ffffff !important;
+}
+
+.visual-brand strong,
+.visual-card h2 {
+  color: #10213d !important;
+}
+
+.visual-brand small,
+.visual-bottom {
+  color: #35445d !important;
+}
+
+.visual-label {
+  color: #155eef !important;
+}
+
+.visual-tags span {
+  background: #eaf1ff !important;
+  color: #1247a8 !important;
+}
       `}</style>
     </main>
   );
