@@ -20,13 +20,22 @@ const PLAN_DETAILS = {
     monthly: 1000,
     annual: 10000,
   },
+  enterprise: {
+    name: "Enterprise",
+    monthly: 1500,
+    annual: 15000,
+  },
   listing: {
     name: "Pay Per Listing",
     monthly: 350,
     annual: 350,
   },
+  pay_per_listing: {
+    name: "Pay Per Listing",
+    monthly: 350,
+    annual: 350,
+  },
 };
-
 function money(value) {
   return new Intl.NumberFormat("en-ZA", {
     maximumFractionDigits: 0,
