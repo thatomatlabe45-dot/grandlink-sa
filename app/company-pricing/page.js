@@ -360,88 +360,75 @@ export default function CompanyPricingPage() {
       </header>
 
       <section className="hero">
-        <div className="hero-content">
-          <div className="eyebrow">
-            <span className="eyebrow-dot" />
-            THE FUTURE OF RECRUITMENT
-          </div>
+  <div className="hero-content">
+    <div className="eyebrow">
+      <span className="eyebrow-dot" />
+      THE FUTURE OF RECRUITMENT
+    </div>
 
-          <h1>
-            Great talent.
-            <br />
-            <span>Greater possibilities.</span>
-          </h1>
+    <h1>
+      Great talent.
+      <br />
+      <span>Greater possibilities.</span>
+    </h1>
 
-          <p className="hero-text">
-            Discover emerging South African talent, advertise
-            internship opportunities and build your future workforce
-            with GradLink SA.
-          </p>
+    <p className="hero-text">
+      Discover emerging South African talent, advertise
+      internship opportunities and build your future workforce
+      with GradLink SA.
+    </p>
 
-          <div className="hero-actions">
-            <a href="#plans" className="primary-button">
-              Explore our plans <span>→</span>
-            </a>
+    <div className="hero-actions">
+      <a href="#plans" className="primary-button">
+        Explore our plans <span>→</span>
+      </a>
 
-            <a href="#benefits" className="secondary-button">
-              Discover the benefits
-            </a>
-          </div>
+      <a href="#benefits" className="secondary-button">
+        Discover the benefits
+      </a>
+    </div>
 
-          <div className="hero-note">
-            <span>✓</span>
-            Paid recruitment plans for your business
-          </div>
+    <div className="hero-note">
+      <span>✓</span>
+      Paid recruitment plans for your business
+    </div>
+  </div>
+
+  <div className="hero-visual" aria-hidden="true">
+    <div className="visual-card">
+      <div className="visual-brand">
+        <span className="visual-mark">G</span>
+
+        <div>
+          <strong>GradLink SA</strong>
+          <small>Talent connection platform</small>
         </div>
+      </div>
 
-        <div className="hero-visual" aria-hidden="true">
-          <div className="visual-card">
-            <div className="visual-brand">
-              <span className="visual-mark">G</span>
-              <div>
-                <strong>GradLink SA</strong>
-                <small>Talent connection platform</small>
-              </div>
-            </div>
+      <div className="visual-divider" />
 
-            <div className="visual-divider" />
+      <span className="visual-label">
+        YOUR NEXT OPPORTUNITY
+      </span>
 
-            <span className="visual-label">YOUR NEXT OPPORTUNITY</span>
+      <h2>
+        Talent meets
+        <br />
+        opportunity.
+      </h2>
 
-            <h2>
-              Talent meets
-              <br />
-              opportunity.
-            </h2>
+      <div className="visual-tags">
+        <span>Internships</span>
+        <span>Emerging talent</span>
+      </div>
 
-            <div className="visual-tags">
-              <span>Internships</span>
-              <span>Emerging talent</span>
-            </div>
-
-            <div className="visual-bottom">
-              <span className="visual-check">✓</span>
-              <span>Build your talent pipeline</span>
-            </div>
-          </div>
-
-          <div className="floating-card floating-top">
-            <span className="floating-icon">✦</span>
-            <div>
-              <strong>Discover talent</strong>
-              <small>Find your next great fit</small>
-            </div>
-          </div>
-
-          <div className="floating-card floating-bottom">
-            <span className="floating-check">✓</span>
-            <div>
-              <strong>Recruit with purpose</strong>
-              <small>Grow your future workforce</small>
-            </div>
-          </div>
-        </div>
-      </section>
+      <div className="visual-bottom">
+        <span className="visual-check">✓</span>
+        <span>Build your talent pipeline</span>
+      </div>
+    </div>
+  </div>
+</section>
 
       <section className="benefits" id="benefits">
         <div className="section-heading">
@@ -2279,6 +2266,275 @@ export default function CompanyPricingPage() {
             animation-duration: 0.01ms !important;
           }
         }
+        
+        /* HERO SECTION FIX */
+.hero {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr) !important;
+  align-items: center !important;
+  gap: 40px !important;
+  padding: 64px 5% !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.hero-content {
+  position: relative !important;
+  z-index: 2 !important;
+  min-width: 0 !important;
+}
+
+.eyebrow {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 9px !important;
+  margin-bottom: 22px !important;
+  color: #155eef !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  letter-spacing: 1.5px !important;
+  line-height: 1.6 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.eyebrow-dot {
+  display: inline-block !important;
+  flex: 0 0 8px !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  background: #155eef !important;
+}
+
+.hero h1 {
+  margin: 0 0 22px !important;
+  color: #10213d !important;
+  font-size: clamp(34px, 4.2vw, 56px) !important;
+  font-weight: 800 !important;
+  line-height: 1.12 !important;
+  letter-spacing: -1.8px !important;
+  overflow-wrap: break-word !important;
+}
+
+.hero h1 span {
+  color: #155eef !important;
+}
+
+.hero-text {
+  max-width: 520px !important;
+  margin: 0 0 28px !important;
+  color: #53627a !important;
+  font-size: 16px !important;
+  line-height: 1.8 !important;
+  opacity: 1 !important;
+}
+
+.hero-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 12px !important;
+  margin-bottom: 24px !important;
+}
+
+.hero-note {
+  display: flex !important;
+  align-items: center !important;
+  gap: 9px !important;
+  color: #35445d !important;
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+}
+
+.hero-note > span {
+  color: #12805c !important;
+  font-weight: 900 !important;
+}
+
+.hero-visual {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  padding: 12px !important;
+  box-sizing: border-box !important;
+}
+
+.visual-card {
+  position: relative !important;
+  width: 100% !important;
+  max-width: 410px !important;
+  min-width: 0 !important;
+  padding: 30px !important;
+  box-sizing: border-box !important;
+  overflow-wrap: break-word !important;
+  border: 1px solid #e0e9f8 !important;
+  border-radius: 24px !important;
+  background: #ffffff !important;
+  box-shadow: 0 20px 55px rgba(22, 54, 105, 0.12) !important;
+}
+
+.visual-brand {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.visual-brand strong {
+  display: block !important;
+  color: #10213d !important;
+  font-size: 16px !important;
+}
+
+.visual-brand small {
+  display: block !important;
+  margin-top: 4px !important;
+  color: #687790 !important;
+  font-size: 12px !important;
+}
+
+.visual-mark {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 44px !important;
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 13px !important;
+  background: #155eef !important;
+  color: #ffffff !important;
+  font-size: 23px !important;
+  font-weight: 800 !important;
+}
+
+.visual-divider {
+  height: 1px !important;
+  margin: 24px 0 !important;
+  background: #e8edf5 !important;
+}
+
+.visual-label {
+  display: block !important;
+  margin-bottom: 12px !important;
+  color: #155eef !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  letter-spacing: 1.4px !important;
+  line-height: 1.6 !important;
+}
+
+.visual-card h2 {
+  margin: 0 0 22px !important;
+  color: #10213d !important;
+  font-size: clamp(27px, 3vw, 38px) !important;
+  font-weight: 800 !important;
+  line-height: 1.2 !important;
+  letter-spacing: -0.8px !important;
+}
+
+.visual-tags {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  margin-bottom: 25px !important;
+}
+
+.visual-tags span {
+  padding: 8px 12px !important;
+  border-radius: 20px !important;
+  background: #eef4ff !important;
+  color: #1550b8 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+.visual-bottom {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding-top: 18px !important;
+  border-top: 1px solid #e8edf5 !important;
+  color: #35445d !important;
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+}
+
+.visual-check {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: 0 0 25px !important;
+  width: 25px !important;
+  height: 25px !important;
+  border-radius: 50% !important;
+  background: #e7f8ef !important;
+  color: #12805c !important;
+  font-weight: 900 !important;
+}
+
+/* IPHONE AND SMALL SCREEN LAYOUT */
+@media (max-width: 700px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 30px !important;
+    padding: 42px 20px !important;
+  }
+
+  .hero-content {
+    width: 100% !important;
+  }
+
+  .eyebrow {
+    max-width: 100% !important;
+    font-size: 10px !important;
+    letter-spacing: 1.1px !important;
+  }
+
+  .hero h1 {
+    font-size: clamp(34px, 9vw, 43px) !important;
+    line-height: 1.15 !important;
+    letter-spacing: -1.2px !important;
+  }
+
+  .hero-text {
+    font-size: 15px !important;
+    line-height: 1.75 !important;
+  }
+
+  .hero-actions {
+    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  .hero-actions a {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-height: 48px !important;
+    box-sizing: border-box !important;
+    text-align: center !important;
+  }
+
+  .hero-visual {
+    padding: 0 !important;
+    margin-top: 2px !important;
+  }
+
+  .visual-card {
+    max-width: none !important;
+    padding: 24px 20px !important;
+    border-radius: 20px !important;
+  }
+
+  .visual-card h2 {
+    font-size: 30px !important;
+  }
+}
       `}</style>
     </main>
   );
