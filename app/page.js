@@ -10,6 +10,7 @@ export default function HomePage() {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
 
   useEffect(() => {
     loadInternships();
@@ -118,12 +119,22 @@ export default function HomePage() {
       ========================= */}
       <header className="home-header">
         <div className="container header-inner">
-          <Link href="/" className="logo">
-            <span className="logo-mark">G</span>
-
-            <span className="logo-text">
-              GradLink <strong>SA</strong>
-            </span>
+          <Link href="/" className="logo" aria-label="GradLink SA home">
+            {!logoFailed ? (
+              <img
+                src="/gradlink-logo.png"
+                alt="GradLink SA"
+                className="brand-logo-image"
+                onError={() => setLogoFailed(true)}
+              />
+            ) : (
+              <>
+                <span className="logo-mark">G</span>
+                <span className="logo-text">
+                  GradLink <strong>SA</strong>
+                </span>
+              </>
+            )}
           </Link>
 
           <nav className="desktop-nav">
@@ -672,12 +683,22 @@ export default function HomePage() {
       <footer className="footer">
         <div className="container footer-grid">
           <div className="footer-brand">
-            <Link href="/" className="logo footer-logo">
-              <span className="logo-mark">G</span>
-
-              <span className="logo-text">
-                GradLink <strong>SA</strong>
-              </span>
+            <Link href="/" className="logo footer-logo" aria-label="GradLink SA home">
+              {!logoFailed ? (
+                <img
+                  src="/gradlink-logo.png"
+                  alt="GradLink SA"
+                  className="brand-logo-image footer-brand-logo-image"
+                  onError={() => setLogoFailed(true)}
+                />
+              ) : (
+                <>
+                  <span className="logo-mark">G</span>
+                  <span className="logo-text">
+                    GradLink <strong>SA</strong>
+                  </span>
+                </>
+              )}
             </Link>
 
             <p>
@@ -793,6 +814,20 @@ export default function HomePage() {
           font-weight: 800;
           letter-spacing: -0.6px;
           white-space: nowrap;
+        }
+
+        .brand-logo-image {
+          display: block;
+          width: 190px;
+          max-width: 100%;
+          height: 54px;
+          object-fit: contain;
+          object-position: left center;
+        }
+
+        .footer-brand-logo-image {
+          width: 190px;
+          height: 58px;
         }
 
         .logo-text strong {
@@ -2207,7 +2242,24 @@ export default function HomePage() {
           }
         }
 
+        @media (max-width: 600px) {
+          .brand-logo-image {
+            width: 150px;
+            height: 46px;
+          }
+
+          .footer-brand-logo-image {
+            width: 175px;
+            height: 52px;
+          }
+        }
+
         @media (max-width: 380px) {
+          .brand-logo-image {
+            width: 132px;
+            height: 42px;
+          }
+
           .container {
             width: calc(100% - 22px);
           }
