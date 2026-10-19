@@ -122,11 +122,10 @@ export default function HomePage() {
           <Link href="/" className="logo" aria-label="GradLink SA home">
             {!logoFailed ? (
               <img
-                src="/gradlink-logo.png"
-                alt="GradLink SA"
-                className="brand-logo-image"
-                onError={() => setLogoFailed(true)}
-              />
+  src="/GradLink-logo.png.JPG"
+  alt="GradLink SA Logo"
+  className="h-20 w-auto object-contain"
+/>
             ) : (
               <>
                 <span className="logo-mark">G</span>
