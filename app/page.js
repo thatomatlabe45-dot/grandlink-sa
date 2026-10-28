@@ -40,21 +40,46 @@ export default function HomePage() {
     };
   }, []);
 
-  async function loadInternships() {
+    async function loadInternships() {
     try {
       const { data, error } = await supabase
         .from("internships")
-        .select(
-          "id, title, company_name, province, qualification, field_of_study, skills"
-        )
-        .order("created_at", { ascending: false })
-        .limit(6);
+        .select("*")
+        .order("created_at", { ascending: false });
 
-      if (!error && data) {
-        setInternships(data);
+      if (error) {
+        console.error("Error loading internships:", error);
+        setInternships([]);
+        return;
       }
+
+      const today = new Date();
+      const todayString =
+        `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+      const activeInternships = (data || [])
+        .filter((internship) => {
+          if (!internship.deadline) {
+            return true;
+          }
+
+          const deadline = String(internship.deadline).slice(0, 10);
+
+          return deadline >= todayString;
+        })
+        .map((internship) => ({
+          ...internship,
+          title:
+            internship.title ||
+            internship.job_title ||
+            "Internship opportunity",
+        }))
+        .slice(0, 6);
+
+      setInternships(activeInternships);
     } catch (error) {
       console.error("Error loading internships:", error);
+      setInternships([]);
     } finally {
       setLoading(false);
     }
