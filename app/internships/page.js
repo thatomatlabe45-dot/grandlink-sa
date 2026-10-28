@@ -27,7 +27,7 @@ export default function InternshipsPage() {
     loadInternships();
   }, []);
 
-  async function loadInternships() {
+    async function loadInternships() {
     try {
       setLoading(true);
       setError("");
@@ -57,7 +57,32 @@ export default function InternshipsPage() {
         throw internshipsError;
       }
 
-      setInternships(data || []);
+      // Use today's local calendar date.
+      const now = new Date();
+
+      const todayString = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0"),
+      ].join("-");
+
+      // Hide internships whose deadlines have passed.
+      // Keep opportunities with no deadline.
+      const activeInternships = (data || []).filter(
+        (internship) => {
+          if (!internship.deadline) {
+            return true;
+          }
+
+          const deadline = String(
+            internship.deadline
+          ).slice(0, 10);
+
+          return deadline >= todayString;
+        }
+      );
+
+      setInternships(activeInternships);
     } catch (err) {
       console.error("Load internships error:", err);
 
