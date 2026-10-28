@@ -41,6 +41,7 @@ export default function SiteHeader() {
         if (!mounted) return;
 
         const currentUser = session?.user || null;
+
         setUser(currentUser);
 
         if (!currentUser) {
@@ -81,8 +82,16 @@ export default function SiteHeader() {
       return pathname === "/";
     }
 
-    return pathname === path || pathname.startsWith(path + "/");
+    return (
+      pathname === path ||
+      pathname.startsWith(path + "/")
+    );
   };
+
+  // Treat internships and individual job-detail pages
+  // as part of the same navigation destination.
+  const isOpportunitiesActive =
+    isActive("/internships") || isActive("/jobs");
 
   return (
     <>
@@ -99,29 +108,27 @@ export default function SiteHeader() {
             </div>
           </Link>
 
-          {/* DESKTOP NAV */}
+          {/* DESKTOP NAVIGATION */}
           <nav className="desktop-nav">
-
             <Link
               href="/internships"
-              className={isActive("/internships") ? "active" : ""}
+              className={
+                isOpportunitiesActive ? "active" : ""
+              }
             >
-              Internships
+              Internships / Jobs
             </Link>
 
             <Link
-              href="/jobs"
-              className={isActive("/jobs") ? "active" : ""}
+              href="/company-solutions"
+              className={
+                isActive("/company-solutions")
+                  ? "active"
+                  : ""
+              }
             >
-              Jobs
+              For Companies
             </Link>
-
-            <Link
-  href="/company-solutions"
-  className={isActive("/company-solutions") ? "active" : ""}
->
-  For Companies
-</Link>
 
             {user ? (
               <>
@@ -150,6 +157,7 @@ export default function SiteHeader() {
                 ) : null}
 
                 <button
+                  type="button"
                   onClick={handleLogout}
                   className="logout-button"
                 >
@@ -193,27 +201,27 @@ export default function SiteHeader() {
           </button>
         </div>
 
-        {/* MOBILE NAV */}
+        {/* MOBILE NAVIGATION */}
         {menuOpen && (
           <div className="mobile-nav">
-
             <Link
               href="/internships"
-              className={isActive("/internships") ? "mobile-active" : ""}
+              className={
+                isOpportunitiesActive
+                  ? "mobile-active"
+                  : ""
+              }
             >
-              Internships
-            </Link>
-
-            <Link
-              href="/jobs"
-              className={isActive("/jobs") ? "mobile-active" : ""}
-            >
-              Jobs
+              Internships / Jobs
             </Link>
 
             <Link
               href="/company"
-              className={isActive("/company") ? "mobile-active" : ""}
+              className={
+                isActive("/company")
+                  ? "mobile-active"
+                  : ""
+              }
             >
               For Companies
             </Link>
@@ -256,7 +264,14 @@ export default function SiteHeader() {
               </>
             ) : (
               <>
-                <Link href="/login">
+                <Link
+                  href="/login"
+                  className={
+                    isActive("/login")
+                      ? "mobile-active"
+                      : ""
+                  }
+                >
                   Login
                 </Link>
 
@@ -320,8 +335,7 @@ export default function SiteHeader() {
           justify-content: center;
           font-size: 20px;
           font-weight: 900;
-          box-shadow:
-            0 7px 18px rgba(37, 99, 235, 0.25);
+          box-shadow: 0 7px 18px rgba(37, 99, 235, 0.25);
         }
 
         .brand-name {
@@ -382,8 +396,7 @@ export default function SiteHeader() {
           ) !important;
           padding: 11px 17px !important;
           margin-left: 4px;
-          box-shadow:
-            0 7px 17px rgba(37, 99, 235, 0.2);
+          box-shadow: 0 7px 17px rgba(37, 99, 235, 0.2);
         }
 
         .signup-button:hover {
