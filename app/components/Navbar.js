@@ -11,11 +11,11 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobile, setMobile] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [profileType, setProfileType] = useState<string | null>(null);
+  const [user, setUser] = useState(null);
+  const [profileType, setProfileType] = useState(null);
   const [profileChecked, setProfileChecked] = useState(false);
 
-  // SCREEN SIZE
+  // Detect screen size
   useEffect(() => {
     function updateScreen() {
       const isMobile = window.innerWidth <= 768;
@@ -36,15 +36,15 @@ export default function Navbar() {
     };
   }, []);
 
-  // DETECT USER PROFILE TYPE
-  async function detectProfileType(currentUser: any) {
+  // Detect the user's profile type
+  async function detectProfileType(currentUser) {
     if (!currentUser) {
       setProfileType(null);
       setProfileChecked(true);
       return;
     }
 
-    // Use the profile selected during login when available.
+    // Use the profile selected during login when available
     const savedProfile =
       typeof window !== "undefined"
         ? localStorage.getItem("gradlink_profile")
@@ -57,19 +57,27 @@ export default function Navbar() {
     }
 
     try {
-      const { data: graduate } = await supabase
+      const { data: graduate, error: graduateError } = await supabase
         .from("graduates")
         .select("id")
         .eq("user_id", currentUser.id)
         .limit(1);
 
-      const { data: company } = await supabase
+      if (graduateError) {
+        throw graduateError;
+      }
+
+      const { data: company, error: companyError } = await supabase
         .from("companies")
         .select("id")
         .eq("user_id", currentUser.id)
         .limit(1);
 
-      let detectedProfile: string | null = null;
+      if (companyError) {
+        throw companyError;
+      }
+
+      let detectedProfile = null;
 
       if (graduate && graduate.length > 0) {
         detectedProfile = "graduate";
@@ -91,7 +99,7 @@ export default function Navbar() {
     }
   }
 
-  // LOAD SESSION AND AUTH CHANGES
+  // Load the session and listen for authentication changes
   useEffect(() => {
     let mounted = true;
 
@@ -147,7 +155,6 @@ export default function Navbar() {
         return;
       }
 
-      // Use the selected account type immediately when available.
       const savedProfile = localStorage.getItem("gradlink_profile");
 
       if (savedProfile === "graduate" || savedProfile === "company") {
@@ -156,7 +163,7 @@ export default function Navbar() {
       } else {
         setProfileChecked(false);
 
-        // Defer database queries until after the auth callback.
+        // Defer database queries until after the auth callback
         setTimeout(() => {
           if (mounted) {
             detectProfileType(currentUser);
@@ -171,7 +178,7 @@ export default function Navbar() {
     };
   }, []);
 
-  // GET STARTED / DASHBOARD
+  // Get started / dashboard navigation
   async function handleGetStarted() {
     if (loading) return;
 
@@ -211,12 +218,12 @@ export default function Navbar() {
     }
   }
 
-  // CLOSE MOBILE MENU
+  // Close the mobile menu
   function closeMenu() {
     setMenuOpen(false);
   }
 
-  // STYLES
+  // Navigation styles
   const navLink = {
     textDecoration: "none",
     color: "#1f2937",
@@ -226,7 +233,7 @@ export default function Navbar() {
 
   const buttonStyle = {
     background: "#0057b8",
-    color: "#fff",
+    color: "#ffffff",
     border: "none",
     padding: "12px 20px",
     borderRadius: "10px",
@@ -243,11 +250,10 @@ export default function Navbar() {
       ? "Graduate Dashboard"
       : "Get Started";
 
-  // GRADUATES SHOULD NOT SEE THE COMPANIES LINK.
+  // Graduates should not see the Companies link
   const showCompaniesLink =
     !user || !profileChecked || profileType === "company";
 
-  // NAVBAR
   return (
     <nav
       style={{
@@ -298,7 +304,6 @@ export default function Navbar() {
               Home
             </Link>
 
-            {/* BOTH LABELS LEAD TO THE PROFESSIONAL INTERNSHIPS PAGE */}
             <Link href="/internships" style={navLink}>
               Internships / Jobs
             </Link>
@@ -363,8 +368,8 @@ export default function Navbar() {
       {mobile && menuOpen && (
         <div
           style={{
-            borderTop: "1px solid #eee",
-            background: "#fff",
+            borderTop: "1px solid #eeeeee",
+            background: "#ffffff",
             padding: "18px 20px 22px",
             display: "flex",
             flexDirection: "column",
@@ -375,7 +380,6 @@ export default function Navbar() {
             Home
           </Link>
 
-          {/* BOTH LABELS LEAD TO THE PROFESSIONAL INTERNSHIPS PAGE */}
           <Link
             href="/internships"
             onClick={closeMenu}
