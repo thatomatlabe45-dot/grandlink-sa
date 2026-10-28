@@ -11,14 +11,11 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobile, setMobile] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState(null);
-  const [profileType, setProfileType] = useState(null);
+  const [user, setUser] = useState<any>(null);
+  const [profileType, setProfileType] = useState<string | null>(null);
   const [profileChecked, setProfileChecked] = useState(false);
 
-  // ----------------------------------------
   // SCREEN SIZE
-  // ----------------------------------------
-
   useEffect(() => {
     function updateScreen() {
       const isMobile = window.innerWidth <= 768;
@@ -39,33 +36,26 @@ export default function Navbar() {
     };
   }, []);
 
-  // ----------------------------------------
   // DETECT USER PROFILE TYPE
-  // ----------------------------------------
-
-  async function detectProfileType(currentUser) {
+  async function detectProfileType(currentUser: any) {
     if (!currentUser) {
       setProfileType(null);
       setProfileChecked(true);
       return;
     }
 
-    // First use the profile selected during login.
+    // Use the profile selected during login when available.
     const savedProfile =
       typeof window !== "undefined"
         ? localStorage.getItem("gradlink_profile")
         : null;
 
-    if (
-      savedProfile === "graduate" ||
-      savedProfile === "company"
-    ) {
+    if (savedProfile === "graduate" || savedProfile === "company") {
       setProfileType(savedProfile);
       setProfileChecked(true);
       return;
     }
 
-    // If no saved profile exists, check the database.
     try {
       const { data: graduate } = await supabase
         .from("graduates")
@@ -79,7 +69,7 @@ export default function Navbar() {
         .eq("user_id", currentUser.id)
         .limit(1);
 
-      let detectedProfile = null;
+      let detectedProfile: string | null = null;
 
       if (graduate && graduate.length > 0) {
         detectedProfile = "graduate";
@@ -88,31 +78,20 @@ export default function Navbar() {
       }
 
       if (detectedProfile) {
-        localStorage.setItem(
-          "gradlink_profile",
-          detectedProfile
-        );
-
+        localStorage.setItem("gradlink_profile", detectedProfile);
         setProfileType(detectedProfile);
       } else {
         setProfileType(null);
       }
     } catch (error) {
-      console.error(
-        "Could not detect profile type:",
-        error
-      );
-
+      console.error("Could not detect profile type:", error);
       setProfileType(null);
     } finally {
       setProfileChecked(true);
     }
   }
 
-  // ----------------------------------------
   // LOAD SESSION AND AUTH CHANGES
-  // ----------------------------------------
-
   useEffect(() => {
     let mounted = true;
 
@@ -154,47 +133,37 @@ export default function Navbar() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (!mounted) return;
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
 
-        const currentUser = session?.user ?? null;
+      const currentUser = session?.user ?? null;
 
-        setUser(currentUser);
+      setUser(currentUser);
 
-        if (!currentUser) {
-          setProfileType(null);
-          setProfileChecked(true);
-
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("gradlink_profile");
-          }
-
-          return;
-        }
-
-        // Use the selected account type immediately when available.
-        const savedProfile =
-          localStorage.getItem("gradlink_profile");
-
-        if (
-          savedProfile === "graduate" ||
-          savedProfile === "company"
-        ) {
-          setProfileType(savedProfile);
-          setProfileChecked(true);
-        } else {
-          setProfileChecked(false);
-
-          // Defer database queries until after the auth callback.
-          setTimeout(() => {
-            if (mounted) {
-              detectProfileType(currentUser);
-            }
-          }, 0);
-        }
+      if (!currentUser) {
+        setProfileType(null);
+        setProfileChecked(true);
+        localStorage.removeItem("gradlink_profile");
+        return;
       }
-    );
+
+      // Use the selected account type immediately when available.
+      const savedProfile = localStorage.getItem("gradlink_profile");
+
+      if (savedProfile === "graduate" || savedProfile === "company") {
+        setProfileType(savedProfile);
+        setProfileChecked(true);
+      } else {
+        setProfileChecked(false);
+
+        // Defer database queries until after the auth callback.
+        setTimeout(() => {
+          if (mounted) {
+            detectProfileType(currentUser);
+          }
+        }, 0);
+      }
+    });
 
     return () => {
       mounted = false;
@@ -202,10 +171,7 @@ export default function Navbar() {
     };
   }, []);
 
-  // ----------------------------------------
   // GET STARTED / DASHBOARD
-  // ----------------------------------------
-
   async function handleGetStarted() {
     if (loading) return;
 
@@ -223,17 +189,11 @@ export default function Navbar() {
         return;
       }
 
-      let currentProfile =
-        localStorage.getItem("gradlink_profile");
+      let currentProfile = localStorage.getItem("gradlink_profile");
 
-      if (
-        currentProfile !== "graduate" &&
-        currentProfile !== "company"
-      ) {
+      if (currentProfile !== "graduate" && currentProfile !== "company") {
         await detectProfileType(session.user);
-
-        currentProfile =
-          localStorage.getItem("gradlink_profile");
+        currentProfile = localStorage.getItem("gradlink_profile");
       }
 
       if (currentProfile === "company") {
@@ -251,18 +211,12 @@ export default function Navbar() {
     }
   }
 
-  // ----------------------------------------
-  // CLOSE MENU
-  // ----------------------------------------
-
+  // CLOSE MOBILE MENU
   function closeMenu() {
     setMenuOpen(false);
   }
 
-  // ----------------------------------------
   // STYLES
-  // ----------------------------------------
-
   const navLink = {
     textDecoration: "none",
     color: "#1f2937",
@@ -289,21 +243,11 @@ export default function Navbar() {
       ? "Graduate Dashboard"
       : "Get Started";
 
-  // ----------------------------------------
-  // MENU PERMISSIONS
-  // ----------------------------------------
-
-  // Graduates should never see the Companies link.
-  // Companies and visitors may still see it.
+  // GRADUATES SHOULD NOT SEE THE COMPANIES LINK.
   const showCompaniesLink =
-    !user ||
-    !profileChecked ||
-    profileType === "company";
+    !user || !profileChecked || profileType === "company";
 
-  // ----------------------------------------
   // NAVBAR
-  // ----------------------------------------
-
   return (
     <nav
       style={{
@@ -326,7 +270,6 @@ export default function Navbar() {
         }}
       >
         {/* LOGO */}
-
         <Link
           href="/"
           onClick={closeMenu}
@@ -342,7 +285,6 @@ export default function Navbar() {
         </Link>
 
         {/* DESKTOP MENU */}
-
         {!mobile ? (
           <div
             style={{
@@ -356,8 +298,9 @@ export default function Navbar() {
               Home
             </Link>
 
-            <Link href="/jobs" style={navLink}>
-              Internships
+            {/* BOTH LABELS LEAD TO THE PROFESSIONAL INTERNSHIPS PAGE */}
+            <Link href="/internships" style={navLink}>
+              Internships / Jobs
             </Link>
 
             {showCompaniesLink && (
@@ -367,10 +310,7 @@ export default function Navbar() {
             )}
 
             {user && profileType === "company" && (
-              <Link
-                href="/company-dashboard"
-                style={navLink}
-              >
+              <Link href="/company-dashboard" style={navLink}>
                 Dashboard
               </Link>
             )}
@@ -395,20 +335,15 @@ export default function Navbar() {
               disabled={loading}
               style={buttonStyle}
             >
-              {loading
-                ? "Please wait..."
-                : accountLabel}
+              {loading ? "Please wait..." : accountLabel}
             </button>
           </div>
         ) : (
           /* MOBILE MENU BUTTON */
-
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
-            aria-label={
-              menuOpen ? "Close menu" : "Open menu"
-            }
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
             aria-expanded={menuOpen}
             style={{
               border: "none",
@@ -425,7 +360,6 @@ export default function Navbar() {
       </div>
 
       {/* MOBILE MENU */}
-
       {mobile && menuOpen && (
         <div
           style={{
@@ -437,20 +371,17 @@ export default function Navbar() {
             gap: "18px",
           }}
         >
-          <Link
-            href="/"
-            onClick={closeMenu}
-            style={navLink}
-          >
+          <Link href="/" onClick={closeMenu} style={navLink}>
             Home
           </Link>
 
+          {/* BOTH LABELS LEAD TO THE PROFESSIONAL INTERNSHIPS PAGE */}
           <Link
-            href="/jobs"
+            href="/internships"
             onClick={closeMenu}
             style={navLink}
           >
-            Internships
+            Internships / Jobs
           </Link>
 
           {showCompaniesLink && (
@@ -483,19 +414,11 @@ export default function Navbar() {
             </Link>
           )}
 
-          <Link
-            href="/terms"
-            onClick={closeMenu}
-            style={navLink}
-          >
+          <Link href="/terms" onClick={closeMenu} style={navLink}>
             Terms & Conditions
           </Link>
 
-          <Link
-            href="/privacy"
-            onClick={closeMenu}
-            style={navLink}
-          >
+          <Link href="/privacy" onClick={closeMenu} style={navLink}>
             Privacy Policy
           </Link>
 
@@ -509,9 +432,7 @@ export default function Navbar() {
               padding: "14px",
             }}
           >
-            {loading
-              ? "Please wait..."
-              : accountLabel}
+            {loading ? "Please wait..." : accountLabel}
           </button>
         </div>
       )}
