@@ -6,14 +6,6 @@ import { supabase } from "../../lib/supabase";
 export default function ChooseProfilePage() {
   const router = useRouter();
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
-
-    localStorage.removeItem("gradlink_profile");
-
-    router.push("/login");
-  }
-
   // ----------------------------------------
   // JOB SEEKER
   // Existing database profile: graduate
@@ -43,7 +35,6 @@ export default function ChooseProfilePage() {
 
       if (companyError) {
         console.error("Company check error:", companyError);
-
         alert("Could not check your account. Please try again.");
         return;
       }
@@ -67,7 +58,6 @@ export default function ChooseProfilePage() {
 
       if (graduateError) {
         console.error("Job seeker check error:", graduateError);
-
         alert("Could not check your job seeker profile.");
         return;
       }
@@ -75,18 +65,11 @@ export default function ChooseProfilePage() {
       // Keep existing internal profile value
       localStorage.setItem("gradlink_profile", "graduate");
 
-      // Existing job seeker
-      if (graduate) {
-        router.push("/graduate");
-        return;
-      }
-
-      // New job seeker
+      // Existing or new job seeker
       router.push("/graduate");
 
     } catch (error) {
       console.error("Job seeker selection error:", error);
-
       alert("Something went wrong. Please try again.");
     }
   }
@@ -140,7 +123,6 @@ export default function ChooseProfilePage() {
 
     } catch (error) {
       console.error("Company selection error:", error);
-
       alert("Something went wrong. Please try again.");
     }
   }
@@ -162,40 +144,24 @@ export default function ChooseProfilePage() {
           maxWidth: "900px",
           margin: "0 auto 40px",
           display: "flex",
-          justifyContent: "space-between",
+          justifyContent: "center",
           alignItems: "center",
           background: "#ffffff",
-          padding: "15px 20px",
+          padding: "18px 20px",
           borderRadius: "14px",
           boxShadow: "0 5px 20px rgba(0,0,0,0.08)",
-          gap: "15px",
         }}
       >
         <div
           style={{
             color: "#0057B8",
-            fontSize: "23px",
+            fontSize: "25px",
             fontWeight: "800",
+            letterSpacing: "-0.5px",
           }}
         >
           GradLink SA
         </div>
-
-        <button
-          onClick={handleLogout}
-          style={{
-            background: "#dc2626",
-            color: "#ffffff",
-            border: "none",
-            padding: "10px 18px",
-            borderRadius: "8px",
-            fontSize: "14px",
-            fontWeight: "700",
-            cursor: "pointer",
-          }}
-        >
-          Logout
-        </button>
       </div>
 
       {/* MAIN CONTENT */}
@@ -281,9 +247,7 @@ export default function ChooseProfilePage() {
               padding: "30px 25px",
               cursor: "pointer",
               boxShadow: "0 10px 30px rgba(0,87,184,0.12)",
-              border: "2px solid transparent",
               boxSizing: "border-box",
-              transition: "transform 0.2s ease",
             }}
           >
             <div
@@ -358,9 +322,7 @@ export default function ChooseProfilePage() {
               padding: "30px 25px",
               cursor: "pointer",
               boxShadow: "0 10px 30px rgba(0,87,184,0.12)",
-              border: "2px solid transparent",
               boxSizing: "border-box",
-              transition: "transform 0.2s ease",
             }}
           >
             <div
