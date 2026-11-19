@@ -124,6 +124,7 @@ export default function AdminPage() {
   const [internshipSearch, setInternshipSearch] = useState("");
 
   const [openingDocument, setOpeningDocument] = useState("");
+  const [deletingAccountId, setDeletingAccountId] = useState("");
   const [activeSection, setActiveSection] = useState("overview");
 
   // ==========================================================
@@ -386,6 +387,64 @@ export default function AdminPage() {
       );
 
       setOpeningDocument("");
+    }
+  }
+
+  // ==========================================================
+  // DELETE GRADUATE OR COMPANY ACCOUNT
+  // ==========================================================
+
+  async function deleteAccount(account, accountType) {
+    const userId = account?.user_id;
+
+    if (!userId) {
+      alert("This profile does not have a linked user account, so it cannot be deleted from here.");
+      return;
+    }
+
+    const accountName =
+      accountType === "company"
+        ? account.company_name || "this company"
+        : account.full_name || "this graduate";
+
+    const confirmed = window.confirm(
+      `PERMANENT ACCOUNT DELETION\n\nYou are about to permanently delete ${accountName}'s ${accountType} account and its linked authentication account. This action cannot be undone.\n\nContinue?`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingAccountId(userId);
+    setError("");
+
+    try {
+      const { data, error: deleteError } = await supabase.rpc(
+        "admin_delete_account",
+        { target_user_id: userId }
+      );
+
+      if (deleteError) {
+        throw new Error(deleteError.message || "The account could not be deleted.");
+      }
+
+      if (!data || data.success !== true) {
+        throw new Error(data?.message || "The account was not deleted.");
+      }
+
+      if (accountType === "company") {
+        setCompanies((current) => current.filter((item) => item.user_id !== userId));
+      } else {
+        setGraduates((current) => current.filter((item) => item.user_id !== userId));
+      }
+
+      alert(`${accountName}'s account has been deleted successfully.`);
+      await loadDashboardData(true);
+    } catch (err) {
+      setError(
+        err.message ||
+          "Account deletion failed. Check database relationships and try again."
+      );
+    } finally {
+      setDeletingAccountId("");
     }
   }
 
@@ -923,6 +982,7 @@ export default function AdminPage() {
                       <th>Location</th>
                       <th>Subscription</th>
                       <th>Registered</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
 
@@ -986,6 +1046,17 @@ export default function AdminPage() {
                           </td>
 
                           <td>{formatDate(company.created_at)}</td>
+                          <td>
+                            <button
+                              className="deleteButton"
+                              disabled={deletingAccountId === company.user_id}
+                              onClick={() => deleteAccount(company, "company")}
+                            >
+                              {deletingAccountId === company.user_id
+                                ? "Deleting…"
+                                : "Delete account"}
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -1328,6 +1399,16 @@ export default function AdminPage() {
                             : "No qualification uploaded"}
                         </span>
                       </div>
+
+                      <button
+                        className="deleteButton graduateDeleteButton"
+                        disabled={deletingAccountId === person.user_id}
+                        onClick={() => deleteAccount(person, "graduate")}
+                      >
+                        {deletingAccountId === person.user_id
+                          ? "Deleting account…"
+                          : "Delete graduate account"}
+                      </button>
                     </article>
                   );
                 })}
@@ -2228,6 +2309,34 @@ const styles = `
     margin-top: 12px;
     color: #7e8d9f;
     font-size: 9px;
+  }
+
+  .deleteButton {
+    min-height: 34px;
+    padding: 8px 11px;
+    border: 1px solid #f0cbd0;
+    border-radius: 8px;
+    background: #fff1f2;
+    color: #a52f40;
+    font-size: 10px;
+    font-weight: 800;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .deleteButton:hover:not(:disabled) {
+    border-color: #e7aab2;
+    background: #ffe5e8;
+  }
+
+  .deleteButton:disabled {
+    opacity: 0.55;
+    cursor: wait;
+  }
+
+  .graduateDeleteButton {
+    width: 100%;
+    margin-top: 13px;
   }
 
   .emptyState {
