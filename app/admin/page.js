@@ -395,10 +395,18 @@ export default function AdminPage() {
   // ==========================================================
 
   async function deleteAccount(account, accountType) {
-    const userId = account?.user_id;
+    if (!account) return;
 
-    if (!userId) {
-      alert("This profile does not have a linked user account, so it cannot be deleted from here.");
+    const userId = account.user_id || null;
+    const profileId = account.id;
+
+    if (
+      !userId &&
+      (profileId === null || profileId === undefined)
+    ) {
+      alert(
+        "This profile has no valid profile ID and cannot be deleted."
+      );
       return;
     }
 
@@ -407,41 +415,70 @@ export default function AdminPage() {
         ? account.company_name || "this company"
         : account.full_name || "this graduate";
 
+    const isOrphan = !userId;
+
     const confirmed = window.confirm(
-      `PERMANENT ACCOUNT DELETION\n\nYou are about to permanently delete ${accountName}'s ${accountType} account and its linked authentication account. This action cannot be undone.\n\nContinue?`
+      `PERMANENT ACCOUNT DELETION\n\nYou are about to permanently delete ${accountName}'s ${accountType} profile${
+        isOrphan
+          ? ". This profile has no linked login account."
+          : " and its linked authentication account."
+      }\n\nThis action cannot be undone.\n\nContinue?`
     );
 
     if (!confirmed) return;
 
-    setDeletingAccountId(userId);
+    const deletingKey = userId || `${accountType}:${profileId}`;
+
+    setDeletingAccountId(deletingKey);
     setError("");
 
     try {
       const { data, error: deleteError } = await supabase.rpc(
-        "admin_delete_account",
-        { target_user_id: userId }
+        "admin_delete_gradlink_account",
+        {
+          p_user_id: userId,
+          p_account_type: accountType,
+          p_profile_id: isOrphan ? String(profileId) : null,
+        }
       );
 
       if (deleteError) {
-        throw new Error(deleteError.message || "The account could not be deleted.");
+        throw new Error(
+          deleteError.message || "The account could not be deleted."
+        );
       }
 
       if (!data || data.success !== true) {
-        throw new Error(data?.message || "The account was not deleted.");
+        throw new Error(
+          data?.message || "The account was not deleted."
+        );
       }
 
       if (accountType === "company") {
-        setCompanies((current) => current.filter((item) => item.user_id !== userId));
+        setCompanies((current) =>
+          current.filter((item) =>
+            userId
+              ? item.user_id !== userId
+              : String(item.id) !== String(profileId)
+          )
+        );
       } else {
-        setGraduates((current) => current.filter((item) => item.user_id !== userId));
+        setGraduates((current) =>
+          current.filter((item) =>
+            userId
+              ? item.user_id !== userId
+              : String(item.id) !== String(profileId)
+          )
+        );
       }
 
       alert(`${accountName}'s account has been deleted successfully.`);
+
       await loadDashboardData(true);
     } catch (err) {
       setError(
         err.message ||
-          "Account deletion failed. Check database relationships and try again."
+          "Account deletion failed. Please try again."
       );
     } finally {
       setDeletingAccountId("");
@@ -991,6 +1028,9 @@ export default function AdminPage() {
                       const subscription =
                         companySubscriptionMap[company.user_id];
 
+                      const companyDeleteKey =
+                        company.user_id || `company:${company.id}`;
+
                       return (
                         <tr key={company.id || company.user_id}>
                           <td>
@@ -1049,10 +1089,14 @@ export default function AdminPage() {
                           <td>
                             <button
                               className="deleteButton"
-                              disabled={deletingAccountId === company.user_id}
-                              onClick={() => deleteAccount(company, "company")}
+                              disabled={
+                                deletingAccountId === companyDeleteKey
+                              }
+                              onClick={() =>
+                                deleteAccount(company, "company")
+                              }
                             >
-                              {deletingAccountId === company.user_id
+                              {deletingAccountId === companyDeleteKey
                                 ? "Deleting…"
                                 : "Delete account"}
                             </button>
@@ -1291,6 +1335,9 @@ export default function AdminPage() {
                 {graduateResults.map((person) => {
                   const match = calculateMatch(person);
 
+                  const graduateDeleteKey =
+                    person.user_id || `graduate:${person.id}`;
+
                   return (
                     <article className="graduateCard" key={person.id}>
                       <div className="graduateHeader">
@@ -1402,10 +1449,14 @@ export default function AdminPage() {
 
                       <button
                         className="deleteButton graduateDeleteButton"
-                        disabled={deletingAccountId === person.user_id}
-                        onClick={() => deleteAccount(person, "graduate")}
+                        disabled={
+                          deletingAccountId === graduateDeleteKey
+                        }
+                        onClick={() =>
+                          deleteAccount(person, "graduate")
+                        }
                       >
-                        {deletingAccountId === person.user_id
+                        {deletingAccountId === graduateDeleteKey
                           ? "Deleting account…"
                           : "Delete graduate account"}
                       </button>
